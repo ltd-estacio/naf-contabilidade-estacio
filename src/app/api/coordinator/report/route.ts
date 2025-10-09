@@ -28,8 +28,12 @@ export async function GET(request: NextRequest) {
       startDateISO = start.toISOString()
     }
 
-    // Attendances for period
-    let aQuery = client.from('attendances').select('*')
+    // Attendances for period - INCLUIR TODOS OS CAMPOS E JOINS
+    let aQuery = client.from('attendances').select(`
+      *,
+      student:students(id, name, email, course, semester, registration_number),
+      supervisor:coordinator_users(id, email)
+    `)
     if (startDateISO) aQuery = aQuery.gte('created_at', startDateISO)
     if (statusFilter !== 'ALL') aQuery = aQuery.eq('status', statusFilter)
     if (categoryFilter !== 'all') aQuery = aQuery.eq('service_type', categoryFilter)
@@ -113,6 +117,7 @@ export async function GET(request: NextRequest) {
       created_at: a.created_at
     }))
 
+    // ESTATÍSTICAS DETALHADAS POR STATUS DE ATENDIMENTO
     const statusCounts: Record<string, number> = {}
     ;(attendances || []).forEach((a: unknown) => {
       const status = (a.status || 'N/D').toString().toUpperCase()
@@ -121,16 +126,17 @@ export async function GET(request: NextRequest) {
 
     const urgencyCounts: Record<string, number> = {}
     ;(attendances || []).forEach((a: unknown) => {
-      const urgency = (a.urgency_level || 'N/D').toString().toUpperCase()
+      const urgency = (a.urgency || a.urgency_level || 'N/D').toString().toUpperCase()
       urgencyCounts[urgency] = (urgencyCounts[urgency] || 0) + 1
     })
 
-    const statusOrder = ['PENDENTE', 'AGENDADO', 'CONFIRMADO', 'EM_ANDAMENTO', 'CONCLUIDO', 'CANCELADO']
-    const statusDistribution = Array.from(new Set([...statusOrder, ...Object.keys(statusCounts)])).map(status => ({
+    // Incluir TODOS os status possíveis: AGENDADO, EM_ANDAMENTO, CONCLUIDO, CANCELADO, NAO_COMPARECEU
+    const statusOrder = ['AGENDADO', 'CONFIRMADO', 'EM_ANDAMENTO', 'CONCLUIDO', 'CANCELADO', 'NAO_COMPARECEU', 'PENDENTE']
+    const statusDistribution = statusOrder.map(status => ({
       status,
       quantidade: statusCounts[status] || 0,
       percentual: totalAtt > 0 ? Math.round(((statusCounts[status] || 0) / totalAtt) * 1000) / 10 : 0
-    })).filter(row => row.quantidade > 0)
+    }))
 
     const urgencyOrder = ['BAIXA', 'NORMAL', 'ALTA', 'URGENTE', 'N/D']
     const urgencyDistribution = Array.from(new Set([...urgencyOrder, ...Object.keys(urgencyCounts)])).map(level => ({
@@ -145,6 +151,63 @@ export async function GET(request: NextRequest) {
     const avgSatisfaction = ratingValues.length
       ? Math.round((ratingValues.reduce((sum, rating) => sum + rating, 0) / ratingValues.length) * 10) / 10
       : 0
+
+    // HISTÓRICO DE ATENDIMENTOS POR ALUNO
+    const attendancesByStudent: Record<string, unknown[]> = {}
+    ;(attendances || []).forEach((att: unknown) => {
+      const studentName = att?.student?.name || att.student_name || 'Não atribuído'
+      if (!attendancesByStudent[studentName]) {
+        attendancesByStudent[studentName] = []
+      }
+      attendancesByStudent[studentName].push(att)
+    })
+
+    const studentAttendanceHistory = Object.entries(attendancesByStudent).map(([studentName, atts]) => {
+      const studentAtts = atts as unknown[]
+      const total = studentAtts.length
+      const concluidos = studentAtts.filter((a: unknown) => a.status === 'CONCLUIDO').length
+      const emAndamento = studentAtts.filter((a: unknown) => a.status === 'EM_ANDAMENTO').length
+      const agendados = studentAtts.filter((a: unknown) => a.status === 'AGENDADO').length
+      const cancelados = studentAtts.filter((a: unknown) => a.status === 'CANCELADO').length
+      const naoCompareceu = studentAtts.filter((a: unknown) => a.status === 'NAO_COMPARECEU').length
+      const avgRating = studentAtts
+        .filter((a: unknown) => a.client_satisfaction_rating)
+        .reduce((sum: number, a: unknown) => sum + (a.client_satisfaction_rating || 0), 0) /
+        Math.max(1, studentAtts.filter((a: unknown) => a.client_satisfaction_rating).length)
+
+      return {
+        studentName,
+        studentEmail: studentAtts[0]?.student?.email || '',
+        studentCourse: studentAtts[0]?.student?.course || '',
+        studentSemester: studentAtts[0]?.student?.semester || '',
+        total,
+        concluidos,
+        emAndamento,
+        agendados,
+        cancelados,
+        naoCompareceu,
+        taxaConclusao: total > 0 ? Math.round((concluidos / total) * 1000) / 10 : 0,
+        avaliacaoMedia: avgRating ? Math.round(avgRating * 10) / 10 : 0,
+        atendimentos: studentAtts
+      }
+    }).sort((a, b) => b.total - a.total)
+
+    // FEEDBACKS DOS ATENDIMENTOS (Top 50 mais recentes com feedback)
+    const attendanceFeedbacks = (attendances || [])
+      .filter((a: unknown) => a.client_feedback && a.client_feedback.trim().length > 0)
+      .slice(0, 50)
+      .map((a: unknown) => ({
+        protocol: a.protocol,
+        clientName: a.client_name,
+        studentName: a?.student?.name || a.student_name || 'N/A',
+        serviceType: a.service_type,
+        rating: a.client_satisfaction_rating || 0,
+        feedback: a.client_feedback,
+        scheduledDate: a.scheduled_date,
+        scheduledTime: a.scheduled_time,
+        completedAt: a.completed_at,
+        status: a.status
+      }))
 
     const backlogAppointments = (attendances || []).filter((a: unknown) => ['PENDENTE', 'EM_ANDAMENTO', 'CONFIRMADO'].includes((a.status || '').toString().toUpperCase()))
     const backlogCount = backlogAppointments.length
@@ -227,33 +290,89 @@ export async function GET(request: NextRequest) {
     const highUrgencyCount = (urgencyCounts['ALTA'] || 0) + urgentCount
     const cancellationRate = totalAtt > 0 ? Math.round(((statusCounts['CANCELADO'] || 0) / totalAtt) * 1000) / 10 : 0
 
+    // INSIGHTS E RECOMENDAÇÕES AVANÇADOS
     const insights: string[] = []
+
+    // Análise de Volume e Crescimento
     if (monthGrowth !== 0) {
-      insights.push(`Variação de volume em relação ao mês anterior: ${monthGrowth > 0 ? '+' : ''}${monthGrowth}% de atendimentos.`)
+      insights.push(`📈 Variação de volume: ${monthGrowth > 0 ? '+' : ''}${monthGrowth}% de atendimentos em relação ao mês anterior${monthGrowth > 20 ? ' - Crescimento significativo!' : monthGrowth < -20 ? ' - Atenção: queda expressiva' : ''}.`)
     }
-    insights.push(`Taxa média de conclusão no período: ${avgMonthlyCompletion}% (meta atual: ${taxaConclusao}%).`)
+
+    // Análise de Status e Conclusão
+    insights.push(`✅ Taxa de conclusão geral: ${taxaConclusao}% | Taxa média mensal: ${avgMonthlyCompletion}%${taxaConclusao < 60 ? ' - Recomenda-se investigar causas de baixa conclusão' : taxaConclusao > 85 ? ' - Excelente desempenho!' : ''}.`)
+
+    const agendadosCount = statusCounts['AGENDADO'] || 0
+    const emAndamentoCount = statusCounts['EM_ANDAMENTO'] || 0
+    const naoCompareceuCount = statusCounts['NAO_COMPARECEU'] || 0
+
+    if (agendadosCount > 0) {
+      insights.push(`📅 ${agendadosCount} atendimentos agendados aguardando realização.`)
+    }
+    if (emAndamentoCount > 0) {
+      insights.push(`⏳ ${emAndamentoCount} atendimentos em andamento no momento.`)
+    }
+    if (naoCompareceuCount > 0) {
+      const naoCompareceuRate = totalAtt > 0 ? Math.round((naoCompareceuCount / totalAtt) * 100) : 0
+      insights.push(`⚠️ ${naoCompareceuCount} casos de não comparecimento (${naoCompareceuRate}% do total)${naoCompareceuRate > 10 ? ' - Taxa alta, considerar sistema de confirmação' : ''}.`)
+    }
+
+    // Análise de Satisfação
     if (avgSatisfaction) {
-      insights.push(`Satisfação média dos atendimentos avaliados: ${avgSatisfaction.toFixed(1)} de 5.`)
+      insights.push(`⭐ Satisfação média: ${avgSatisfaction.toFixed(1)}/5 baseado em ${ratingValues.length} avaliações${avgSatisfaction >= 4.5 ? ' - Excelente!' : avgSatisfaction < 3.5 ? ' - Atenção: abaixo do esperado' : ''}.`)
     }
+
+    // Análise de Urgência
     if (highUrgencyCount > 0) {
-      insights.push(`Foram registradas ${highUrgencyCount} ocorrências de alta urgência, sendo ${urgentCount} urgentes.`)
+      insights.push(`🔴 ${highUrgencyCount} casos de alta urgência identificados, sendo ${urgentCount} marcados como URGENTE - Priorizar atendimento!`)
     }
+
+    // Análise de Backlog
     if (backlogCount > 0) {
-      insights.push(`Backlog atual: ${backlogCount} atendimentos aguardando conclusão.`)
+      const backlogRate = totalAtt > 0 ? Math.round((backlogCount / totalAtt) * 100) : 0
+      insights.push(`📊 Backlog atual: ${backlogCount} atendimentos pendentes (${backlogRate}% do total)${backlogRate > 30 ? ' - Considerar aumentar capacidade' : ''}.`)
     }
+
+    // Análise de Pendências Críticas
     if (criticalAppointments.length > 0) {
-      insights.push(`Há ${criticalAppointments.length} pendências consideradas críticas (≥7 dias ou alta urgência).`)
+      insights.push(`⚡ ${criticalAppointments.length} pendências CRÍTICAS identificadas (≥7 dias em aberto ou alta urgência) - Ação imediata necessária!`)
     }
+
+    // Análise de Serviços
     if (topServices.length > 0) {
-      insights.push(`Serviço mais demandado: ${topServices[0].service_type} (${topServices[0].requests_count} solicitações).`)
+      insights.push(`🏆 Serviço mais demandado: "${topServices[0].service_type}" com ${topServices[0].requests_count} solicitações e taxa de conclusão de ${Math.round((topServices[0].completed_count / topServices[0].requests_count) * 100)}%.`)
+      if (topServices.length >= 3) {
+        insights.push(`📌 Top 3 serviços: ${topServices.slice(0, 3).map(s => s.service_type).join(', ')}.`)
+      }
     }
+
+    // Análise de Público
     if (publicoResumo.length > 0) {
-      insights.push(`Principal público atendido: ${publicoResumo[0].categoria} (${publicoResumo[0].percentual}% do total).`)
+      insights.push(`👥 Principal público: ${publicoResumo[0].categoria} representa ${publicoResumo[0].percentual}% dos atendimentos.`)
     }
+
+    // Análise de Estudantes
+    if (studentAttendanceHistory.length > 0) {
+      insights.push(`👨‍🎓 ${studentAttendanceHistory.length} estudantes realizaram atendimentos no período.`)
+      const topStudent = studentAttendanceHistory[0]
+      insights.push(`🌟 Estudante destaque: ${topStudent.studentName} com ${topStudent.total} atendimentos (${topStudent.concluidos} concluídos) e avaliação média de ${topStudent.avaliacaoMedia.toFixed(1)}/5.`)
+    }
+
     if (avgAttendancesPerStudent) {
-      insights.push(`Média de ${avgAttendancesPerStudent} atendimentos por estudante ativo no período.`)
+      insights.push(`📊 Média de ${avgAttendancesPerStudent} atendimentos por estudante ativo.`)
     }
-    insights.push(`Tempo médio de atendimento registrado: ${tempoMedio} minutos.`)
+
+    // Análise de Tempo
+    insights.push(`⏱️ Tempo médio de atendimento: ${tempoMedio} minutos${tempoMedio > 90 ? ' - Considerar otimização de processos' : tempoMedio < 30 ? ' - Verificar qualidade do atendimento' : ''}.`)
+
+    // Análise de Feedbacks
+    if (attendanceFeedbacks.length > 0) {
+      insights.push(`💬 ${attendanceFeedbacks.length} feedbacks detalhados recebidos - importante para melhoria contínua.`)
+    }
+
+    // Análise de Cancelamentos
+    if (cancellationRate > 0) {
+      insights.push(`❌ Taxa de cancelamento: ${cancellationRate}%${cancellationRate > 15 ? ' - Alta taxa, investigar motivos' : ''}.`)
+    }
 
     // Generate formats
     if (format === 'csv') {
@@ -277,7 +396,59 @@ export async function GET(request: NextRequest) {
 
     if (format === 'xlsx' || format === 'excel') {
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attendances || []), 'Atendimentos')
+      // Planilha: Atendimentos Completos
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((attendances || []).map(a => ({
+        Protocolo: a.protocol,
+        Cliente: a.client_name,
+        Email: a.client_email,
+        Telefone: a.client_phone,
+        Categoria: a.client_category,
+        Servico: a.service_type,
+        Status: a.status,
+        Urgencia: a.urgency || a.urgency_level,
+        Estudante: a?.student?.name || a.student_name,
+        CursoEstudante: a?.student?.course || '',
+        DataAgendamento: a.scheduled_date,
+        HoraAgendamento: a.scheduled_time,
+        DuracaoMinutos: a.duration_minutes,
+        Online: a.is_online ? 'Sim' : 'Não',
+        AvaliacaoCliente: a.client_satisfaction_rating || 'N/A',
+        Feedback: a.client_feedback || '',
+        DataCriacao: a.created_at,
+        DataConclusao: a.completed_at || '',
+        DataCancelamento: a.cancelled_at || ''
+      }))), 'Atendimentos')
+
+      // Planilha: Histórico por Aluno
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(studentAttendanceHistory.map(s => ({
+        Estudante: s.studentName,
+        Email: s.studentEmail,
+        Curso: s.studentCourse,
+        Semestre: s.studentSemester,
+        TotalAtendimentos: s.total,
+        Concluidos: s.concluidos,
+        EmAndamento: s.emAndamento,
+        Agendados: s.agendados,
+        Cancelados: s.cancelados,
+        NaoCompareceu: s.naoCompareceu,
+        TaxaConclusao: `${s.taxaConclusao}%`,
+        AvaliacaoMedia: s.avaliacaoMedia
+      }))), 'HistoricoPorAluno')
+
+      // Planilha: Feedbacks dos Clientes
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attendanceFeedbacks.map(f => ({
+        Protocolo: f.protocol,
+        Cliente: f.clientName,
+        Estudante: f.studentName,
+        Servico: f.serviceType,
+        Avaliacao: f.rating,
+        Feedback: f.feedback,
+        DataAgendamento: f.scheduledDate,
+        HoraAgendamento: f.scheduledTime,
+        DataConclusao: f.completedAt,
+        Status: f.status
+      }))), 'FeedbacksClientes')
+
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(servicesPerf || []), 'Serviços')
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(studentsPerf || []), 'Estudantes')
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(publicoAlvo || []), 'PublicoAlvo')
@@ -479,6 +650,53 @@ export async function GET(request: NextRequest) {
         children.push(new Table({ rows: [criticalHeader, ...criticalRows] }))
       }
 
+      // HISTÓRICO DE ATENDIMENTOS POR ALUNO
+      if (studentAttendanceHistory.length) {
+        children.push(new Paragraph({ text: '' }))
+        children.push(new Paragraph({ text: 'Histórico de Atendimentos por Aluno', heading: HeadingLevel.HEADING_1 }))
+        const studentHistoryHeader = new TableRow({
+          children: ['Estudante', 'Curso', 'Total', 'Concluídos', 'Em Andamento', 'Agendados', 'Cancelados', 'Não Compareceu', 'Taxa (%)', 'Aval. Média'].map(text => new TableCell({ children: [new Paragraph(text)] }))
+        })
+        const studentHistoryRows = studentAttendanceHistory.slice(0, 30).map(student => new TableRow({
+          children: [
+            student.studentName || '—',
+            student.studentCourse || '—',
+            student.total.toString(),
+            student.concluidos.toString(),
+            student.emAndamento.toString(),
+            student.agendados.toString(),
+            student.cancelados.toString(),
+            student.naoCompareceu.toString(),
+            student.taxaConclusao.toFixed(1),
+            student.avaliacaoMedia.toFixed(1)
+          ].map(cell => new TableCell({ children: [new Paragraph(String(cell))] }))
+        }))
+        children.push(new Table({ rows: [studentHistoryHeader, ...studentHistoryRows] }))
+      }
+
+      // FEEDBACKS DOS ATENDIMENTOS
+      if (attendanceFeedbacks.length) {
+        children.push(new Paragraph({ text: '' }))
+        children.push(new Paragraph({ text: 'Feedbacks dos Atendimentos', heading: HeadingLevel.HEADING_1 }))
+        children.push(new Paragraph({ text: `Total de feedbacks recebidos: ${attendanceFeedbacks.length}`, bullet: { level: 0 } }))
+
+        const feedbackHeader = new TableRow({
+          children: ['Protocolo', 'Cliente', 'Estudante', 'Serviço', 'Avaliação', 'Feedback', 'Data/Hora'].map(text => new TableCell({ children: [new Paragraph(text)] }))
+        })
+        const feedbackRows = attendanceFeedbacks.slice(0, 25).map(fb => new TableRow({
+          children: [
+            fb.protocol || '—',
+            fb.clientName || '—',
+            fb.studentName || '—',
+            fb.serviceType || '—',
+            `${fb.rating}/5`,
+            (fb.feedback || '').substring(0, 100) + ((fb.feedback || '').length > 100 ? '...' : ''),
+            fb.scheduledDate && fb.scheduledTime ? `${fb.scheduledDate} ${fb.scheduledTime}` : '—'
+          ].map(cell => new TableCell({ children: [new Paragraph(String(cell))] }))
+        }))
+        children.push(new Table({ rows: [feedbackHeader, ...feedbackRows] }))
+      }
+
       children.push(new Paragraph({ text: '' }))
       children.push(new Paragraph({ text: 'Agendamentos Recentes', heading: HeadingLevel.HEADING_2 }))
       if (recentAppointments.length) {
@@ -570,12 +788,61 @@ export async function GET(request: NextRequest) {
       series.forEach((s,i)=>{ const px=x+30+i*stepX; const py=y+h-10-((h-30)*s.value)/max; if(i>0){ const ppx=x+30+(i-1)*stepX; const ppy=y+h-10-((h-30)*series[i-1].value)/max; doc.line(ppx,ppy,px,py)} doc.setFillColor(...color); doc.circle(px,py,2,'F') })
       doc.setFontSize(8); doc.setTextColor(75,85,99); series.forEach((s,i)=>{ const px=x+30+i*stepX; doc.text(String(s.label).slice(0,6), px-8, y+h) })
     }
+    const drawPie = (x: number, y: number, radius: number, data: {label: string; value: number; color: [number,number,number]}[], title: string) => {
+      doc.setFontSize(12); doc.setTextColor(31,41,55); doc.text(title, x, y - radius - 20)
+      const total = data.reduce((sum, d) => sum + d.value, 0)
+      if (total === 0) return
+      let currentAngle = -Math.PI / 2
+      data.forEach((item, idx) => {
+        const sliceAngle = (item.value / total) * 2 * Math.PI
+        const endAngle = currentAngle + sliceAngle
+        const cx = x; const cy = y
+        doc.setFillColor(...item.color)
+        // Draw pie slice
+        const steps = Math.max(20, Math.floor(sliceAngle * 50))
+        for (let i = 0; i <= steps; i++) {
+          const angle = currentAngle + (sliceAngle * i / steps)
+          const px = cx + radius * Math.cos(angle)
+          const py = cy + radius * Math.sin(angle)
+          if (i === 0) doc.moveTo?.(cx, cy)
+          doc.lineTo?.(px, py)
+        }
+        doc.lineTo?.(cx, cy)
+        doc.fill?.()
+        // Draw label
+        const midAngle = currentAngle + sliceAngle / 2
+        const labelX = cx + (radius + 30) * Math.cos(midAngle)
+        const labelY = cy + (radius + 30) * Math.sin(midAngle)
+        doc.setFontSize(8); doc.setTextColor(31,41,55)
+        const percentage = ((item.value / total) * 100).toFixed(1)
+        doc.text(`${item.label} (${percentage}%)`, labelX, labelY, { align: midAngle > Math.PI / 2 && midAngle < 3 * Math.PI / 2 ? 'right' : 'left' } as unknown)
+        currentAngle = endAngle
+      })
+    }
 
     // Build series from data
     const weeklySeries = weeklyData.map(w => ({ label: w.day, value: w.atendimentos }))
     const publicoSeries = publicoResumo.map(p => ({ label: p.categoria, value: p.quantidade }))
     const servicesSeries = topServices.slice(0, 8).map(s => ({ label: s.service_type || 'OUTROS', value: s.requests_count }))
     const studentsSeries = topStudents.slice(0, 8).map(s => ({ label: (s.name || 'Estudante').split(' ')[0], value: s.totalAttendances }))
+
+    // Série para gráfico de pizza - Distribuição de Status
+    const statusColors: Record<string, [number,number,number]> = {
+      'AGENDADO': [59, 130, 246],       // Azul
+      'CONFIRMADO': [16, 185, 129],     // Verde
+      'EM_ANDAMENTO': [245, 158, 11],   // Laranja
+      'CONCLUIDO': [34, 197, 94],       // Verde escuro
+      'CANCELADO': [239, 68, 68],       // Vermelho
+      'NAO_COMPARECEU': [156, 163, 175],// Cinza
+      'PENDENTE': [168, 85, 247]        // Roxo
+    }
+    const statusPieSeries = statusDistribution
+      .filter(s => s.quantidade > 0)
+      .map(s => ({
+        label: s.status.replace('_', ' '),
+        value: s.quantidade,
+        color: statusColors[s.status] || [107, 114, 128] as [number,number,number]
+      }))
 
     // Draw PDF
     drawHeader()
@@ -635,7 +902,12 @@ export async function GET(request: NextRequest) {
     if (currentY + chartHeight + 60 > page.h - 80) {
       doc.addPage(); drawHeader(); currentY = 100
     }
-    drawBar(pad, currentY + 20, colW, chartHeight, weeklySeries, 'Atendimentos por Dia da Semana', [0,87,184])
+    // Gráfico de Pizza - Distribuição de Status
+    if (statusPieSeries.length > 0) {
+      const pieRadius = 70
+      drawPie(pad + colW / 2, currentY + 100, pieRadius, statusPieSeries, 'Distribuição por Status de Atendimento')
+    }
+    // Gráfico de Barras - Público-Alvo
     drawBar(pad + colW + 12, currentY + 20, colW, chartHeight, publicoSeries, 'Distribuição do Público-Alvo', [16,185,129])
     currentY += chartHeight + 60
 
@@ -643,8 +915,14 @@ export async function GET(request: NextRequest) {
     let page2Y = 100
     const fullWidth = page.w - pad * 2
 
+    // Gráfico de Barras - Atendimentos por Dia da Semana
+    if (weeklySeries.length) {
+      drawBar(pad, page2Y + 20, fullWidth, chartHeight, weeklySeries, 'Distribuição de Atendimentos por Dia da Semana', [0,87,184])
+      page2Y += chartHeight + 60
+    }
+
     if (monthlySeries.length) {
-      drawLine(pad, page2Y + 20, fullWidth, chartHeight, monthlySeries, 'Evolução Mensal de Atendimentos', [0,87,184])
+      drawLine(pad, page2Y + 20, fullWidth, chartHeight, monthlySeries, 'Evolução Mensal de Atendimentos', [59,130,246])
       page2Y += chartHeight + 60
     }
     if (monthlyCompletionSeries.length) {
@@ -740,6 +1018,71 @@ export async function GET(request: NextRequest) {
         item.urgencia,
         item.diasAberto.toLocaleString('pt-BR')
       ]))
+
+    // HISTÓRICO DE ATENDIMENTOS POR ALUNO
+    if (studentAttendanceHistory.length) {
+      if (page3Y + 80 > page.h - 120) {
+        doc.addPage(); drawHeader(); page3Y = 100
+      }
+      doc.setFontSize(14); doc.setTextColor(31,41,55); doc.text('Histórico de Atendimentos por Aluno', pad, page3Y)
+      page3Y += 20
+      doc.setFontSize(10); doc.setTextColor(55,65,81)
+      doc.text(`Total de ${studentAttendanceHistory.length} estudantes com atendimentos registrados no período`, pad, page3Y)
+      page3Y += 10
+
+      autoTable(doc, {
+        startY: page3Y,
+        head: [['Estudante', 'Curso', 'Total', 'Concl.', 'Em And.', 'Agend.', 'Canc.', 'Não Comp.', 'Taxa %', 'Aval.']],
+        body: studentAttendanceHistory.slice(0, 25).map(s => [
+          s.studentName,
+          s.studentCourse || '—',
+          s.total,
+          s.concluidos,
+          s.emAndamento,
+          s.agendados,
+          s.cancelados,
+          s.naoCompareceu,
+          s.taxaConclusao.toFixed(1),
+          s.avaliacaoMedia.toFixed(1)
+        ]),
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: [59,130,246], textColor: [255,255,255] },
+        alternateRowStyles: { fillColor: [240,249,255] }
+      })
+      page3Y = ((doc as unknown).lastAutoTable?.finalY ?? page3Y) + 16
+    }
+
+    // FEEDBACKS DOS ATENDIMENTOS
+    if (attendanceFeedbacks.length) {
+      if (page3Y + 80 > page.h - 120) {
+        doc.addPage(); drawHeader(); page3Y = 100
+      }
+      doc.setFontSize(14); doc.setTextColor(31,41,55); doc.text('Feedbacks dos Atendimentos', pad, page3Y)
+      page3Y += 20
+      doc.setFontSize(10); doc.setTextColor(55,65,81)
+      doc.text(`Total de ${attendanceFeedbacks.length} feedbacks recebidos de clientes`, pad, page3Y)
+      page3Y += 10
+
+      autoTable(doc, {
+        startY: page3Y,
+        head: [['Protocolo', 'Cliente', 'Estudante', 'Serviço', 'Aval.', 'Feedback', 'Data/Hora']],
+        body: attendanceFeedbacks.slice(0, 20).map(fb => [
+          fb.protocol || '—',
+          fb.clientName || '—',
+          fb.studentName || '—',
+          fb.serviceType || '—',
+          `${fb.rating}/5`,
+          (fb.feedback || '').substring(0, 60) + ((fb.feedback || '').length > 60 ? '...' : ''),
+          fb.scheduledDate && fb.scheduledTime ? `${new Date(fb.scheduledDate).toLocaleDateString('pt-BR')} ${fb.scheduledTime}` : '—'
+        ]),
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: [245,158,11], textColor: [255,255,255] },
+        alternateRowStyles: { fillColor: [254,252,232] }
+      })
+      page3Y = ((doc as unknown).lastAutoTable?.finalY ?? page3Y) + 16
+    }
 
     addTablePage3('Agendamentos Recentes', ['Protocolo', 'Cliente', 'Serviço', 'Status', 'Urgência', 'Criado em'],
       recentAppointments.map(a => [
