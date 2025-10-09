@@ -1,0 +1,129 @@
+/* Smooth scrolling behavior for the main navigation */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Ensure content doesn't get hidden behind fixed navigation */
+.nav-fixed-offset {
+  padding-top: 4rem; /* 64px - height of the navigation */
+}
+
+/* Smooth transitions for navigation states */
+.nav-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced dropdown animations */
+.nav-dropdown {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mobile menu animations */
+.mobile-menu-enter {
+  animation: slideDownMobile 0.3s ease-out;
+}
+
+@keyframes slideDownMobile {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Active route indicator */
+.active-route {
+  position: relative;
+}
+
+.active-route::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3B82F6, #1D4ED8);
+  border-radius: 1px;
+}
+
+/* Notification badge animations */
+.notification-badge {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* Navigation backdrop blur enhancement */
+.nav-backdrop {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Focus states for accessibility */
+.nav-button:focus-visible {
+  outline: 2px solid #3B82F6;
+  outline-offset: 2px;
+}
+
+/* Mobile navigation overlay */
+.mobile-nav-overlay {
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* Responsive navigation adjustments */
+@media (max-width: 1024px) {
+  .nav-fixed-offset {
+    padding-top: 5rem; /* Slightly more space on mobile */
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .nav-dropdown {
+    border: 2px solid currentColor;
+  }
+
+  .active-route::after {
+    background: currentColor;
+    height: 3px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .nav-transition,
+  .nav-dropdown,
+  .mobile-menu-enter,
+  .notification-badge {
+    animation: none;
+    transition: none;
+  }
+}

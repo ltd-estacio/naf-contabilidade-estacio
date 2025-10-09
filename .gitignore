@@ -1,0 +1,114 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+*.test.js
+test-*.js
+teste-*.js
+*test*.json
+verification-report.json
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env*.local
+.env.production
+.env.template
+.env.testing
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Database
+/prisma/dev.db
+/prisma/dev.db-journal
+
+# Backup files
+*_backup.*
+*_new.*
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Documentation temporária
+AGENDAMENTO_CORRIGIDO.js
+FUNCIONALIDADES_CORRIGIDAS.js
+FUNCIONANDO.js
+IMPLEMENTACAO_COMPLETA.js
+MANUAL_TESTE_COMPLETO.md
+MELHORIAS_*.md
+MODO-OFFLINE.md
+POWERBI_IMPLEMENTADO_COMPLETO.md
+README_NOVO.md
+RELATORIO_*.md
+ROTAS_CONFIGURADAS.js
+SERVICOS_FUNCIONANDO.md
+SISTEMA_INTELIGENTE_COMPLETO.md
+STATUS_FINAL.js
+STATUS_FINAL_IMPLEMENTACAO.md
+SUCESSO.md
+TESTE_*.md
+TESTE_FINAL_LOGIN.js
+TESTE_MANUAL_FUNCIONANDO.md
+TESTE_RAPIDO_OK.md
+VALIDACAO_MANUAL_SUCESSO.md
+
+# Servidores temporários
+express-server.js
+naf-server.js
+server.js
+servidor-teste.js
+iniciar-offline.bat
+
+# Scripts de validação temporários
+validacao-final.js
+validar-sistema-completo.js
+
+# prisma
+/prisma/migrations
+/generated
+/generated/prisma
+
+# logs
+logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+Thumbs.db
+
+# Local Netlify folder
+.netlify
