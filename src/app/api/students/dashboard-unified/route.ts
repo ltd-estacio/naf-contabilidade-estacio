@@ -53,13 +53,13 @@ function getMockData(studentId: string) {
       createdAt: '2021-02-15T08:00:00Z'
     },
     stats: {
-      totalAttendances: 25,
-      completedAttendances: 22,
-      avgRating: 4.7,
-      completedTrainings: 8,
-      totalTrainings: 10,
-      avgPerformanceScore: 8.75,
-      successRate: 88
+      totalAttendances: 6, // 3 fiscalAppointments mock + 3 regulares mock
+      completedAttendances: 1, // 1 regular concluído
+      avgRating: 5.0,
+      completedTrainings: 1,
+      totalTrainings: 2,
+      avgPerformanceScore: 9.0,
+      successRate: 17 // 1 de 6 = ~17%
     },
     attendances: [
       {
@@ -91,6 +91,22 @@ function getMockData(studentId: string) {
         status: 'EM_ANDAMENTO',
         urgency: 'ALTA',
         is_online: true,
+        client_satisfaction_rating: null,
+        supervisor_validation: false
+      },
+      {
+        id: '3',
+        protocol: 'ATD-003',
+        client_name: 'Pedro Silva Costa',
+        client_email: 'pedro@email.com',
+        client_phone: '(11) 96666-5555',
+        service_type: 'Consulta Tributária',
+        service_description: 'Dúvidas sobre tributação de empresa',
+        scheduled_date: '2024-01-17',
+        scheduled_time: '10:00',
+        status: 'PENDENTE',
+        urgency: 'NORMAL',
+        is_online: false,
         client_satisfaction_rating: null,
         supervisor_validation: false
       }
@@ -196,6 +212,32 @@ function getMockData(studentId: string) {
         updated_at: '2024-01-16T14:00:00Z',
         confirmed_at: null,
         scheduled_at: null,
+        completed_at: null
+      },
+      {
+        id: '3',
+        protocol: 'FAP-20240117-0900',
+        service_type: 'consultoria-tributaria',
+        service_title: 'Consultoria Tributária Empresarial',
+        service_category: 'Tributação',
+        client_name: 'Fernanda Almeida Souza',
+        client_email: 'fernanda.almeida@empresa.com',
+        client_phone: '(11) 97666-5544',
+        client_cpf: '333.444.555-66',
+        address_city: 'São Paulo',
+        address_state: 'SP',
+        urgency_level: 'URGENTE',
+        preferred_date: '2024-01-17',
+        preferred_time: '09:00',
+        preferred_period: 'MANHA',
+        status: 'EM_ANDAMENTO',
+        client_notes: 'Empresa com problemas fiscais urgentes que precisam de resolução',
+        internal_notes: 'Cliente muito importante, priorizar',
+        service_details: {},
+        created_at: '2024-01-17T09:00:00Z',
+        updated_at: '2024-01-17T09:30:00Z',
+        confirmed_at: '2024-01-17T09:10:00Z',
+        scheduled_at: '2024-01-17T09:30:00Z',
         completed_at: null
       }
     ]
@@ -310,14 +352,22 @@ export async function GET(request: NextRequest) {
         console.error('❌ Erro ao buscar avaliações:', evaluationsError)
       }
 
-      // 5. Calcular estatísticas
-      const totalAttendances = attendances?.length || 0
-      const completedAttendances = attendances?.filter(a => a.status === 'CONCLUIDO').length || 0
-      const avgRating = attendances?.filter(a => a.client_satisfaction_rating)
-        .reduce((sum, a, _, arr) => {
-          const total = sum + (a.client_satisfaction_rating || 0)
-          return arr.length > 0 ? total / arr.length : 0
-        }, 0) || 0
+      // 5. Calcular estatísticas (incluindo atendimentos fiscais)
+      const regularAttendances = attendances?.length || 0
+      const fiscalAttendancesCount = fiscalAppointments?.length || 0
+      const totalAttendances = regularAttendances + fiscalAttendancesCount
+
+      const completedRegular = attendances?.filter(a => a.status === 'CONCLUIDO').length || 0
+      const completedFiscal = fiscalAppointments?.filter(a => a.status === 'CONCLUIDO').length || 0
+      const completedAttendances = completedRegular + completedFiscal
+
+      // Calcular avaliação média (somente atendimentos regulares têm client_satisfaction_rating)
+      const ratingsCount = attendances?.filter(a => a.client_satisfaction_rating).length || 0
+      const avgRating = ratingsCount > 0
+        ? attendances
+            .filter(a => a.client_satisfaction_rating)
+            .reduce((sum, a) => sum + (a.client_satisfaction_rating || 0), 0) / ratingsCount
+        : 0
 
       const totalTrainings = trainingProgress?.length || 0
       const completedTrainings = trainingProgress?.filter(tp => tp.is_completed).length || 0
