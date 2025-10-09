@@ -57,11 +57,12 @@ export async function GET(request: NextRequest) {
 
     const studentId = studentAuth.studentId || studentAuth.id
 
-    // Buscar atendimentos fiscais atribuídos ao estudante
+    // Buscar atendimentos fiscais atribuídos ao estudante (excluindo os deletados)
     const { data: fiscalAppointments, error } = await supabase
       .from('fiscal_appointments')
       .select('*')
       .eq('assigned_student_id', studentId)
+      .is('deleted_at', null)  // Não retornar atendimentos excluídos
       .order('created_at', { ascending: false })
 
     if (error) {

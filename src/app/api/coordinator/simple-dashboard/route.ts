@@ -38,6 +38,18 @@ export async function GET(request: NextRequest) {
 
     console.log(`📊 Encontrados ${fiscalAppointments?.length || 0} agendamentos fiscais`)
 
+    // 1.6. BUSCAR FEEDBACKS DOS ATENDIMENTOS FISCAIS
+    const { data: fiscalFeedbacks, error: feedbacksError } = await supabase
+      .from('fiscal_appointment_feedbacks')
+      .select('rating, created_at')
+      .gte('created_at', thirtyDaysAgo.toISOString())
+
+    if (feedbacksError) {
+      console.error('Erro ao buscar feedbacks fiscais:', feedbacksError)
+    }
+
+    console.log(`⭐ Encontrados ${fiscalFeedbacks?.length || 0} feedbacks de atendimentos fiscais`)
+
     // Calcular métricas principais (INCLUINDO agendamentos fiscais)
     const totalAtendimentos = (allAttendances?.length || 0) + (fiscalAppointments?.length || 0)
 
@@ -52,10 +64,16 @@ export async function GET(request: NextRequest) {
       ? completedAttendances.reduce((sum, a) => sum + (a.duration_minutes || 60), 0) / completedAttendances.length
       : 60
 
-    // Calcular satisfação média
+    // Calcular satisfação média (INCLUINDO feedbacks de atendimentos fiscais)
     const ratingsAtendimentos = allAttendances?.filter(a => a.client_satisfaction_rating) || []
-    const satisfacaoMedia = ratingsAtendimentos.length > 0
-      ? ratingsAtendimentos.reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / ratingsAtendimentos.length
+    const ratingsFiscais = fiscalFeedbacks || []
+
+    const sumAtendimentos = ratingsAtendimentos.reduce((sum, a) => sum + a.client_satisfaction_rating, 0)
+    const sumFiscais = ratingsFiscais.reduce((sum, f) => sum + f.rating, 0)
+    const totalRatings = ratingsAtendimentos.length + ratingsFiscais.length
+
+    const satisfacaoMedia = totalRatings > 0
+      ? (sumAtendimentos + sumFiscais) / totalRatings
       : 0
 
     console.log('📈 Métricas calculadas:', {

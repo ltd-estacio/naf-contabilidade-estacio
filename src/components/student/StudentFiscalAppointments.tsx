@@ -30,7 +30,8 @@ import {
   Star,
   UserX,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  Trash2
 } from 'lucide-react'
 import FeedbackModal from './FeedbackModal'
 
@@ -183,9 +184,11 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showNoShowModal, setShowNoShowModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [internalNotes, setInternalNotes] = useState('')
   const [cancelReason, setCancelReason] = useState('')
   const [noShowNotes, setNoShowNotes] = useState('')
+  const [deleteReason, setDeleteReason] = useState('')
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleTime, setRescheduleTime] = useState('')
   const [reschedulePeriod, setReschedulePeriod] = useState('MANHA')
@@ -390,6 +393,44 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       }
     } catch (err) {
       setError('Erro ao reagendar atendimento')
+      console.error(err)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleDeleteAppointment = async () => {
+    if (!selectedAppointment) return
+
+    try {
+      setUpdating(true)
+      setError('')
+
+      const response = await fetch('/api/students/fiscal-appointments/delete', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          appointmentId: selectedAppointment.id,
+          deleteReason: deleteReason || 'Excluído pelo estudante'
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSuccess(data.message || 'Atendimento excluído com sucesso! Você pode recuperá-lo na lixeira.')
+        await loadAppointments()
+        setShowDeleteModal(false)
+        setShowDetails(false)
+        setDeleteReason('')
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || 'Erro ao excluir atendimento')
+      }
+    } catch (err) {
+      setError('Erro ao excluir atendimento')
       console.error(err)
     } finally {
       setUpdating(false)
@@ -830,19 +871,34 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                     </Button>
                   )}
 
-                  {/* Botão Feedback para status CONCLUIDO */}
+                  {/* Botões para status CONCLUIDO */}
                   {appointment.status === 'CONCLUIDO' && (
-                    <Button
-                      onClick={() => {
-                        setSelectedAppointment(appointment)
-                        setShowFeedbackModal(true)
-                      }}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Star className="h-4 w-4 mr-2" />
-                      Feedback
-                    </Button>
+                    <>
+                      <Button
+                        onClick={() => {
+                          setSelectedAppointment(appointment)
+                          setShowFeedbackModal(true)
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Star className="h-4 w-4 mr-2" />
+                        Feedback
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setSelectedAppointment(appointment)
+                          setShowDeleteModal(true)
+                        }}
+                        disabled={updating}
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir
+                      </Button>
+                    </>
                   )}
 
                   {/* Botão CANCELAR - disponível para status que ainda não finalizaram */}
@@ -1283,6 +1339,79 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                   className="flex-1"
                 >
                   {updating ? 'Reagendando...' : 'Confirmar'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de Exclusão */}
+      {showDeleteModal && selectedAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-600">
+                <Trash2 className="h-5 w-5" />
+                Excluir Atendimento
+              </CardTitle>
+              <CardDescription>
+                Tem certeza que deseja excluir este atendimento?
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-blue-200 bg-blue-50">
+                <AlertTriangle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  Este atendimento será movido para a lixeira e poderá ser recuperado posteriormente.
+                </AlertDescription>
+              </Alert>
+
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Protocolo:</span>
+                  <span className="text-sm font-mono text-gray-900 dark:text-white">{selectedAppointment.protocol}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Cliente:</span>
+                  <span className="text-sm text-gray-900 dark:text-white">{selectedAppointment.client_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Serviço:</span>
+                  <span className="text-sm text-gray-900 dark:text-white">{selectedAppointment.service_title}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Motivo da Exclusão (Opcional)
+                </label>
+                <Textarea
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Informe o motivo da exclusão (opcional)..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setDeleteReason('')
+                  }}
+                  className="flex-1"
+                  disabled={updating}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleDeleteAppointment}
+                  disabled={updating}
+                  className="flex-1 bg-red-600 hover:bg-red-700"
+                >
+                  {updating ? 'Excluindo...' : 'Confirmar Exclusão'}
                 </Button>
               </div>
             </CardContent>
