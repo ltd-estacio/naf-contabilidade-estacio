@@ -57,12 +57,16 @@ export async function GET(request: NextRequest) {
 
     const studentId = studentAuth.studentId || studentAuth.id
 
-    // Buscar atendimentos fiscais atribuídos ao estudante (excluindo os deletados)
+    // Buscar atendimentos fiscais atribuídos ao estudante
+    // NOTA: O filtro .is('deleted_at', null) foi removido temporariamente
+    // porque a coluna deleted_at ainda não foi adicionada à tabela.
+    // Execute o script: src/sql/add_soft_delete_fiscal_appointments.sql
+    // e depois descomente o filtro abaixo
     const { data: fiscalAppointments, error } = await supabase
       .from('fiscal_appointments')
       .select('*')
       .eq('assigned_student_id', studentId)
-      .is('deleted_at', null)  // Não retornar atendimentos excluídos
+      // .is('deleted_at', null)  // ⚠️ Descomentado após executar add_soft_delete_fiscal_appointments.sql
       .order('created_at', { ascending: false })
 
     if (error) {
