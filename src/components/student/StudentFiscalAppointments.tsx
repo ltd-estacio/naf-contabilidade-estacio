@@ -27,7 +27,10 @@ import {
   MessageSquare,
   Ban,
   CalendarX,
-  Star
+  Star,
+  UserX,
+  TrendingUp,
+  BarChart3
 } from 'lucide-react'
 import FeedbackModal from './FeedbackModal'
 
@@ -62,6 +65,105 @@ interface StudentFiscalAppointmentsProps {
   token: string
 }
 
+// Componente de gráfico simples sem dependências externas
+const SimpleChart = ({ data, type = 'bar', title }: {
+  data: Array<{label: string, value: number, color?: string}>,
+  type?: 'bar' | 'pie',
+  title?: string
+}) => {
+  if (type === 'bar') {
+    const maxValue = Math.max(...data.map(d => d.value), 1)
+
+    return (
+      <div className="space-y-3">
+        {title && <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">{title}</h4>}
+        {data.map((item, index) => (
+          <div key={index} className="space-y-1">
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-600 dark:text-gray-400">{item.label}</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{item.value}</span>
+            </div>
+            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${item.color || 'bg-blue-500'}`}
+                style={{ width: `${(item.value / maxValue) * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Gráfico de pizza (pie chart) simplificado
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  let currentAngle = -90 // Começar do topo
+
+  return (
+    <div className="space-y-3">
+      {title && <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-3">{title}</h4>}
+      <div className="flex items-center justify-center">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          {data.map((item, index) => {
+            const percentage = (item.value / total) * 100
+            const angle = (percentage / 100) * 360
+            const radius = 70
+            const centerX = 80
+            const centerY = 80
+
+            // Calcular coordenadas do arco
+            const startAngle = currentAngle
+            const endAngle = currentAngle + angle
+
+            const startX = centerX + radius * Math.cos((startAngle * Math.PI) / 180)
+            const startY = centerY + radius * Math.sin((startAngle * Math.PI) / 180)
+            const endX = centerX + radius * Math.cos((endAngle * Math.PI) / 180)
+            const endY = centerY + radius * Math.sin((endAngle * Math.PI) / 180)
+
+            const largeArc = angle > 180 ? 1 : 0
+
+            const pathData = [
+              `M ${centerX} ${centerY}`,
+              `L ${startX} ${startY}`,
+              `A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY}`,
+              'Z'
+            ].join(' ')
+
+            currentAngle += angle
+
+            return item.value > 0 ? (
+              <path
+                key={index}
+                d={pathData}
+                fill={item.color || `hsl(${index * 60}, 70%, 60%)`}
+                stroke="white"
+                strokeWidth="2"
+              />
+            ) : null
+          })}
+          <circle cx="80" cy="80" r="40" fill="white" />
+          <text x="80" y="85" textAnchor="middle" className="text-lg font-bold fill-gray-900">
+            {total}
+          </text>
+        </svg>
+      </div>
+      <div className="space-y-1">
+        {data.map((item, index) => (
+          <div key={index} className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-sm ${item.color || 'bg-gray-400'}`} />
+              <span className="text-gray-600 dark:text-gray-400">{item.label}</span>
+            </div>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {item.value} ({total > 0 ? Math.round((item.value / total) * 100) : 0}%)
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function StudentFiscalAppointments({ token }: StudentFiscalAppointmentsProps) {
   const [appointments, setAppointments] = useState<FiscalAppointment[]>([])
   const [stats, setStats] = useState({
@@ -70,7 +172,8 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
     confirmados: 0,
     emAndamento: 0,
     concluidos: 0,
-    cancelados: 0
+    cancelados: 0,
+    naoCompareceu: 0
   })
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -79,8 +182,10 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
   const [showRescheduleModal, setShowRescheduleModal] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [showNoShowModal, setShowNoShowModal] = useState(false)
   const [internalNotes, setInternalNotes] = useState('')
   const [cancelReason, setCancelReason] = useState('')
+  const [noShowNotes, setNoShowNotes] = useState('')
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleTime, setRescheduleTime] = useState('')
   const [reschedulePeriod, setReschedulePeriod] = useState('MANHA')
@@ -112,6 +217,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
           emAndamento: appts.filter((a: FiscalAppointment) => a.status === 'EM_ANDAMENTO').length,
           concluidos: appts.filter((a: FiscalAppointment) => a.status === 'CONCLUIDO').length,
           cancelados: appts.filter((a: FiscalAppointment) => a.status === 'CANCELADO').length,
+          naoCompareceu: appts.filter((a: FiscalAppointment) => a.status === 'NAO_COMPARECEU').length
         })
       } else {
         const errorData = await response.json()
@@ -208,6 +314,44 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
     }
   }
 
+  const handleNoShowAppointment = async () => {
+    if (!selectedAppointment) return
+
+    try {
+      setUpdating(true)
+      setError('')
+
+      const response = await fetch('/api/students/fiscal-appointments', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          appointmentId: selectedAppointment.id,
+          status: 'NAO_COMPARECEU',
+          internalNotes: `Cliente não compareceu. ${noShowNotes ? `Observações: ${noShowNotes}` : ''}`
+        })
+      })
+
+      if (response.ok) {
+        setSuccess('Atendimento marcado como "Não Compareceu"')
+        await loadAppointments()
+        setShowNoShowModal(false)
+        setShowDetails(false)
+        setNoShowNotes('')
+      } else {
+        const errorData = await response.json()
+        setError(errorData.message || 'Erro ao atualizar atendimento')
+      }
+    } catch (err) {
+      setError('Erro ao atualizar atendimento')
+      console.error(err)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   const handleRescheduleAppointment = async () => {
     if (!selectedAppointment || !rescheduleDate) {
       setError('Por favor, selecione uma data')
@@ -258,7 +402,8 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       'CONFIRMADO': { color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
       'EM_ANDAMENTO': { color: 'bg-purple-100 text-purple-800', icon: Play },
       'CONCLUIDO': { color: 'bg-green-100 text-green-800', icon: CheckCheck },
-      'CANCELADO': { color: 'bg-red-100 text-red-800', icon: XCircle }
+      'CANCELADO': { color: 'bg-red-100 text-red-800', icon: XCircle },
+      'NAO_COMPARECEU': { color: 'bg-orange-100 text-orange-800', icon: UserX }
     }
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['PENDENTE']
@@ -267,7 +412,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
     return (
       <Badge className={`${config.color} border-0 flex items-center gap-1`}>
         <Icon className="h-3 w-3" />
-        {status}
+        {status.replace('_', ' ')}
       </Badge>
     )
   }
@@ -301,6 +446,39 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
     setShowDetails(true)
   }
 
+  // Calcular dados para gráficos
+  const completionRate = stats.total > 0
+    ? Math.round((stats.concluidos / stats.total) * 100)
+    : 0
+
+  const statusChartData = [
+    { label: 'Concluídos', value: stats.concluidos, color: 'bg-green-500' },
+    { label: 'Em Andamento', value: stats.emAndamento, color: 'bg-purple-500' },
+    { label: 'Confirmados', value: stats.confirmados, color: 'bg-blue-500' },
+    { label: 'Pendentes', value: stats.pendentes, color: 'bg-yellow-500' },
+    { label: 'Cancelados', value: stats.cancelados, color: 'bg-red-500' },
+    { label: 'Não Compareceu', value: stats.naoCompareceu, color: 'bg-orange-500' }
+  ]
+
+  const statusPieData = [
+    { label: 'Concluídos', value: stats.concluidos, color: '#22c55e' },
+    { label: 'Em Andamento', value: stats.emAndamento, color: '#a855f7' },
+    { label: 'Confirmados', value: stats.confirmados, color: '#3b82f6' },
+    { label: 'Pendentes', value: stats.pendentes, color: '#eab308' },
+    { label: 'Cancelados', value: stats.cancelados, color: '#ef4444' },
+    { label: 'Não Compareceu', value: stats.naoCompareceu, color: '#f97316' }
+  ]
+
+  // Agrupar por categoria de serviço
+  const categoryStats: Record<string, number> = {}
+  appointments.forEach(apt => {
+    categoryStats[apt.service_category] = (categoryStats[apt.service_category] || 0) + 1
+  })
+  const categoryChartData = Object.entries(categoryStats)
+    .map(([label, value]) => ({ label, value, color: 'bg-indigo-500' }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -331,6 +509,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
             <option value="EM_ANDAMENTO">Em Andamento</option>
             <option value="CONCLUIDO">Concluídos</option>
             <option value="CANCELADO">Cancelados</option>
+            <option value="NAO_COMPARECEU">Não Compareceu</option>
           </select>
 
           <Button onClick={loadAppointments} variant="outline" size="sm">
@@ -341,44 +520,106 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       </div>
 
       {/* Estatísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <CardContent className="p-4">
             <p className="text-sm font-medium text-blue-100">Total</p>
-            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className="text-3xl font-bold">{stats.total}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
+        <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
           <CardContent className="p-4">
             <p className="text-sm font-medium text-yellow-100">Pendentes</p>
-            <p className="text-2xl font-bold">{stats.pendentes}</p>
+            <p className="text-3xl font-bold">{stats.pendentes}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-r from-blue-400 to-blue-500 text-white">
+        <Card className="bg-gradient-to-br from-blue-400 to-blue-500 text-white">
           <CardContent className="p-4">
             <p className="text-sm font-medium text-blue-100">Confirmados</p>
-            <p className="text-2xl font-bold">{stats.confirmados}</p>
+            <p className="text-3xl font-bold">{stats.confirmados}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
           <CardContent className="p-4">
             <p className="text-sm font-medium text-purple-100">Em Andamento</p>
-            <p className="text-2xl font-bold">{stats.emAndamento}</p>
+            <p className="text-3xl font-bold">{stats.emAndamento}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
+        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
           <CardContent className="p-4">
             <p className="text-sm font-medium text-green-100">Concluídos</p>
-            <p className="text-2xl font-bold">{stats.concluidos}</p>
+            <p className="text-3xl font-bold">{stats.concluidos}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
+        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
           <CardContent className="p-4">
             <p className="text-sm font-medium text-red-100">Cancelados</p>
-            <p className="text-2xl font-bold">{stats.cancelados}</p>
+            <p className="text-3xl font-bold">{stats.cancelados}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+          <CardContent className="p-4">
+            <p className="text-sm font-medium text-orange-100">Não Compareceu</p>
+            <p className="text-3xl font-bold">{stats.naoCompareceu}</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Gráficos de Desempenho */}
+      {stats.total > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="h-5 w-5 text-green-600" />
+                Taxa de Conclusão
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-green-600 mb-2">{completionRate}%</div>
+                <p className="text-sm text-gray-500">
+                  {stats.concluidos} de {stats.total} atendimentos concluídos
+                </p>
+                <div className="mt-4 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
+                    style={{ width: `${completionRate}%` }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                Distribuição por Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SimpleChart data={statusChartData} type="bar" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calculator className="h-5 w-5 text-indigo-600" />
+                Por Categoria de Serviço
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {categoryChartData.length > 0 ? (
+                <SimpleChart data={categoryChartData} type="bar" />
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">Sem dados disponíveis</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Mensagens de erro/sucesso */}
       {error && (
@@ -401,7 +642,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
           <CardContent className="p-12 text-center">
             <Calculator className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              {filter === 'all' ? 'Nenhum atendimento fiscal atribuído' : `Nenhum atendimento ${filter.toLowerCase()}`}
+              {filter === 'all' ? 'Nenhum atendimento fiscal atribuído' : `Nenhum atendimento ${filter.toLowerCase().replace('_', ' ')}`}
             </h3>
             <p className="text-gray-500 mb-4">
               Clique no botão abaixo para verificar se há atendimentos disponíveis
@@ -446,13 +687,13 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       ) : (
         <div className="space-y-4">
           {filteredAppointments.map((appointment) => (
-            <Card key={appointment.id} className="hover:shadow-md transition-shadow">
+            <Card key={appointment.id} className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <Calculator className="h-5 w-5 text-blue-600" />
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="outline" className="font-mono text-xs">{appointment.protocol}</Badge>
                         {getStatusBadge(appointment.status)}
                         {getUrgencyBadge(appointment.urgency_level)}
@@ -520,6 +761,20 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                     Ver Detalhes
                   </Button>
 
+                  {/* Botão CONFIRMAR - apenas para status PENDENTE */}
+                  {appointment.status === 'PENDENTE' && (
+                    <Button
+                      onClick={() => updateAppointmentStatus(appointment.id, 'CONFIRMADO')}
+                      disabled={updating}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Confirmar
+                    </Button>
+                  )}
+
+                  {/* Botões para status CONFIRMADO */}
                   {appointment.status === 'CONFIRMADO' && (
                     <>
                       <Button
@@ -543,9 +798,23 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                         <CalendarX className="h-4 w-4 mr-2" />
                         Reagendar
                       </Button>
+                      <Button
+                        onClick={() => {
+                          setSelectedAppointment(appointment)
+                          setShowNoShowModal(true)
+                        }}
+                        disabled={updating}
+                        variant="outline"
+                        size="sm"
+                        className="text-orange-600 hover:text-orange-700"
+                      >
+                        <UserX className="h-4 w-4 mr-2" />
+                        Não Compareceu
+                      </Button>
                     </>
                   )}
 
+                  {/* Botões para status EM_ANDAMENTO */}
                   {appointment.status === 'EM_ANDAMENTO' && (
                     <Button
                       onClick={() => {
@@ -561,6 +830,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                     </Button>
                   )}
 
+                  {/* Botão Feedback para status CONCLUIDO */}
                   {appointment.status === 'CONCLUIDO' && (
                     <Button
                       onClick={() => {
@@ -575,7 +845,8 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                     </Button>
                   )}
 
-                  {!['CONCLUIDO', 'CANCELADO'].includes(appointment.status) && (
+                  {/* Botão CANCELAR - disponível para status que ainda não finalizaram */}
+                  {!['CONCLUIDO', 'CANCELADO', 'NAO_COMPARECEU'].includes(appointment.status) && (
                     <Button
                       onClick={() => {
                         setSelectedAppointment(appointment)
@@ -601,7 +872,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       {showDetails && selectedAppointment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-900 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-900 z-10">
               <div>
                 <h3 className="text-lg font-semibold">Detalhes do Atendimento</h3>
                 <p className="text-sm text-gray-500">{selectedAppointment.protocol}</p>
@@ -620,6 +891,62 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Timeline do Atendimento */}
+              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Timeline do Atendimento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Criado</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(selectedAppointment.created_at).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedAppointment.confirmed_at && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Confirmado</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(selectedAppointment.confirmed_at).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedAppointment.scheduled_at && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-purple-500" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Iniciado</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(selectedAppointment.scheduled_at).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedAppointment.completed_at && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-green-600" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Concluído</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(selectedAppointment.completed_at).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Informações do Cliente */}
               <Card>
                 <CardHeader>
@@ -685,12 +1012,23 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
               </Card>
 
               {/* Ações do Atendimento */}
-              {selectedAppointment.status !== 'CONCLUIDO' && selectedAppointment.status !== 'CANCELADO' && (
+              {!['CONCLUIDO', 'CANCELADO', 'NAO_COMPARECEU'].includes(selectedAppointment.status) && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Ações do Atendimento</CardTitle>
                   </CardHeader>
                   <CardContent className="flex gap-2 flex-wrap">
+                    {selectedAppointment.status === 'PENDENTE' && (
+                      <Button
+                        onClick={() => updateAppointmentStatus(selectedAppointment.id, 'CONFIRMADO', internalNotes)}
+                        disabled={updating}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Confirmar Atendimento
+                      </Button>
+                    )}
+
                     {selectedAppointment.status === 'CONFIRMADO' && (
                       <>
                         <Button
@@ -711,6 +1049,18 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                         >
                           <CalendarX className="h-4 w-4 mr-2" />
                           Reagendar
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setShowDetails(false)
+                            setShowNoShowModal(true)
+                          }}
+                          disabled={updating}
+                          variant="outline"
+                          className="text-orange-600 hover:text-orange-700"
+                        >
+                          <UserX className="h-4 w-4 mr-2" />
+                          Não Compareceu
                         </Button>
                       </>
                     )}
@@ -797,6 +1147,64 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                   className="flex-1 bg-red-600 hover:bg-red-700"
                 >
                   {updating ? 'Cancelando...' : 'Confirmar Cancelamento'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de Não Compareceu */}
+      {showNoShowModal && selectedAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-600">
+                <UserX className="h-5 w-5" />
+                Marcar como "Não Compareceu"
+              </CardTitle>
+              <CardDescription>
+                O cliente não compareceu ao atendimento agendado?
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-orange-200 bg-orange-50">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  Esta ação registrará que o cliente não compareceu ao atendimento.
+                </AlertDescription>
+              </Alert>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Observações (Opcional)
+                </label>
+                <Textarea
+                  value={noShowNotes}
+                  onChange={(e) => setNoShowNotes(e.target.value)}
+                  placeholder="Adicione observações sobre a ausência do cliente..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowNoShowModal(false)
+                    setNoShowNotes('')
+                  }}
+                  className="flex-1"
+                  disabled={updating}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  onClick={handleNoShowAppointment}
+                  disabled={updating}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                >
+                  {updating ? 'Processando...' : 'Confirmar'}
                 </Button>
               </div>
             </CardContent>

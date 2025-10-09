@@ -149,7 +149,8 @@ export default function AppointmentsPanel() {
                  apt.status === 'CONFIRMADO' ? 'confirmed' as const :
                  apt.status === 'EM_ANDAMENTO' ? 'in_progress' as const :
                  apt.status === 'CONCLUIDO' ? 'completed' as const :
-                 apt.status === 'CANCELADO' ? 'cancelled' as const : 'scheduled' as const,
+                 apt.status === 'CANCELADO' ? 'cancelled' as const :
+                 apt.status === 'NAO_COMPARECEU' ? 'no_show' as const : 'scheduled' as const,
           notes: apt.client_notes,
           created_at: apt.created_at,
           updated_at: apt.updated_at,
