@@ -101,30 +101,25 @@ const lastMessageIdRef = useRef<string | null>(null)
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
     const token = searchParams.get('chat_token')
+    const expiresParam = searchParams.get('expires')
 
-    if (token) {
-      // Validate the token
-      validateChatToken(token)
-    }
-  }, [])
+    if (token && expiresParam) {
+      // Check if token is expired
+      const expiresAt = parseInt(expiresParam)
+      const now = Date.now()
 
-  const validateChatToken = async (token: string) => {
-    try {
-      const response = await fetch(`/api/chat/validate-link?token=${token}`)
-      const data = await response.json()
-
-      if (data.valid) {
+      if (expiresAt > now) {
+        // Token is valid and not expired
         setHasChatToken(true)
         setTokenValidated(true)
         // Auto-open the chat widget
         setIsOpen(true)
+        console.log('✅ Token válido - Chat habilitado')
       } else {
-        console.log('Token inválido ou expirado')
+        console.log('❌ Token expirado')
       }
-    } catch (error) {
-      console.error('Erro ao validar token:', error)
     }
-  }
+  }, [])
 
 const scrollToBottom = () => {
   const container = messagesContainerRef.current
@@ -1490,6 +1485,11 @@ Não foi possível processar a transferência no momento.
 
   const maximizeChat = () => {
     setIsMinimized(false)
+  }
+
+  // Only render if user has valid token or is logged in
+  if (!tokenValidated && !isLoggedIn) {
+    return null
   }
 
   return (
