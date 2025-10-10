@@ -25,6 +25,8 @@ import {
   RadialLinearScale
 } from 'chart.js'
 import FiscalAppointmentsSection from './FiscalAppointmentsSection'
+import BusinessIntelligence from './BusinessIntelligence'
+import RelatorioCoordrenador from './RelatorioCoordrenador'
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -63,7 +65,7 @@ export default function CoordinatorDashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [timeFilter, setTimeFilter] = useState('30') // dias
-  const [activeTab, setActiveTab] = useState('dashboard') // 'dashboard' ou 'fiscal-appointments'
+  const [activeTab, setActiveTab] = useState('dashboard') // 'dashboard', 'business-intelligence', 'relatorio-completo' ou 'fiscal-appointments'
 
   // Dados para gráficos
   const [monthlyData, setMonthlyData] = useState<ChartData | null>(null)
@@ -269,10 +271,10 @@ export default function CoordinatorDashboard() {
 
         {/* Navegação por Abas */}
         <div className="border-b border-gray-200 dark:border-gray-800">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px flex space-x-8 overflow-x-auto">
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                 activeTab === 'dashboard'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-700'
@@ -282,8 +284,30 @@ export default function CoordinatorDashboard() {
               Dashboard Geral
             </button>
             <button
+              onClick={() => setActiveTab('business-intelligence')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'business-intelligence'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-700'
+              }`}
+            >
+              <Activity className="h-5 w-5 inline mr-2" />
+              Business Intelligence
+            </button>
+            <button
+              onClick={() => setActiveTab('relatorio-completo')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                activeTab === 'relatorio-completo'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-700'
+              }`}
+            >
+              <FileText className="h-5 w-5 inline mr-2" />
+              Relatório Completo
+            </button>
+            <button
               onClick={() => setActiveTab('fiscal-appointments')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                 activeTab === 'fiscal-appointments'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-700'
@@ -297,7 +321,13 @@ export default function CoordinatorDashboard() {
       </div>
 
       {/* Conteúdo baseado na aba ativa */}
-      {activeTab === 'dashboard' ? (
+      {activeTab === 'business-intelligence' ? (
+        <BusinessIntelligence />
+      ) : activeTab === 'relatorio-completo' ? (
+        <RelatorioCoordrenador />
+      ) : activeTab === 'fiscal-appointments' ? (
+        <FiscalAppointmentsSection />
+      ) : activeTab === 'dashboard' ? (
         <>
           {/* Métricas Principais */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -613,10 +643,7 @@ export default function CoordinatorDashboard() {
             </Card>
           )}
         </>
-      ) : (
-        /* Seção de Agendamentos Fiscais */
-        <FiscalAppointmentsSection />
-      )}
+      ) : null}
     </div>
   )
 }

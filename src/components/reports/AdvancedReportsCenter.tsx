@@ -22,7 +22,9 @@ import {
   Database,
   FileSpreadsheet,
   RefreshCw,
-  Settings
+  Settings,
+  Briefcase,
+  Clock
 } from 'lucide-react'
 
 interface ReportMetrics {
@@ -64,6 +66,12 @@ export default function AdvancedReportsCenter() {
         }))
         setLastUpdated(new Date().toLocaleString('pt-BR'))
         console.log(`✅ ${type} report loaded successfully`)
+        console.log(`📊 Data for ${type}:`, result.data)
+
+        // Log específico para type general
+        if (type === 'general' && result.data.generalStats) {
+          console.log('📈 General Stats:', result.data.generalStats)
+        }
       } else {
         setError(result.error || `Erro ao carregar relatório ${type}`)
         console.error(`❌ Error loading ${type} report:`, result.error)
@@ -172,62 +180,82 @@ export default function AdvancedReportsCenter() {
   const renderGeneralReport = () => {
     const generalData = data.general?.generalStats
 
+    console.log('🔍 Rendering General Report')
+    console.log('   data.general:', data.general)
+    console.log('   generalStats:', generalData)
+
     if (!generalData) {
       return (
         <div className="text-center py-8">
           <Activity className="h-12 w-12 mx-auto text-gray-400 mb-4" />
           <p className="text-gray-500">Carregue os dados para visualizar o relatório geral</p>
+          <Button onClick={() => loadReportData('general')} className="mt-4" variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Carregar Dados
+          </Button>
         </div>
       )
     }
 
+    // Verificar se há dados de atendimentos
+    const hasAttendanceData = generalData.totalAttendances > 0
+
     return (
       <div className="space-y-6">
+        {!hasAttendanceData && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Não há atendimentos registrados no período selecionado. Execute o script de seed (`scripts/seed-attendances.sql`) no Supabase para adicionar dados de teste ou altere o período para "Todos".
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
+          <Card className={!hasAttendanceData ? 'opacity-60' : ''}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Users className="h-5 w-5 text-blue-500" />
                 <div>
                   <p className="text-2xl font-bold">{formatNumber(generalData.totalAttendances)}</p>
-                  <p className="text-sm text-gray-600">Atendimentos</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Atendimentos</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={!hasAttendanceData ? 'opacity-60' : ''}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-5 w-5 text-green-500" />
                 <div>
                   <p className="text-2xl font-bold">{formatPercentage(generalData.completionRate)}</p>
-                  <p className="text-sm text-gray-600">Taxa Conclusão</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Taxa Conclusão</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={!hasAttendanceData ? 'opacity-60' : ''}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Star className="h-5 w-5 text-yellow-500" />
                 <div>
                   <p className="text-2xl font-bold">{generalData.averageSatisfaction.toFixed(1)}</p>
-                  <p className="text-sm text-gray-600">Satisfação</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Satisfação</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={!hasAttendanceData ? 'opacity-60' : ''}>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <TrendingUp className={`h-5 w-5 ${generalData.monthlyGrowth >= 0 ? 'text-green-500' : 'text-red-500'}`} />
                 <div>
                   <p className="text-2xl font-bold">{formatPercentage(generalData.monthlyGrowth)}</p>
-                  <p className="text-sm text-gray-600">Crescimento</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Crescimento</p>
                 </div>
               </div>
             </CardContent>
@@ -238,31 +266,49 @@ export default function AdvancedReportsCenter() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Estudantes</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5 text-blue-500" />
+                Estudantes
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{formatNumber(generalData.totalStudents)}</div>
-              <p className="text-sm text-gray-600">estudantes ativos</p>
+              <div className="text-4xl font-bold text-blue-600 mb-2">{formatNumber(generalData.totalStudents)}</div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">estudantes ativos</p>
+              {generalData.totalStudents > 0 && (
+                <p className="text-xs text-green-600 mt-2">✓ Cadastrados no sistema</p>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Serviços</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-green-500" />
+                Serviços
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">{formatNumber(generalData.totalServices)}</div>
-              <p className="text-sm text-gray-600">serviços disponíveis</p>
+              <div className="text-4xl font-bold text-green-600 mb-2">{formatNumber(generalData.totalServices)}</div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">serviços disponíveis</p>
+              {generalData.totalServices > 0 && (
+                <p className="text-xs text-green-600 mt-2">✓ Disponíveis para solicitação</p>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={!hasAttendanceData ? 'opacity-60' : ''}>
             <CardHeader>
-              <CardTitle className="text-lg">Duração Média</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="h-5 w-5 text-purple-500" />
+                Duração Média
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-purple-600">{generalData.averageDuration} min</div>
-              <p className="text-sm text-gray-600">por atendimento</p>
+              <div className="text-4xl font-bold text-purple-600 mb-2">{generalData.averageDuration} min</div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">por atendimento</p>
+              {!hasAttendanceData && (
+                <p className="text-xs text-gray-500 mt-2">Aguardando atendimentos</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -356,6 +402,8 @@ export default function AdvancedReportsCenter() {
       )
     }
 
+    const hasStudentData = studentsData.studentRankings && studentsData.studentRankings.length > 0
+
     return (
       <div className="space-y-6">
         {/* Student Rankings */}
@@ -365,27 +413,40 @@ export default function AdvancedReportsCenter() {
             <CardDescription>Top 10 estudantes por número de atendimentos</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {studentsData.studentRankings?.slice(0, 10).map((student: unknown, index: number) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-sm font-medium">
-                      {index + 1}
+            {hasStudentData ? (
+              <div className="space-y-3">
+                {studentsData.studentRankings.slice(0, 10).map((student: unknown, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-sm">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">{student.student_name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{student.course}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{student.student_name}</p>
-                      <p className="text-sm text-gray-600">{student.course}</p>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-blue-600">{student.total_attendances}</div>
+                      <div className="flex items-center justify-end gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 text-yellow-500 fill-current" />
+                          <span>{student.avg_rating > 0 ? student.avg_rating.toFixed(1) : 'N/A'}</span>
+                        </div>
+                        <span>•</span>
+                        <span>{formatPercentage(student.completion_rate)}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold">{student.total_attendances}</div>
-                    <div className="text-sm text-gray-600">
-                      {student.avg_rating.toFixed(1)} ⭐ • {formatPercentage(student.completion_rate)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <AlertTriangle className="h-10 w-10 mx-auto text-yellow-500 mb-3" />
+                <p className="text-gray-600 dark:text-gray-400 mb-2">Nenhum estudante com atendimentos registrados</p>
+                <p className="text-sm text-gray-500">Aguardando atendimentos para gerar rankings</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -397,22 +458,44 @@ export default function AdvancedReportsCenter() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h4 className="font-medium mb-3">Mais Produtivos</h4>
-                <div className="space-y-2">
-                  {studentsData.productivityAnalysis?.slice(0, 5).map((student: unknown, index: number) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <span className="text-sm">{student.student_name}</span>
-                      <Badge variant="outline">{student.productivity_score} pts</Badge>
-                    </div>
-                  ))}
-                </div>
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-green-500" />
+                  Mais Produtivos
+                </h4>
+                {studentsData.productivityAnalysis && studentsData.productivityAnalysis.length > 0 ? (
+                  <div className="space-y-2">
+                    {studentsData.productivityAnalysis.slice(0, 5).map((student: unknown, index: number) => (
+                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-900 rounded">
+                        <span className="text-sm font-medium">{student.student_name}</span>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                          {student.productivity_score} pts
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500">Nenhum dado disponível</p>
+                  </div>
+                )}
               </div>
               <div>
-                <h4 className="font-medium mb-3">Estudantes Ativos</h4>
-                <div className="text-3xl font-bold text-green-600">
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-500" />
+                  Estudantes Ativos
+                </h4>
+                <div className="text-4xl font-bold text-green-600 mb-2">
                   {studentsData.activeStudents?.length || 0}
                 </div>
-                <p className="text-sm text-gray-600">estudantes com atendimentos realizados</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">estudantes com atendimentos realizados</p>
+                {(studentsData.activeStudents?.length || 0) === 0 && (
+                  <Alert className="mt-3">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Nenhum estudante realizou atendimentos no período selecionado
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
           </CardContent>
@@ -774,14 +857,10 @@ export default function AdvancedReportsCenter() {
 
       {/* Reports Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ReportType)}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="general" className="flex items-center space-x-2">
             <Activity className="h-4 w-4" />
             <span>Geral</span>
-          </TabsTrigger>
-          <TabsTrigger value="performance" className="flex items-center space-x-2">
-            <TrendingUp className="h-4 w-4" />
-            <span>Performance</span>
           </TabsTrigger>
           <TabsTrigger value="students" className="flex items-center space-x-2">
             <Users className="h-4 w-4" />

@@ -783,13 +783,6 @@ export default function CoordinatorDashboard() {
       category: 'analytics'
     },
     {
-      value: 'services',
-      label: 'Serviços',
-      description: 'Performance e Qualidade',
-      icon: FileText,
-      category: 'operations'
-    },
-    {
       value: 'students',
       label: 'Estudantes',
       description: 'Desenvolvimento da Equipe',

@@ -140,10 +140,13 @@ class AdvancedReportsService {
       const { data: fiscalAppointments, error: fiscalError } = await fiscalQuery
 
       // Handle errors
-      if (attendancesError) console.error('Attendances error:', attendancesError)
-      if (studentsError) console.error('Students error:', studentsError)
-      if (servicesError) console.error('Services error:', servicesError)
-      if (fiscalError) console.error('Fiscal error:', fiscalError)
+      if (attendancesError) console.error('❌ Attendances error:', attendancesError)
+      if (studentsError) console.error('❌ Students error:', studentsError)
+      if (servicesError) console.error('❌ Services error:', servicesError)
+      if (fiscalError) console.error('❌ Fiscal error:', fiscalError)
+
+      // Log data counts
+      console.log(`📊 Data fetched - Attendances: ${attendances?.length || 0}, Students: ${students?.length || 0}, Services: ${services?.length || 0}, Fiscal: ${fiscalAppointments?.length || 0}`)
 
       // 2. PROCESS GENERAL STATISTICS
       console.log('📈 Processing general statistics...')
@@ -151,10 +154,12 @@ class AdvancedReportsService {
       const completedAttendances = attendances?.filter(a => a.status === 'CONCLUIDO') || []
       const completionRate = totalAttendances > 0 ? (completedAttendances.length / totalAttendances) * 100 : 0
 
-      const ratingsData = attendances?.filter(a => a.client_satisfaction_rating) || []
+      const ratingsData = attendances?.filter(a => a.client_satisfaction_rating && a.client_satisfaction_rating > 0) || []
       const averageSatisfaction = ratingsData.length > 0
         ? ratingsData.reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / ratingsData.length
         : 0
+
+      console.log(`⭐ Satisfação: ${ratingsData.length} avaliações, média ${averageSatisfaction.toFixed(2)}`)
 
       const durationData = completedAttendances.filter(a => a.duration_minutes)
       const averageDuration = durationData.length > 0
@@ -245,12 +250,13 @@ class AdvancedReportsService {
         .slice(0, 5)
 
       // Student performance analysis
+      console.log(`👨‍🎓 Processing performance for ${students?.length || 0} students...`)
       const studentPerformanceData = await Promise.all(
         (students || []).map(async (student: unknown) => {
           const studentAttendances = attendances?.filter(a => a.student_id === student.id) || []
           const totalAttendances = studentAttendances.length
           const completedAttendances = studentAttendances.filter(a => a.status === 'CONCLUIDO').length
-          const studentRatings = studentAttendances.filter(a => a.client_satisfaction_rating)
+          const studentRatings = studentAttendances.filter(a => a.client_satisfaction_rating && a.client_satisfaction_rating > 0)
           const avgRating = studentRatings.length > 0
             ? studentRatings.reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / studentRatings.length
             : 0
@@ -258,23 +264,34 @@ class AdvancedReportsService {
           const weeksActive = Math.max(1, Math.ceil((Date.now() - new Date(student.created_at).getTime()) / (1000 * 60 * 60 * 24 * 7)))
           const productivity = totalAttendances / weeksActive
 
-          return {
+          const performanceData = {
             student_id: student.id,
             student_name: student.name,
             email: student.email,
-            course: student.course,
+            course: student.course || 'Não informado',
+            semester: student.semester || '-',
             total_attendances: totalAttendances,
             completed_attendances: completedAttendances,
-            completion_rate: totalAttendances > 0 ? (completedAttendances / totalAttendances) * 100 : 0,
+            completion_rate: totalAttendances > 0 ? Math.round((completedAttendances / totalAttendances) * 100 * 10) / 10 : 0,
             avg_rating: Math.round(avgRating * 10) / 10,
             productivity_score: Math.round(productivity * 10) / 10,
             performance_level: avgRating >= 4.5 ? 'Excelente' :
                              avgRating >= 4.0 ? 'Muito Bom' :
                              avgRating >= 3.5 ? 'Bom' :
-                             avgRating >= 3.0 ? 'Regular' : 'Precisa Melhorar'
+                             avgRating >= 3.0 ? 'Regular' :
+                             totalAttendances > 0 ? 'Precisa Melhorar' : 'Sem Avaliações'
           }
+
+          if (totalAttendances > 0) {
+            console.log(`   ${student.name}: ${totalAttendances} atendimentos, ${avgRating.toFixed(1)} ⭐`)
+          }
+
+          return performanceData
         })
       )
+
+      const studentsWithAttendances = studentPerformanceData.filter(s => s.total_attendances > 0)
+      console.log(`✅ ${studentsWithAttendances.length} estudantes com atendimentos encontrados`)
 
       const performanceMetrics = {
         topPerformingServices,
@@ -286,16 +303,28 @@ class AdvancedReportsService {
 
       // 4. STUDENT REPORTS
       console.log('👨‍🎓 Processing student reports...')
+      const activeStudentsData = studentPerformanceData.filter(s => s.total_attendances > 0)
+
       const studentReports = {
-        activeStudents: studentPerformanceData.filter(s => s.total_attendances > 0),
+        activeStudents: activeStudentsData,
         studentRankings: studentPerformanceData
-          .sort((a, b) => b.total_attendances - a.total_attendances)
+          .filter(s => s.total_attendances > 0) // Apenas estudantes com atendimentos
+          .sort((a, b) => {
+            // Ordenar por número de atendimentos, depois por avaliação
+            if (b.total_attendances !== a.total_attendances) {
+              return b.total_attendances - a.total_attendances
+            }
+            return b.avg_rating - a.avg_rating
+          })
           .slice(0, 20),
         productivityAnalysis: studentPerformanceData
+          .filter(s => s.productivity_score > 0)
           .sort((a, b) => b.productivity_score - a.productivity_score)
           .slice(0, 15),
         specialtyDistribution: [] // Service specialties by student
       }
+
+      console.log(`📊 Rankings - Ativos: ${activeStudentsData.length}, Top 20: ${studentReports.studentRankings.length}, Top Produtivos: ${studentReports.productivityAnalysis.length}`)
 
       // 5. SERVICE REPORTS
       console.log('🛠️ Processing service reports...')
