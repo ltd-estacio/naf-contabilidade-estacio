@@ -45,7 +45,8 @@ import {
   LogOut,
   Home,
   ChevronDown,
-  UserCheck
+  UserCheck,
+  Link as LinkIcon
 } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -57,6 +58,7 @@ import TrainingsSection from '@/components/TrainingsSection'
 import ReportGenerator from '@/components/reports/ReportGenerator'
 import { StudentChat } from '@/components/chat/StudentChat'
 import StudentFiscalAppointments from '@/components/student/StudentFiscalAppointments'
+import ChatLinkGenerator from '@/components/coordinator/ChatLinkGenerator'
 
 interface StudentProfile {
   id: string
@@ -247,6 +249,12 @@ export default function StudentPortal() {
       label: 'Assistente IA',
       description: 'Suporte inteligente',
       icon: Bot
+    },
+    {
+      value: 'chat-links',
+      label: 'Links de Chat',
+      description: 'Gerar links de atendimento',
+      icon: LinkIcon
     }
   ]
 
@@ -2091,6 +2099,11 @@ export default function StudentPortal() {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Chat Links Tab */}
+          <TabsContent value="chat-links" className="mt-6">
+            <ChatLinkGenerator />
           </TabsContent>
         </Tabs>
       </main>
