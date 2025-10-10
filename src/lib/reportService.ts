@@ -17,11 +17,17 @@ export interface ReportData {
   stats: {
     totalAttendances: number
     completedAttendances: number
+    cancelledAttendances: number
+    scheduledAttendances: number
+    inProgressAttendances: number
+    noShowAttendances: number
     successRate: number
     avgRating: number
     avgPerformanceScore: number
     completedTrainings: number
     totalTrainings: number
+    totalFeedbacks: number
+    avgFeedbackRating: number
   }
   attendances: Array<{
     id: string
@@ -34,6 +40,22 @@ export interface ReportData {
     urgency: string
     is_online: boolean
     client_satisfaction_rating?: number
+    feedback?: string
+  }>
+  fiscalAppointments?: Array<{
+    id: string
+    protocol?: string
+    client_name?: string
+    service_description?: string
+    status: string
+    appointment_date: string
+    student_name?: string
+    feedback?: {
+      rating: number
+      comment: string
+      strengths: string[]
+      improvements: string[]
+    }
   }>
   trainings: Array<{
     id: string
@@ -114,11 +136,19 @@ export class ReportService {
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       yPosition = addText(`Total de Atendimentos: ${data.stats.totalAttendances}`, 20, yPosition + 5)
-      yPosition = addText(`Atendimentos Concluídos: ${data.stats.completedAttendances}`, 20, yPosition + 3)
-      yPosition = addText(`Taxa de Sucesso: ${data.stats.successRate}%`, 20, yPosition + 3)
+      yPosition = addText(`  • Concluídos: ${data.stats.completedAttendances}`, 25, yPosition + 3)
+      yPosition = addText(`  • Agendados: ${data.stats.scheduledAttendances}`, 25, yPosition + 3)
+      yPosition = addText(`  • Em Andamento: ${data.stats.inProgressAttendances}`, 25, yPosition + 3)
+      yPosition = addText(`  • Cancelados: ${data.stats.cancelledAttendances}`, 25, yPosition + 3)
+      yPosition = addText(`  • Não Compareceu: ${data.stats.noShowAttendances}`, 25, yPosition + 3)
+      yPosition = addText(`Taxa de Sucesso: ${data.stats.successRate}%`, 20, yPosition + 5)
       yPosition = addText(`Avaliação Média dos Clientes: ${data.stats.avgRating.toFixed(1)}/5`, 20, yPosition + 3)
       yPosition = addText(`Performance Geral: ${data.stats.avgPerformanceScore.toFixed(1)}/5`, 20, yPosition + 3)
       yPosition = addText(`Treinamentos Concluídos: ${data.stats.completedTrainings}/${data.stats.totalTrainings}`, 20, yPosition + 3)
+      if (data.stats.totalFeedbacks > 0) {
+        yPosition = addText(`Total de Feedbacks Recebidos: ${data.stats.totalFeedbacks}`, 20, yPosition + 3)
+        yPosition = addText(`Avaliação Média nos Feedbacks: ${data.stats.avgFeedbackRating.toFixed(1)}/5`, 20, yPosition + 3)
+      }
     }
 
     // Verificar se precisa de nova página
@@ -211,6 +241,62 @@ export class ReportService {
     if (yPosition > 220) {
       doc.addPage()
       yPosition = 20
+    }
+
+    // Feedbacks dos Atendimentos Fiscais
+    if (data.fiscalAppointments && data.fiscalAppointments.length > 0) {
+      const appointmentsWithFeedback = data.fiscalAppointments.filter(f => f.feedback)
+
+      if (appointmentsWithFeedback.length > 0) {
+        yPosition += 15
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        yPosition = addText('FEEDBACKS DOS ATENDIMENTOS', 20, yPosition)
+
+        appointmentsWithFeedback.forEach(appointment => {
+          if (yPosition > 240) {
+            doc.addPage()
+            yPosition = 20
+          }
+
+          doc.setFontSize(12)
+          doc.setFont('helvetica', 'bold')
+          yPosition = addText(`Atendimento: ${appointment.protocol || appointment.id}`, 20, yPosition + 8)
+
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'normal')
+          yPosition = addText(`Cliente: ${appointment.client_name || 'N/A'}`, 20, yPosition + 4)
+          yPosition = addText(`Data: ${new Date(appointment.appointment_date).toLocaleDateString('pt-BR')}`, 20, yPosition + 3)
+          yPosition = addText(`Status: ${appointment.status}`, 20, yPosition + 3)
+
+          if (appointment.feedback) {
+            yPosition = addText(`Avaliação: ${appointment.feedback.rating}/5`, 20, yPosition + 3)
+            yPosition = addText(`Comentário: ${appointment.feedback.comment}`, 20, yPosition + 3)
+
+            if (appointment.feedback.strengths && appointment.feedback.strengths.length > 0) {
+              yPosition = addText(`Pontos Fortes:`, 20, yPosition + 3)
+              appointment.feedback.strengths.forEach(strength => {
+                yPosition = addText(`  • ${strength}`, 25, yPosition + 3)
+              })
+            }
+
+            if (appointment.feedback.improvements && appointment.feedback.improvements.length > 0) {
+              yPosition = addText(`Pontos a Melhorar:`, 20, yPosition + 3)
+              appointment.feedback.improvements.forEach(improvement => {
+                yPosition = addText(`  • ${improvement}`, 25, yPosition + 3)
+              })
+            }
+          }
+
+          yPosition += 3
+        })
+
+        // Verificar se precisa de nova página
+        if (yPosition > 220) {
+          doc.addPage()
+          yPosition = 20
+        }
+      }
     }
 
     // Tabela de Avaliações

@@ -38,7 +38,7 @@ async function getStudentReportData(studentId: string): Promise<ReportData> {
       throw new Error('Estudante não encontrado')
     }
 
-    // Buscar atendimentos
+    // Buscar atendimentos regulares
     const { data: attendances, error: attendancesError } = await supabase
       .from('attendances')
       .select('*')
@@ -47,6 +47,27 @@ async function getStudentReportData(studentId: string): Promise<ReportData> {
 
     if (attendancesError) {
       console.error('Erro ao buscar atendimentos:', attendancesError)
+    }
+
+    // Buscar atendimentos fiscais com feedback
+    const { data: fiscalAppointments, error: fiscalError } = await supabase
+      .from('fiscal_appointments')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('appointment_date', { ascending: false })
+
+    if (fiscalError) {
+      console.error('Erro ao buscar atendimentos fiscais:', fiscalError)
+    }
+
+    // Buscar feedbacks dos atendimentos fiscais
+    const { data: feedbacks, error: feedbacksError } = await supabase
+      .from('fiscal_appointment_feedback')
+      .select('*')
+      .in('appointment_id', (fiscalAppointments || []).map(a => a.id))
+
+    if (feedbacksError) {
+      console.error('Erro ao buscar feedbacks:', feedbacksError)
     }
 
     // Buscar progresso de treinamentos
@@ -73,11 +94,19 @@ async function getStudentReportData(studentId: string): Promise<ReportData> {
       console.error('Erro ao buscar avaliações:', evaluationsError)
     }
 
-    // Calcular estatísticas
+    // Calcular estatísticas detalhadas
     const totalAttendances = attendances?.length || 0
     const completedAttendances = attendances?.filter(a => a.status === 'CONCLUIDO').length || 0
+    const cancelledAttendances = attendances?.filter(a => a.status === 'CANCELADO').length || 0
+    const scheduledAttendances = attendances?.filter(a => a.status === 'AGENDADO').length || 0
+    const inProgressAttendances = attendances?.filter(a => a.status === 'EM_ANDAMENTO').length || 0
+    const noShowAttendances = attendances?.filter(a => a.status === 'NAO_COMPARECEU').length || 0
+
     const avgRating = attendances?.length ?
       attendances.reduce((sum, a) => sum + (a.client_satisfaction_rating || 0), 0) / attendances.filter(a => a.client_satisfaction_rating).length || 0 : 0
+
+    const totalFiscalAppointments = fiscalAppointments?.length || 0
+    const completedFiscalAppointments = fiscalAppointments?.filter(a => a.status === 'CONCLUIDO' || a.status === 'FINALIZADO').length || 0
 
     const completedTrainings = trainings?.filter(t => t.is_completed).length || 0
     const totalTrainings = trainings?.length || 0
@@ -85,7 +114,13 @@ async function getStudentReportData(studentId: string): Promise<ReportData> {
     const avgPerformanceScore = evaluations?.length ?
       evaluations.reduce((sum, e) => sum + e.overall_score, 0) / evaluations.length : 0
 
+    // Calcular média de feedbacks
+    const totalFeedbacks = feedbacks?.length || 0
+    const avgFeedbackRating = feedbacks?.length ?
+      feedbacks.reduce((sum, f) => sum + (f.rating || 0), 0) / feedbacks.length : 0
+
     const successRate = totalAttendances > 0 ? Math.round((completedAttendances / totalAttendances) * 100) : 0
+    const fiscalSuccessRate = totalFiscalAppointments > 0 ? Math.round((completedFiscalAppointments / totalFiscalAppointments) * 100) : 0
 
     // Preparar dados do relatório
     const reportData: ReportData = {
@@ -101,11 +136,17 @@ async function getStudentReportData(studentId: string): Promise<ReportData> {
       stats: {
         totalAttendances,
         completedAttendances,
+        cancelledAttendances,
+        scheduledAttendances,
+        inProgressAttendances,
+        noShowAttendances,
         successRate,
         avgRating,
         avgPerformanceScore,
         completedTrainings,
-        totalTrainings
+        totalTrainings,
+        totalFeedbacks,
+        avgFeedbackRating
       },
       attendances: attendances?.map(att => ({
         id: att.id,
@@ -117,8 +158,27 @@ async function getStudentReportData(studentId: string): Promise<ReportData> {
         scheduled_time: att.scheduled_time,
         urgency: att.urgency,
         is_online: att.is_online,
-        client_satisfaction_rating: att.client_satisfaction_rating
+        client_satisfaction_rating: att.client_satisfaction_rating,
+        feedback: att.feedback || undefined
       })) || [],
+      fiscalAppointments: fiscalAppointments?.map(fiscal => {
+        const appointmentFeedback = feedbacks?.find(f => f.appointment_id === fiscal.id)
+        return {
+          id: fiscal.id,
+          protocol: fiscal.protocol,
+          client_name: fiscal.client_name,
+          service_description: fiscal.service_description,
+          status: fiscal.status,
+          appointment_date: fiscal.appointment_date,
+          student_name: student.name,
+          feedback: appointmentFeedback ? {
+            rating: appointmentFeedback.rating || 0,
+            comment: appointmentFeedback.comment || '',
+            strengths: appointmentFeedback.strengths ? JSON.parse(appointmentFeedback.strengths) : [],
+            improvements: appointmentFeedback.improvements ? JSON.parse(appointmentFeedback.improvements) : []
+          } : undefined
+        }
+      }) || [],
       trainings: trainings?.map(training => ({
         id: training.training_id,
         title: training.training?.title || 'N/A',
@@ -187,6 +247,46 @@ function createTemplate(templateType: string = 'complete'): ReportTemplate {
   }
 
   return templates[templateType] || templates.complete
+}
+
+async function saveReportHistory(
+  studentId: string,
+  studentName: string,
+  studentEmail: string,
+  reportData: ReportData,
+  reportType: 'quick' | 'custom',
+  template: string,
+  format: string,
+  customTemplate: ReportTemplate | null,
+  fileSize: number
+) {
+  try {
+    const { error } = await supabase
+      .from('report_history')
+      .insert({
+        student_id: studentId,
+        student_name: studentName,
+        student_email: studentEmail,
+        report_type: reportType,
+        template: template,
+        format: format,
+        custom_template: customTemplate,
+        stats: reportData.stats,
+        total_attendances: reportData.stats.totalAttendances,
+        completed_attendances: reportData.stats.completedAttendances,
+        total_trainings: reportData.stats.totalTrainings,
+        completed_trainings: reportData.stats.completedTrainings,
+        success_rate: reportData.stats.successRate,
+        avg_rating: reportData.stats.avgRating,
+        file_size: fileSize
+      })
+
+    if (error) {
+      console.error('Erro ao salvar histórico do relatório:', error)
+    }
+  } catch (error) {
+    console.error('Erro ao salvar histórico do relatório:', error)
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -287,6 +387,19 @@ export async function GET(request: NextRequest) {
     // Converter blob para buffer
     const arrayBuffer = await blob.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
+
+    // Salvar histórico do relatório
+    await saveReportHistory(
+      studentAuth.studentId,
+      reportData.student.name,
+      reportData.student.email,
+      reportData,
+      'quick',
+      templateType,
+      format,
+      null,
+      buffer.length
+    )
 
     // Retornar arquivo
     return new NextResponse(buffer, {
@@ -408,6 +521,19 @@ export async function POST(request: NextRequest) {
     // Converter blob para buffer
     const arrayBuffer = await blob.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
+
+    // Salvar histórico do relatório customizado
+    await saveReportHistory(
+      studentAuth.studentId,
+      reportData.student.name,
+      reportData.student.email,
+      reportData,
+      'custom',
+      customTemplate ? 'custom' : 'complete',
+      format,
+      customTemplate,
+      buffer.length
+    )
 
     // Retornar arquivo
     return new NextResponse(buffer, {

@@ -412,16 +412,49 @@ model Legislation {
 // Modelo de FAQ
 model FAQ {
   id          String @id @default(cuid())
-  question    String 
-  answer      String 
+  question    String
+  answer      String
   category    String
   keywords    String // JSON array como string
   viewCount   Int    @default(0)
   isActive    Boolean @default(true)
-  
+
   // Metadados
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@map("faqs")
+}
+
+// Modelo de histórico de relatórios
+model ReportHistory {
+  id              String   @id @default(cuid())
+  studentId       String
+  studentName     String
+  studentEmail    String
+
+  // Configurações do relatório
+  reportType      String   // 'quick' ou 'custom'
+  template        String   // 'complete', 'performance', 'attendances', 'trainings'
+  format          String   // 'pdf', 'docx', 'excel', 'csv', 'txt'
+
+  // Template customizado (JSON)
+  customTemplate  Json?
+
+  // Estatísticas do relatório no momento da geração
+  stats           Json
+
+  // Informações sobre o conteúdo
+  totalAttendances      Int      @default(0)
+  completedAttendances  Int      @default(0)
+  totalTrainings        Int      @default(0)
+  completedTrainings    Int      @default(0)
+  successRate           Float    @default(0)
+  avgRating             Float    @default(0)
+
+  // Metadados
+  generatedAt     DateTime @default(now())
+  fileSize        Int?     // Tamanho do arquivo em bytes
+
+  @@map("report_history")
 }
