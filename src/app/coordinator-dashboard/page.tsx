@@ -36,7 +36,8 @@ import {
   History,
   Home,
   ChevronDown,
-  UserCheck
+  UserCheck,
+  Link as LinkIcon
 } from 'lucide-react'
 import Link from 'next/link'
 import MainNavigation from '@/components/MainNavigation'
@@ -48,6 +49,7 @@ import SimpleChart from '@/components/charts/SimpleChart'
 import AppointmentsPanel from '@/components/admin/AppointmentsPanel'
 import UsersPanel from '@/components/admin/UsersPanel'
 import StudentsPerformancePanel from '@/components/coordinator/StudentsPerformancePanel'
+import ChatLinkGenerator from '@/components/coordinator/ChatLinkGenerator'
 // import { HistoryDashboard } from '@/components/coordinator/HistoryDashboard'
 
 interface ServiceMetrics {
@@ -815,6 +817,13 @@ export default function CoordinatorDashboard() {
       label: 'Business Intelligence',
       description: 'Relatórios Estratégicos',
       icon: Download,
+      category: 'analytics'
+    },
+    {
+      value: 'chat-links',
+      label: 'Links de Chat',
+      description: 'Gerar Acesso ao Chat',
+      icon: LinkIcon,
       category: 'analytics'
     },
     {
@@ -1952,6 +1961,9 @@ export default function CoordinatorDashboard() {
             <AdvancedReportsCenter />
           </TabsContent>
 
+          <TabsContent value="chat-links" className="space-y-6">
+            <ChatLinkGenerator />
+          </TabsContent>
 
           <TabsContent value="backup" className="space-y-6">
             <Card>

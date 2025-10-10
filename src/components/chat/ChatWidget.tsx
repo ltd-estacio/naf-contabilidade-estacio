@@ -91,9 +91,40 @@ export default function ChatWidget() {
   const [transferData, setTransferData] = useState({ reason: '', notes: '', to_user_type: 'coordinator' })
   const [availableAttendants, setAvailableAttendants] = useState([])
   const [selectedAttendant, setSelectedAttendant] = useState('')
+  const [hasChatToken, setHasChatToken] = useState(false)
+  const [tokenValidated, setTokenValidated] = useState(false)
 
 const messagesContainerRef = useRef<HTMLDivElement>(null)
 const lastMessageIdRef = useRef<string | null>(null)
+
+  // Check for chat_token in URL on mount
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const token = searchParams.get('chat_token')
+
+    if (token) {
+      // Validate the token
+      validateChatToken(token)
+    }
+  }, [])
+
+  const validateChatToken = async (token: string) => {
+    try {
+      const response = await fetch(`/api/chat/validate-link?token=${token}`)
+      const data = await response.json()
+
+      if (data.valid) {
+        setHasChatToken(true)
+        setTokenValidated(true)
+        // Auto-open the chat widget
+        setIsOpen(true)
+      } else {
+        console.log('Token inválido ou expirado')
+      }
+    } catch (error) {
+      console.error('Erro ao validar token:', error)
+    }
+  }
 
 const scrollToBottom = () => {
   const container = messagesContainerRef.current
