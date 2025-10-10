@@ -62,7 +62,7 @@ interface TrainingsData {
 export default function TrainingsSection() {
   const [trainingsData, setTrainingsData] = useState<TrainingsData | null>(null)
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('internal')
+  const [activeTab, setActiveTab] = useState('external')
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
   const [enrolling, setEnrolling] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -567,7 +567,7 @@ export default function TrainingsSection() {
 
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
           <TabsTrigger value="external" className="flex items-center gap-2">
             <ExternalLink className="h-4 w-4" />
             Cursos
