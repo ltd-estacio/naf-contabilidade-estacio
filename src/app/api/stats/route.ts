@@ -50,9 +50,9 @@ export async function GET(request: NextRequest) {
 
     // 3. SERVIÇOS DISPONÍVEIS - Contar serviços NAF ativos
     const { data: nafServices, error: nafServicesError } = await supabase
-      .from('naf_services')
+      .from('services')
       .select('id')
-      .eq('status', 'ativo')
+      .eq('isActive', true)
 
     if (nafServicesError) {
       console.error('Erro ao buscar serviços NAF:', nafServicesError)
@@ -100,16 +100,17 @@ export async function GET(request: NextRequest) {
 
     console.log(`⭐ Satisfação calculada: ${satisfactionPercentage}% (baseada em ${allRatings.length} avaliações)`)
 
-    // 5. Garantir valores mínimos para apresentação pública
+    // 5. SSL verification
     const sslEnabled = ((process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || '').startsWith('https://'))
       || (process.env.NEXT_PUBLIC_SUPABASE_URL || '').startsWith('https://')
 
+    // Retornar dados reais do banco - SEM valores mínimos artificiais
     const finalStats = {
-      totalAttendances: Math.max(totalServices, 150), // Mínimo 150 para apresentação
-      userSatisfaction: satisfactionPercentage > 0 ? satisfactionPercentage : 95, // Usar real ou padrão
-      availableServices: availableServices || 21, // Usar real ou padrão
-      onlineSupport: '24h', // Fixo
-      activeCoordinators: totalActiveCoordinators || 3, // Substitui estudantes ativos
+      totalAttendances: totalServices, // Total real de atendimentos + fiscais
+      userSatisfaction: satisfactionPercentage > 0 ? satisfactionPercentage : 95, // Usar real ou padrão apenas se não houver dados
+      availableServices: availableServices, // Serviços reais cadastrados
+      onlineSupport: '24h', // Fixo - informação institucional
+      activeCoordinators: totalActiveCoordinators, // Coordenadores reais ativos
       sslEnabled,
       fiscalCompleted // Orientações fiscais concluídas (real)
     }

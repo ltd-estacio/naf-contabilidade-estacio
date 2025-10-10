@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -55,11 +55,23 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [lastGenerated, setLastGenerated] = useState<string | null>(null)
   const [generationHistory, setGenerationHistory] = useState<Array<{
+    id?: string
     format: string
     template: string
     timestamp: string
     filename: string
+    reportType?: string
+    fileSize?: number
+    stats?: {
+      totalAttendances: number
+      completedAttendances: number
+      successRate: number
+      avgRating: number
+      totalTrainings: number
+      completedTrainings: number
+    }
   }>>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   const formats = [
     {
@@ -134,6 +146,55 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
       includes: ['treinamentos']
     }
   ]
+
+  // Buscar histórico de relatórios do banco de dados
+  const fetchReportHistory = async () => {
+    try {
+      setLoadingHistory(true)
+      const token = localStorage.getItem('student_token')
+      if (!token) {
+        console.error('Token não encontrado')
+        return
+      }
+
+      const response = await fetch('/api/students/reports-advanced/history?limit=10', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao buscar histórico')
+      }
+
+      const result = await response.json()
+
+      if (result.success && result.data) {
+        // Converter dados do banco para o formato do componente
+        const historyFromDB = result.data.map((item: unknown) => ({
+          id: item.id,
+          format: item.format,
+          template: item.template,
+          timestamp: item.generatedAt,
+          filename: `relatorio-${item.template}-${item.format}-${new Date(item.generatedAt).toISOString().split('T')[0]}.${item.format}`,
+          reportType: item.reportType,
+          fileSize: item.fileSize,
+          stats: item.stats
+        }))
+
+        setGenerationHistory(historyFromDB)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar histórico de relatórios:', error)
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  // Carregar histórico ao montar o componente
+  useEffect(() => {
+    fetchReportHistory()
+  }, [])
 
   const generateReport = async (format: string, template?: ReportTemplate) => {
     try {
@@ -217,16 +278,13 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
       window.URL.revokeObjectURL(downloadUrl)
       document.body.removeChild(a)
 
-      // Atualizar histórico
-      const historyEntry = {
-        format,
-        template: template ? 'customizado' : selectedTemplate,
-        timestamp: new Date().toISOString(),
-        filename
-      }
-
-      setGenerationHistory(prev => [historyEntry, ...prev.slice(0, 4)])
+      // Atualizar histórico local
       setLastGenerated(new Date().toLocaleString('pt-BR'))
+
+      // Recarregar histórico do banco de dados após 1 segundo
+      setTimeout(() => {
+        fetchReportHistory()
+      }, 1000)
 
       alert(`✅ Relatório ${format.toUpperCase()} baixado com sucesso!`)
 
@@ -660,29 +718,55 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
                 Histórico de Relatórios
               </CardTitle>
               <CardDescription>
-                Últimos relatórios gerados nesta sessão
+                Todos os relatórios gerados pelo sistema
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {generationHistory.length > 0 ? (
+              {loadingHistory ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-emerald-600" />
+                  <p className="text-gray-600">Carregando histórico...</p>
+                </div>
+              ) : generationHistory.length > 0 ? (
                 <div className="space-y-3">
-                  {generationHistory.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                        <div>
-                          <div className="font-medium">{item.filename}</div>
-                          <div className="text-sm text-gray-600">
-                            {item.format.toUpperCase()} • Template: {item.template} • {new Date(item.timestamp).toLocaleString('pt-BR')}
+                  {generationHistory.map((item, index) => {
+                    const formatInfo = formats.find(f => f.value === item.format)
+                    const FormatIcon = formatInfo?.icon || FileText
+
+                    return (
+                      <div key={item.id || index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center space-x-4 flex-1">
+                          <div className={`p-2 rounded ${formatInfo?.bgColor || 'bg-gray-50'}`}>
+                            <FormatIcon className={`h-5 w-5 ${formatInfo?.color || 'text-gray-600'}`} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium">{item.filename}</div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              {item.format.toUpperCase()} • Template: {item.template}
+                              {item.fileSize && ` • ${(item.fileSize / 1024).toFixed(1)} KB`}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {new Date(item.timestamp).toLocaleString('pt-BR')}
+                            </div>
+                            {item.stats && (
+                              <div className="flex gap-3 mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {item.stats.totalAttendances} atendimentos
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {item.stats.successRate}% sucesso
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                         </div>
+                        <Badge variant="outline" className="bg-green-50 text-green-700">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Gerado
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="bg-green-50 text-green-700">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Sucesso
-                      </Badge>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">

@@ -261,31 +261,62 @@ async function saveReportHistory(
   fileSize: number
 ) {
   try {
-    const { error } = await supabase
+    console.log('📊 Salvando histórico de relatório:', {
+      studentId,
+      studentName,
+      reportType,
+      template,
+      format,
+      fileSize
+    })
+
+    // Gerar um ID único usando timestamp + random
+    const generateId = () => {
+      const timestamp = Date.now().toString(36)
+      const randomStr = Math.random().toString(36).substring(2, 15)
+      return `${timestamp}-${randomStr}`
+    }
+
+    const historyData = {
+      id: generateId(),
+      student_id: studentId,
+      student_name: studentName,
+      student_email: studentEmail,
+      report_type: reportType,
+      template: template,
+      format: format,
+      custom_template: customTemplate,
+      stats: reportData.stats,
+      total_attendances: reportData.stats.totalAttendances,
+      completed_attendances: reportData.stats.completedAttendances,
+      total_trainings: reportData.stats.totalTrainings,
+      completed_trainings: reportData.stats.completedTrainings,
+      success_rate: reportData.stats.successRate,
+      avg_rating: reportData.stats.avgRating,
+      file_size: fileSize
+    }
+
+    const { data, error } = await supabase
       .from('report_history')
-      .insert({
-        student_id: studentId,
-        student_name: studentName,
-        student_email: studentEmail,
-        report_type: reportType,
-        template: template,
-        format: format,
-        custom_template: customTemplate,
-        stats: reportData.stats,
-        total_attendances: reportData.stats.totalAttendances,
-        completed_attendances: reportData.stats.completedAttendances,
-        total_trainings: reportData.stats.totalTrainings,
-        completed_trainings: reportData.stats.completedTrainings,
-        success_rate: reportData.stats.successRate,
-        avg_rating: reportData.stats.avgRating,
-        file_size: fileSize
-      })
+      .insert(historyData)
+      .select()
 
     if (error) {
-      console.error('Erro ao salvar histórico do relatório:', error)
+      console.error('❌ Erro ao salvar histórico do relatório:', error)
+      console.error('Detalhes do erro:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+    } else {
+      console.log('✅ Histórico de relatório salvo com sucesso:', data)
     }
   } catch (error) {
-    console.error('Erro ao salvar histórico do relatório:', error)
+    console.error('❌ Exceção ao salvar histórico do relatório:', error)
+    if (error instanceof Error) {
+      console.error('Stack trace:', error.stack)
+    }
   }
 }
 
