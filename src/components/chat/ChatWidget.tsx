@@ -1097,39 +1097,80 @@ Não foi possível carregar seu histórico no momento.
     if (!isLoggedIn || !loggedUser || !conversation) return
 
     try {
-      // Buscar atendentes disponíveis (mock data)
-      const mockAttendants = [
-        { id: 'coord-1', name: 'Prof. Maria Santos', type: 'coordinator', available: true },
-        { id: 'coord-2', name: 'Prof. Carlos Lima', type: 'coordinator', available: true },
-        { id: 'coord-3', name: 'Prof. Ana Silva', type: 'coordinator', available: false },
-        { id: 'stud-1', name: 'Ana Costa', type: 'student', available: true },
-        { id: 'stud-2', name: 'Carlos Lima', type: 'student', available: true },
-        { id: 'stud-3', name: 'Pedro Alves', type: 'student', available: true },
-        { id: 'stud-4', name: 'Lucas Santos', type: 'student', available: false }
-      ]
+      // Buscar atendentes disponíveis do banco de dados
+      const response = await fetch('/api/chat/available-attendants?type=all')
+      const data = await response.json()
 
-      setAvailableAttendants(mockAttendants.filter(att => att.available))
-      setShowTransferModal(true)
+      if (data.success && data.attendants) {
+        // Filtrar apenas atendentes disponíveis
+        const availableOnly = data.attendants.filter((att: any) => att.available)
 
-      const transferMessage: Message = {
-        id: generateId(),
-        content: `🔄 **Solicitar Transferência**
+        if (availableOnly.length === 0) {
+          const noAttendantsMessage: Message = {
+            id: generateId(),
+            content: `⚠️ **Nenhum atendente disponível no momento**
 
-Para melhor atendê-lo, você pode solicitar transferência para:
+Todos os nossos atendentes estão ocupados no momento.
 
-• **Coordenador:** Questões complexas ou supervisão
-• **Estudante especializado:** Área específica de conhecimento
+**Alternativas:**
+• Aguarde alguns minutos e tente novamente
+• Continue com o atendimento atual
+• Ligue: (48) 98461-4449
+
+Tente novamente em alguns instantes.`,
+            sender_type: 'assistant',
+            sender_name: 'Sistema NAF',
+            created_at: new Date().toISOString(),
+            is_read: true
+          }
+          setMessages(prev => [...prev, noAttendantsMessage])
+          return
+        }
+
+        setAvailableAttendants(availableOnly)
+        setShowTransferModal(true)
+
+        const transferMessage: Message = {
+          id: generateId(),
+          content: `🔄 **Solicitar Transferência**
+
+Encontramos **${availableOnly.length} atendente(s) disponível(is)** para transferência:
+
+• **Coordenadores:** Questões complexas, supervisão, casos especializados
+• **Estudantes:** Atendimento especializado por área de conhecimento
+
+**${data.available_count} atendente(s) disponível(is) agora**
 
 Selecione o tipo de atendente e o motivo da transferência no formulário que apareceu.`,
+          sender_type: 'assistant',
+          sender_name: 'Sistema NAF',
+          created_at: new Date().toISOString(),
+          is_read: true
+        }
+        setMessages(prev => [...prev, transferMessage])
+      } else {
+        throw new Error('Erro ao buscar atendentes')
+      }
+
+    } catch (error) {
+      console.error('Erro ao iniciar transferência:', error)
+
+      const errorMessage: Message = {
+        id: generateId(),
+        content: `❌ **Erro ao buscar atendentes**
+
+Não foi possível carregar a lista de atendentes disponíveis.
+
+**Tente:**
+• Atualizar a página
+• Tentar novamente em alguns minutos
+• Entrar em contato: (48) 98461-4449`,
         sender_type: 'assistant',
         sender_name: 'Sistema NAF',
         created_at: new Date().toISOString(),
         is_read: true
       }
-      setMessages(prev => [...prev, transferMessage])
-
-    } catch (error) {
-      console.error('Erro ao iniciar transferência:', error)
+      setMessages(prev => [...prev, errorMessage])
     }
   }
 

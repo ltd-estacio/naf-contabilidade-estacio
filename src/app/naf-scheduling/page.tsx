@@ -697,8 +697,8 @@ function NAFSchedulingSystem() {
         </div>
 
         <Card className="overflow-hidden dark:bg-gray-900 dark:border-gray-700">
-          <CardContent className="p-4 sm:p-6 space-y-6">
-            <div className="grid gap-3 md:grid-cols-3">
+          <CardContent className="p-6 space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
               {summaryItems.map(item => {
                 const Icon = item.icon
                 return (
@@ -737,29 +737,26 @@ function NAFSchedulingSystem() {
               })}
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
+            <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr]">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                     Calendário
                   </h3>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Domingos e dias passados indisponíveis
+                    Domingos indisponíveis
                   </span>
                 </div>
-                <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900/40 p-4">
                   <Calendar
                     mode="single"
                     selected={selectedDate}
                     onSelect={handleDateSelection}
                     disabled={(date: Date) => isPastDate(date) || date.getDay() === 0}
                     locale={ptBR}
-                    className="w-full [&_table]:w-full"
+                    className="w-full mx-auto"
                   />
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Clique em um dia disponível para ver os horários e prosseguir.
-                </p>
               </div>
 
               <div className="space-y-5">
@@ -772,27 +769,27 @@ function NAFSchedulingSystem() {
                             day: '2-digit',
                             month: 'long'
                           })
-                        : 'Horários disponíveis'}
+                        : 'Horários'}
                     </p>
                     {selectedDate && (
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Horário de Brasília (BRT)
+                        BRT
                       </span>
                     )}
                   </div>
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3 min-h-[200px]">
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-4">
                     {!selectedDate ? (
                       <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-gray-500 dark:text-gray-400">
-                        <CalendarIcon className="h-10 w-10 opacity-40" />
-                        Escolha um dia para visualizar os horários disponíveis.
+                        <Clock className="h-10 w-10 opacity-40" />
+                        Escolha uma data
                       </div>
                     ) : loading ? (
-                      <div className="flex flex-col items-center justify-center gap-3 py-12 text-sm text-gray-500 dark:text-gray-400">
-                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-r-transparent"></div>
-                        Carregando horários disponíveis...
+                      <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-r-transparent"></div>
+                        Carregando...
                       </div>
                     ) : availableSlots.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-3">
                         {availableSlots.map((slot, index) => {
                           const isSelected =
                             appointment.preferredTime === slot.time &&
@@ -805,52 +802,45 @@ function NAFSchedulingSystem() {
                               variant="outline"
                               disabled={!slot.available || loading}
                               onClick={() => handleTimeSelection(slot)}
-                              className={`justify-center h-12 text-sm font-semibold transition-all relative ${
+                              className={`justify-center h-12 text-sm font-semibold transition-all ${
                                 isSelected
-                                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-lg'
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
                                   : slot.available
                                     ? 'border-gray-200 hover:border-blue-400 dark:border-gray-700 dark:hover:border-blue-600'
                                     : 'border-gray-200 dark:border-gray-700 opacity-40 cursor-not-allowed'
                               }`}
                             >
-                              <Clock className="h-4 w-4 mr-2" />
                               {slot.time}
-                              {!slot.available && (
-                                <span className="absolute -top-1 -right-1 flex h-5 w-5">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500"></span>
-                                </span>
-                              )}
                             </Button>
                           )
                         })}
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center gap-2 py-8 text-sm text-gray-500 dark:text-gray-400">
-                        <Clock className="h-8 w-8 opacity-40" />
-                        Nenhum horário disponível para esta data. Escolha outro dia.
+                      <div className="flex flex-col items-center justify-center gap-2 py-6 text-sm text-gray-500 dark:text-gray-400">
+                        <Clock className="h-6 w-6 opacity-40" />
+                        Sem horários
                       </div>
                     )}
                   </div>
                   {selectedDate && !loading && availableSlots.length > 0 && (
-                    <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
+                    <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-blue-500"></span>
                         Disponível
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full bg-gray-400"></span>
-                        Indisponível
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-gray-400"></span>
+                        Ocupado
                       </div>
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Formato do atendimento *
+                  <p className="text-base font-semibold text-gray-900 dark:text-white">
+                    Formato do Atendimento *
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <Button
                       type="button"
                       variant="outline"
@@ -858,19 +848,19 @@ function NAFSchedulingSystem() {
                       className={`h-20 justify-start gap-3 border-2 text-left transition-all ${
                         presencialSelected
                           ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-900/30 dark:border-blue-500'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-500'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
                       }`}
                     >
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${
                         presencialSelected
                           ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300'
                           : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200'
                       }`}>
                         <Building2 className="h-5 w-5" />
                       </div>
-                      <div className="flex flex-col items-start">
-                        <span className="font-semibold text-gray-900 dark:text-white">Presencial</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Atendimento na unidade do NAF</span>
+                      <div className="flex flex-col">
+                        <span className="text-base font-semibold text-gray-900 dark:text-white">Presencial</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No NAF</span>
                       </div>
                     </Button>
                     <Button
@@ -880,25 +870,22 @@ function NAFSchedulingSystem() {
                       className={`h-20 justify-start gap-3 border-2 text-left transition-all ${
                         onlineSelected
                           ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-900/30 dark:border-blue-500'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-500'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
                       }`}
                     >
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${
                         onlineSelected
                           ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300'
                           : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200'
                       }`}>
                         <Monitor className="h-5 w-5" />
                       </div>
-                      <div className="flex flex-col items-start">
-                        <span className="font-semibold text-gray-900 dark:text-white">Online</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Receba o link por e-mail</span>
+                      <div className="flex flex-col">
+                        <span className="text-base font-semibold text-gray-900 dark:text-white">Online</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Link por email</span>
                       </div>
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Defina como o atendimento será realizado para continuarmos.
-                  </p>
                 </div>
               </div>
             </div>
@@ -1025,7 +1012,7 @@ function NAFSchedulingSystem() {
 
       {/* Header */}
       <header className="bg-white dark:bg-gray-900 shadow-sm border-b dark:border-gray-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center">
@@ -1044,7 +1031,7 @@ function NAFSchedulingSystem() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {step < 4 && (
           <div className="mb-8">
             <div className="flex items-center justify-center space-x-4">
@@ -1077,7 +1064,7 @@ function NAFSchedulingSystem() {
           </div>
         )}
 
-        <Card className="max-w-2xl mx-auto dark:bg-gray-900 dark:border-gray-800">
+        <Card className="max-w-5xl mx-auto dark:bg-gray-900 dark:border-gray-800">
           <CardContent className="p-8">
             {step === 1 && renderStep1()}
             {step === 2 && renderStep2()}

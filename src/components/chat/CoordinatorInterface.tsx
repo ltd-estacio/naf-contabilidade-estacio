@@ -359,10 +359,20 @@ export default function CoordinatorInterface({ coordinatorId, coordinatorName }:
   // Carregar coordenadores disponíveis para transferência
   const loadAvailableCoordinators = async () => {
     try {
-      const response = await fetch(`/api/chat/transfer-chat?exclude_id=${coordinatorId}`)
+      const response = await fetch(`/api/chat/available-attendants?type=coordinator&exclude_id=${coordinatorId}`)
       const data = await response.json()
-      if (data.coordinators) {
-        setAvailableCoordinators(data.coordinators)
+
+      if (data.success && data.attendants) {
+        // Converter formato da nova API para o formato esperado
+        const formattedCoordinators = data.attendants.map((att: any) => ({
+          id: att.id,
+          name: att.name || att.email,
+          email: att.email,
+          specialties: att.specialties || [],
+          is_online: att.available,
+          status: att.available ? 'available' : 'busy'
+        }))
+        setAvailableCoordinators(formattedCoordinators)
       }
     } catch (error) {
       console.error('Erro ao carregar coordenadores:', error)
@@ -371,10 +381,21 @@ export default function CoordinatorInterface({ coordinatorId, coordinatorName }:
 
   const loadAvailableStudents = async () => {
     try {
-      const response = await fetch('/api/chat/available-students')
+      const response = await fetch('/api/chat/available-attendants?type=student')
       const data = await response.json()
-      if (data.students) {
-        setAvailableStudents(data.students)
+
+      if (data.success && data.attendants) {
+        // Converter formato da nova API para o formato esperado
+        const formattedStudents = data.attendants.map((att: any) => ({
+          id: att.id,
+          name: att.name || att.email,
+          email: att.email,
+          course: att.specialties?.[0] || 'Não informado',
+          semester: '',
+          is_online: att.available,
+          status: att.available ? 'available' : 'busy'
+        }))
+        setAvailableStudents(formattedStudents)
       }
     } catch (error) {
       console.error('Erro ao carregar estudantes:', error)
@@ -386,52 +407,57 @@ export default function CoordinatorInterface({ coordinatorId, coordinatorName }:
     if (!activeChat) return
 
     try {
-      if (transferType === 'coordinator') {
-        if (!selectedCoordinator) return
-        const targetCoordinator = availableCoordinators.find(c => c.id === selectedCoordinator)
+      // Usar API unificada de transferência
+      const isTransferToCoordinator = transferType === 'coordinator'
+      const targetId = isTransferToCoordinator ? selectedCoordinator : selectedStudent
 
-        const response = await fetch('/api/chat/transfer-chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            conversation_id: activeChat.id,
-            from_coordinator_id: coordinatorId,
-            to_coordinator_id: selectedCoordinator,
-            from_coordinator_name: coordinatorName,
-            to_coordinator_name: targetCoordinator?.name,
-            reason: transferReason
-          })
-        })
-
-        if (!response.ok) {
-          throw new Error('Falha ao transferir chat para outro coordenador')
-        }
-      } else {
-        if (!selectedStudent) return
-        const targetStudent = availableStudents.find(student => student.id === selectedStudent)
-
-        const response = await fetch('/api/chat/transfer-to-student', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            conversation_id: activeChat.id,
-            from_coordinator_id: coordinatorId,
-            to_student_id: selectedStudent,
-            from_coordinator_name: coordinatorName,
-            to_student_name: targetStudent?.name,
-            reason: transferReason,
-            message: transferMessage || `Olá! ${coordinatorName} encaminhou este atendimento para você. Pode assumir?`
-          })
-        })
-
-        if (!response.ok) {
-          throw new Error('Falha ao solicitar transferência para estudante')
-        }
+      if (!targetId) {
+        console.error('Nenhum atendente selecionado')
+        return
       }
+
+      const targetUser = isTransferToCoordinator
+        ? availableCoordinators.find(c => c.id === targetId)
+        : availableStudents.find(s => s.id === targetId)
+
+      if (!targetUser) {
+        console.error('Atendente não encontrado')
+        return
+      }
+
+      console.log('🔄 Transferindo chat:', {
+        conversation_id: activeChat.id,
+        from: coordinatorName,
+        to: targetUser.name,
+        type: isTransferToCoordinator ? 'coordinator' : 'student'
+      })
+
+      const response = await fetch('/api/chat/transfer-attendant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: activeChat.id,
+          from_user_id: coordinatorId,
+          from_user_type: 'coordinator',
+          from_user_name: coordinatorName,
+          to_user_id: targetId,
+          to_user_type: isTransferToCoordinator ? 'coordinator' : 'student',
+          to_user_name: targetUser.name || targetUser.email,
+          transfer_reason: transferReason || 'Transferência solicitada pelo coordenador',
+          transfer_notes: transferMessage || ''
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Erro na transferência:', errorData)
+        throw new Error(errorData.message || 'Falha ao transferir chat')
+      }
+
+      const result = await response.json()
+      console.log('✅ Transferência realizada:', result)
 
       setActiveChat(null)
       setShowTransferDialog(false)

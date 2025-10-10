@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
     const {
-      session_id,
+      session_id, // conversation_id
       from_user_id,
       from_user_type,
       from_user_name,
@@ -21,73 +24,186 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Mock data para desenvolvimento - em produção, salvar no banco de dados
-    const transferId = `transfer-${Date.now()}`
-
-    const transferData = {
-      id: transferId,
+    console.log('🔄 Iniciando transferência:', {
       session_id,
       from_user_id,
-      from_user_type: from_user_type || 'student',
-      from_user_name: from_user_name || 'Atendente Anterior',
       to_user_id,
-      to_user_type: to_user_type || 'coordinator',
-      to_user_name: to_user_name || 'Novo Atendente',
-      transfer_reason: transfer_reason || 'Solicitação de especialista',
-      transfer_notes: transfer_notes || '',
-      status: 'pending',
-      transferred_at: new Date().toISOString(),
-      accepted_at: null,
-      completed_at: null,
-      created_at: new Date().toISOString()
-    }
-
-    // Simular persistência (em produção seria salvo no banco)
-    if (!global.chatTransfers) {
-      global.chatTransfers = new Map()
-    }
-    global.chatTransfers.set(transferId, transferData)
-
-    // Atualizar sessão do chat
-    if (!global.chatSessions) {
-      global.chatSessions = new Map()
-    }
-
-    const currentSession = global.chatSessions.get(session_id) || {
-      id: session_id,
-      status: 'active',
-      user_id: from_user_id,
-      assigned_coordinator_id: null,
-      assigned_student_id: null,
-      transferred_from_user_id: null,
-      transferred_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-
-    // Atualizar com informações da transferência
-    const updatedSession = {
-      ...currentSession,
-      status: 'transferred',
-      transferred_from_user_id: from_user_id,
-      transferred_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-
-    if (to_user_type === 'coordinator') {
-      updatedSession.assigned_coordinator_id = to_user_id
-    } else if (to_user_type === 'student') {
-      updatedSession.assigned_student_id = to_user_id
-    }
-
-    global.chatSessions.set(session_id, updatedSession)
-
-    return NextResponse.json({
-      success: true,
-      transfer: transferData,
-      session: updatedSession,
-      message: `Atendimento transferido de ${from_user_name} para ${to_user_name}`
+      to_user_type,
+      transfer_reason
     })
+
+    try {
+      // 1. Buscar conversa atual com todas as mensagens
+      const { data: conversation, error: convError } = await supabaseAdmin
+        .from('chat_conversations')
+        .select('*, chat_messages(*)')
+        .eq('id', session_id)
+        .single()
+
+      if (convError || !conversation) {
+        console.error('Conversa não encontrada:', convError)
+        return NextResponse.json(
+          { success: false, message: 'Conversa não encontrada' },
+          { status: 404 }
+        )
+      }
+
+      console.log(`📋 Conversa encontrada com ${conversation.chat_messages?.length || 0} mensagens`)
+
+      // 2. Criar registro de transferência
+      const transferId = `transfer-${Date.now()}`
+      const transferRecord = {
+        id: transferId,
+        conversation_id: session_id,
+        from_user_id,
+        from_user_type: from_user_type || 'client',
+        from_user_name: from_user_name || 'Cliente',
+        to_user_id,
+        to_user_type: to_user_type || 'coordinator',
+        to_user_name: to_user_name || 'Atendente',
+        transfer_reason: transfer_reason || 'Solicitação de transferência',
+        transfer_notes: transfer_notes || '',
+        status: 'pending',
+        transferred_at: new Date().toISOString(),
+        accepted_at: null,
+        created_at: new Date().toISOString()
+      }
+
+      // Tentar salvar no Supabase
+      const { error: transferError } = await supabaseAdmin
+        .from('chat_transfer_requests')
+        .insert(transferRecord)
+
+      if (transferError) {
+        console.warn('Erro ao salvar transferência no Supabase, usando fallback:', transferError)
+      }
+
+      // 3. Atualizar conversa com informações da transferência
+      const updatedConversation: any = {
+        status: 'waiting_transfer',
+        transferred_from: from_user_name,
+        transfer_pending: true,
+        updated_at: new Date().toISOString()
+      }
+
+      // Atribuir ao novo atendente baseado no tipo
+      if (to_user_type === 'coordinator') {
+        updatedConversation.coordinator_id = to_user_id
+        updatedConversation.coordinator_name = to_user_name
+      } else if (to_user_type === 'student') {
+        updatedConversation.student_id = to_user_id
+        updatedConversation.student_name = to_user_name
+      }
+
+      // Atualizar no Supabase
+      const { error: updateError } = await supabaseAdmin
+        .from('chat_conversations')
+        .update(updatedConversation)
+        .eq('id', session_id)
+
+      if (updateError) {
+        console.error('Erro ao atualizar conversa:', updateError)
+      }
+
+      // 4. Adicionar mensagem de sistema informando sobre a transferência
+      const transferMessage = {
+        conversation_id: session_id,
+        content: `🔄 **Transferência Solicitada**
+
+**De:** ${from_user_name} (${from_user_type === 'coordinator' ? 'Coordenador' : from_user_type === 'student' ? 'Estudante' : 'Cliente'})
+**Para:** ${to_user_name} (${to_user_type === 'coordinator' ? 'Coordenador' : 'Estudante'})
+
+**Motivo:** ${transfer_reason}
+${transfer_notes ? `**Observações:** ${transfer_notes}` : ''}
+
+⏳ Aguardando aceitação do novo atendente...
+
+📋 **Histórico completo da conversa está disponível** - ${conversation.chat_messages?.length || 0} mensagens anteriores`,
+        sender_type: 'system',
+        sender_id: 'system',
+        sender_name: 'Sistema NAF',
+        is_ai_response: false,
+        is_read: false,
+        created_at: new Date().toISOString()
+      }
+
+      const { error: msgError } = await supabaseAdmin
+        .from('chat_messages')
+        .insert(transferMessage)
+
+      if (msgError) {
+        console.warn('Erro ao inserir mensagem de transferência:', msgError)
+      }
+
+      // 5. Notificar novo atendente (criar notificação)
+      try {
+        await supabaseAdmin
+          .from('chat_notifications')
+          .insert({
+            user_id: to_user_id,
+            user_type: to_user_type,
+            conversation_id: session_id,
+            notification_type: 'transfer_request',
+            title: 'Nova solicitação de transferência',
+            message: `${from_user_name} solicitou transferência de atendimento para você`,
+            data: {
+              transfer_id: transferId,
+              from_user_name,
+              transfer_reason,
+              message_count: conversation.chat_messages?.length || 0
+            },
+            is_read: false,
+            created_at: new Date().toISOString()
+          })
+      } catch (notifError) {
+        console.warn('Erro ao criar notificação:', notifError)
+      }
+
+      console.log('✅ Transferência processada com sucesso')
+
+      return NextResponse.json({
+        success: true,
+        transfer: transferRecord,
+        session: {
+          id: session_id,
+          ...updatedConversation,
+          message_count: conversation.chat_messages?.length || 0
+        },
+        message: `Transferência solicitada com sucesso. ${to_user_name} será notificado.`
+      })
+
+    } catch (supabaseError) {
+      console.error('Erro do Supabase:', supabaseError)
+
+      // Fallback: usar sistema em memória
+      if (!global.chatTransfers) {
+        global.chatTransfers = new Map()
+      }
+
+      const fallbackTransfer = {
+        id: `transfer-${Date.now()}`,
+        session_id,
+        from_user_id,
+        from_user_type,
+        from_user_name,
+        to_user_id,
+        to_user_type,
+        to_user_name,
+        transfer_reason,
+        transfer_notes,
+        status: 'pending',
+        transferred_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      }
+
+      global.chatTransfers.set(fallbackTransfer.id, fallbackTransfer)
+
+      return NextResponse.json({
+        success: true,
+        transfer: fallbackTransfer,
+        message: 'Transferência processada (modo fallback)'
+      })
+    }
 
   } catch (error) {
     console.error('Erro ao processar transferência:', error)

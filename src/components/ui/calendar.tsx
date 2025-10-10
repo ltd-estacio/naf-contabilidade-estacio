@@ -18,28 +18,28 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      className={cn("p-4", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
+        month: "space-y-4 w-full",
+        caption: "flex justify-center pt-1 relative items-center mb-4",
+        caption_label: "text-base font-semibold",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+          "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
-        table: "w-full border-collapse",
-        head_row: "grid grid-cols-7 gap-1",
+        table: "w-full border-collapse space-y-2",
+        head_row: "flex w-full justify-between mb-2",
         head_cell:
-          "text-muted-foreground rounded-md w-full font-normal text-[0.8rem] flex items-center justify-center",
-        row: "grid grid-cols-7 gap-1 mt-1",
-        cell: "text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+          "text-muted-foreground rounded-md w-11 font-semibold text-sm flex items-center justify-center h-11 uppercase",
+        row: "flex w-full mt-1 justify-between",
+        cell: "text-center text-sm p-0.5 relative focus-within:relative focus-within:z-20 w-11 h-11 flex items-center justify-center",
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-full p-0 font-normal aria-selected:opacity-100"
+          "h-10 w-10 p-0 font-medium text-sm aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
         ),
         day_range_end: "day-range-end",
         day_selected:
