@@ -80,44 +80,57 @@ const MainNavigation = ({ showBrand = true }: MainNavigationProps) => {
   const navigationRoutes = {
     portals: [
       {
-        href: '/student-portal',
+        href: '/student-login-simple',
         label: 'Portal do Estudante',
         icon: GraduationCap,
-        description: 'Área do estudante NAF',
+        description: 'Gerencie suas atividades e treinamentos',
         badge: 'Estudante'
       },
       {
         href: '/coordinator-dashboard',
         label: 'Dashboard Coordenador',
         icon: BarChart3,
-        description: 'Painel administrativo',
+        description: 'Métricas e análises avançadas',
         badge: 'Admin'
-      }
-    ],
-    services: [
-      {
-        href: '/naf-scheduling',
-        label: 'Agendamento',
-        icon: Calendar,
-        description: 'Agendar atendimentos'
-      },
-      {
-        href: '/services',
-        label: 'Serviços NAF',
-        icon: FileText,
-        description: 'Lista de serviços'
       },
       {
         href: '/fiscal-guides',
         label: 'Guias Fiscais',
         icon: BookOpen,
-        description: 'Orientações e legislações'
+        description: 'Legislações e procedimentos',
+        badge: 'Guias'
+      }
+    ],
+    services: [
+      {
+        href: '/naf-scheduling',
+        label: 'Agendar',
+        icon: Calendar,
+        description: 'Agendar atendimentos'
       },
       {
-        href: '/schedule',
-        label: 'Agenda Geral',
-        icon: Calendar,
-        description: 'Visualizar agenda'
+        href: '/eligibility',
+        label: 'Verificar Elegibilidade',
+        icon: UserCheck,
+        description: 'Checar se você é elegível'
+      },
+      {
+        href: '/faq',
+        label: 'Perguntas Frequentes',
+        icon: BookOpen,
+        description: 'Dúvidas comuns'
+      },
+      {
+        href: '/about-naf',
+        label: 'Sobre o NAF',
+        icon: Building2,
+        description: 'Conheça o NAF Estácio'
+      },
+      {
+        href: '/services',
+        label: 'Serviços',
+        icon: FileText,
+        description: 'Lista completa de serviços'
       }
     ],
     auth: [
