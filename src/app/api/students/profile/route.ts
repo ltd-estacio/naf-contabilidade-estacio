@@ -12,7 +12,7 @@ async function verifyStudentToken(token: string): Promise<unknown> {
       process.env.NEXTAUTH_SECRET || 'your-secret-key'
     ) as unknown
 
-    if (!decoded.studentId && !decoded.id && decoded.role !== 'student') {
+    if ((!decoded.studentId && !decoded.id) || decoded.role !== 'student') {
       return null
     }
 
