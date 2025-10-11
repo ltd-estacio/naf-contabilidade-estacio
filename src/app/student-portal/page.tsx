@@ -322,9 +322,19 @@ export default function StudentPortal() {
           console.log('📊 Dados do dashboard recebidos:', {
             hasFiscalAppointments: !!data.fiscalAppointments,
             fiscalAppointmentsCount: data.fiscalAppointments?.length || 0,
-            fiscalAppointments: data.fiscalAppointments
+            fiscalAppointments: data.fiscalAppointments,
+            hasProfile: !!data.profile
           })
           setDashboardData(data)
+
+          // Inicializar profileData com dados do dashboard
+          if (data.profile) {
+            setProfileData({
+              profile: data.profile,
+              availability: []
+            })
+            setProfileForm(data.profile)
+          }
         } else {
           // Se retornou 401, token inválido/expirado - fazer logout
           if (response.status === 401) {
