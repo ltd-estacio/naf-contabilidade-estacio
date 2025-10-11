@@ -196,6 +196,7 @@ export default function StudentPortal() {
   const [_trainingsData, setTrainingsData] = useState<unknown>(null)
   const [profileData, setProfileData] = useState<unknown>(null)
   const [studentToken, setStudentToken] = useState('')
+  const [authChecking, setAuthChecking] = useState(true)
   // AI Assistant state
   const [aiMessages, setAiMessages] = useState<{ role: 'user'|'assistant'|'system'; content: string; ts?: number }[]>([
     { role: 'system', content: 'Você é um assistente do NAF para estudantes, especializado em contabilidade brasileira (IRPF, MEI, tributos, obrigações acessórias). Explique de forma clara, com exemplos e checklists quando apropriado. Não ofereça aconselhamento jurídico; cite fontes oficiais (Receita Federal, gov.br) quando útil. Se a pergunta for pessoal/privada, sugira procurar um coordenador ou professor.' }
@@ -262,18 +263,32 @@ export default function StudentPortal() {
   // Verificar autenticação e carregar dados
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('student_token')
-      const userData = localStorage.getItem('student_user')
-
-      if (!token || !userData) {
-        router.push('/student-login-simple')
-        return
-      }
-
-      // Set token in state for child components
-      setStudentToken(token)
-
       try {
+        // Verificar se estamos no cliente (browser)
+        if (typeof window === 'undefined') {
+          return
+        }
+
+        // Pequeno delay para garantir que localStorage está acessível
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        const token = localStorage.getItem('student_token')
+        const userData = localStorage.getItem('student_user')
+
+        console.log('🔐 Verificação de autenticação:', {
+          hasToken: !!token,
+          hasUserData: !!userData
+        })
+
+        if (!token || !userData) {
+          console.log('⚠️ Token ou dados do usuário não encontrados, redirecionando...')
+          setAuthChecking(false)
+          router.push('/student-login-simple')
+          return
+        }
+
+        // Set token in state for child components
+        setStudentToken(token)
         setUser(JSON.parse(userData))
 
         // Buscar dados do dashboard (API unificada que funciona em produção e desenvolvimento)
@@ -306,15 +321,24 @@ export default function StudentPortal() {
           const data = await response.json()
           setDashboardData(data)
         } else {
+          // Se retornou 401, token inválido/expirado - fazer logout
+          if (response.status === 401) {
+            console.log('⚠️ Token inválido ou expirado, fazendo logout...')
+            localStorage.removeItem('student_token')
+            localStorage.removeItem('student_user')
+            router.push('/student-login-simple')
+            return
+          }
           const errorText = await response.text().catch(() => 'Erro desconhecido')
           console.error('Erro da API:', response.status, errorText)
           setError(`Erro ao carregar dados do dashboard: ${response.status}`)
         }
       } catch (error) {
-        console.error('Erro de conexão ao carregar dashboard:', error)
+        console.error('Erro ao verificar autenticação ou carregar dashboard:', error)
         setError('Erro de conexão')
       } finally {
         setLoading(false)
+        setAuthChecking(false)
       }
     }
 
@@ -662,6 +686,18 @@ export default function StudentPortal() {
   const openRequests = dashboardData.attendances?.filter(att =>
     ['AGENDADO', 'EM_ANDAMENTO', 'PENDENTE'].includes(att.status)
   ).length || 0
+
+  // Mostrar loading enquanto verifica autenticação
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando autenticação...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
