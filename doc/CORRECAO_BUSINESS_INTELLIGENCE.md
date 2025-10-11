@@ -1,370 +1,382 @@
-# Correção do Business Intelligence - Ranking e Satisfação de Estudantes
+# 📊 Correção - Business Intelligence (Estudantes)
 
-## Problema Identificado
+## 📋 Resumo das Correções
 
-O "Ranking de Estudantes" e "Análise de Produtividade (Estudantes Ativos)" estavam mostrando dados zerados ou não estavam pegando informações reais do banco de dados Supabase.
+### ✅ 1. Ranking de Estudantes (CORRIGIDO)
+**Problema:** Mostrava "Nenhum estudante com atendimentos registrados"
 
-## Soluções Implementadas
+**Causa:** A API só contava atendimentos da tabela `attendances`, ignorando atendimentos fiscais
 
-### 1. Melhorias na API `/api/coordinator/reports/advanced`
-
-#### Correções Aplicadas:
-
-**a) Filtro de Avaliações Aprimorado:**
-```typescript
-// ANTES - Poderia incluir ratings nulos ou 0
-const ratingsData = attendances?.filter(a => a.client_satisfaction_rating) || []
-
-// DEPOIS - Garante apenas ratings válidos (> 0)
-const ratingsData = attendances?.filter(a =>
-  a.client_satisfaction_rating && a.client_satisfaction_rating > 0
-) || []
-```
-
-**b) Cálculo de Performance de Estudantes Melhorado:**
-```typescript
-// Adicionado filtro para garantir apenas ratings válidos
-const studentRatings = studentAttendances.filter(a =>
-  a.client_satisfaction_rating && a.client_satisfaction_rating > 0
-)
-
-// Cálculo preciso da média de avaliação
-const avgRating = studentRatings.length > 0
-  ? studentRatings.reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / studentRatings.length
-  : 0
-```
-
-**c) Ranking de Estudantes Otimizado:**
-```typescript
-studentRankings: studentPerformanceData
-  .filter(s => s.total_attendances > 0) // Apenas estudantes com atendimentos
-  .sort((a, b) => {
-    // Ordenar por número de atendimentos, depois por avaliação
-    if (b.total_attendances !== a.total_attendances) {
-      return b.total_attendances - a.total_attendances
-    }
-    return b.avg_rating - a.avg_rating
-  })
-  .slice(0, 20)
-```
-
-**d) Logs Detalhados para Debugging:**
-```typescript
-console.log(`📊 Data fetched - Attendances: ${attendances?.length || 0}, Students: ${students?.length || 0}`)
-console.log(`⭐ Satisfação: ${ratingsData.length} avaliações, média ${averageSatisfaction.toFixed(2)}`)
-console.log(`👨‍🎓 Processing performance for ${students?.length || 0} students...`)
-console.log(`✅ ${studentsWithAttendances.length} estudantes com atendimentos encontrados`)
-```
-
-### 2. Melhorias no Componente `AdvancedReportsCenter.tsx`
-
-#### Melhorias Visuais e Funcionais:
-
-**a) Exibição de Estrelas de Satisfação:**
-```tsx
-// Ícone de estrela preenchida com cor amarela
-<div className="flex items-center gap-1">
-  <Star className="h-3 w-3 text-yellow-500 fill-current" />
-  <span>{student.avg_rating > 0 ? student.avg_rating.toFixed(1) : 'N/A'}</span>
-</div>
-```
-
-**b) Mensagens Quando Não Há Dados:**
-```tsx
-{hasStudentData ? (
-  // Exibir ranking
-) : (
-  <div className="text-center py-8">
-    <AlertTriangle className="h-10 w-10 mx-auto text-yellow-500 mb-3" />
-    <p className="text-gray-600 mb-2">Nenhum estudante com atendimentos registrados</p>
-    <p className="text-sm text-gray-500">Aguardando atendimentos para gerar rankings</p>
-  </div>
-)}
-```
-
-**c) Design Melhorado do Ranking:**
-```tsx
-<div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-sm">
-  {index + 1}
-</div>
-```
-
-**d) Alerta para Estudantes Ativos Zerados:**
-```tsx
-{(studentsData.activeStudents?.length || 0) === 0 && (
-  <Alert className="mt-3">
-    <AlertTriangle className="h-4 w-4" />
-    <AlertDescription className="text-xs">
-      Nenhum estudante realizou atendimentos no período selecionado
-    </AlertDescription>
-  </Alert>
-)}
-```
-
-### 3. Script de Seed para Dados de Teste
-
-Criado arquivo `scripts/seed-attendances.sql` com:
-
-- **8 atendimentos concluídos** com avaliações de 4-5 estrelas
-- **2 atendimentos concluídos** com avaliação de 3 estrelas
-- **3 atendimentos em andamento** (sem avaliação)
-- **Queries de verificação** para validar os dados inseridos
-- **Estatísticas rápidas** para conferir médias e totais
-- **Ranking de estudantes** para testar a visualização
-
-## Como Usar
-
-### Passo 1: Adicionar Dados de Teste
-
-1. **Acesse o Supabase Dashboard**
-   ```
-   https://app.supabase.com
-   ```
-
-2. **Abra o SQL Editor**
-   - Navegue até: SQL Editor → New Query
-
-3. **Execute o Script de Seed**
-   - Abra o arquivo: `scripts/seed-attendances.sql`
-   - **IMPORTANTE:** Substitua os placeholders pelos IDs reais:
-     ```sql
-     -- Buscar IDs reais dos estudantes:
-     SELECT id, name, email FROM students WHERE status = 'ATIVO' LIMIT 10;
-
-     -- Depois substitua no INSERT:
-     ('STUDENT_ID_1', ...) → ('uuid-real-do-estudante-1', ...)
-     ```
-   - Execute o script completo
-
-4. **Verifique os Dados Inseridos**
-   ```sql
-   SELECT
-     s.name as student_name,
-     a.service_type,
-     a.client_name,
-     a.status,
-     a.client_satisfaction_rating as rating,
-     a.duration_minutes
-   FROM attendances a
-   LEFT JOIN students s ON a.student_id = s.id
-   ORDER BY a.created_at DESC
-   LIMIT 20;
-   ```
-
-### Passo 2: Testar no Dashboard
-
-1. **Acesse o Dashboard do Coordenador**
-   ```
-   http://localhost:3000/coordinator-dashboard
-   ```
-
-2. **Navegue até Business Intelligence**
-   - Clique na aba "Business Intelligence"
-
-3. **Vá para a Seção Estudantes**
-   - Clique na aba "Estudantes"
-
-4. **Verifique os Dados**
-   - **Ranking de Estudantes:** Deve mostrar estudantes ordenados por atendimentos
-   - **Satisfação:** Estrelas amarelas com valores entre 3.0 e 5.0
-   - **Taxa de Conclusão:** Porcentagem calculada corretamente
-   - **Estudantes Ativos:** Número total de estudantes com atendimentos
-
-5. **Teste os Filtros**
-   - Altere o período (7 dias, 30 dias, 90 dias)
-   - Clique em "Atualizar" para recarregar os dados
-
-### Passo 3: Como a Satisfação é Calculada
-
-A satisfação vem da tabela `attendances` no campo `client_satisfaction_rating`:
-
-```sql
--- Quando o estudante finaliza um atendimento no portal, o cliente avalia:
-UPDATE attendances
-SET
-  client_satisfaction_rating = 5,  -- Valor de 1 a 5
-  status = 'CONCLUIDO'
-WHERE id = 'atendimento-id';
-```
-
-**Fluxo Completo:**
-
-1. **Estudante cria atendimento** → `status = 'AGENDADO'`
-2. **Estudante inicia atendimento** → `status = 'EM_ANDAMENTO'`
-3. **Estudante finaliza atendimento** → `status = 'CONCLUIDO'`
-4. **Cliente avalia** → `client_satisfaction_rating = 1-5` (estrelas)
-5. **API calcula média** → Todos os ratings do estudante
-6. **Dashboard exibe** → Estrela amarela + valor numérico
-
-## Campos de Dados por Estudante
-
-Cada estudante no ranking possui:
-
-```typescript
-{
-  student_id: string           // ID do estudante
-  student_name: string         // Nome completo
-  email: string                // Email
-  course: string               // Curso (ex: "Análise e Desenvolvimento de Sistemas")
-  semester: string             // Semestre atual
-  total_attendances: number    // Total de atendimentos
-  completed_attendances: number // Atendimentos concluídos
-  completion_rate: number      // Taxa de conclusão (%)
-  avg_rating: number           // Média de satisfação (0-5)
-  productivity_score: number   // Score de produtividade
-  performance_level: string    // "Excelente" | "Muito Bom" | "Bom" | "Regular" | "Precisa Melhorar"
-}
-```
-
-## Troubleshooting
-
-### Problema: "Nenhum estudante com atendimentos registrados"
-
-**Causa:** Não há dados na tabela `attendances` ou o período selecionado está vazio.
-
-**Solução:**
-1. Execute o script de seed: `scripts/seed-attendances.sql`
-2. Altere o período para "Todos" ou "90 dias"
-3. Verifique se há estudantes ativos: `SELECT * FROM students WHERE status = 'ATIVO'`
-
-### Problema: Satisfação mostra "0.0"
-
-**Causa:** Atendimentos não têm o campo `client_satisfaction_rating` preenchido.
-
-**Solução:**
-```sql
--- Atualizar atendimentos existentes com avaliações de teste:
-UPDATE attendances
-SET client_satisfaction_rating = 4 + (random() * 1)::int
-WHERE status = 'CONCLUIDO'
-  AND client_satisfaction_rating IS NULL;
-```
-
-### Problema: API retorna erro
-
-**Causa:** Credenciais do Supabase inválidas ou tabelas não existem.
-
-**Solução:**
-1. Verifique o arquivo `.env.local`:
-   ```bash
-   NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anonima
-   SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
-   ```
-
-2. Verifique se as tabelas existem:
-   ```sql
-   SELECT table_name
-   FROM information_schema.tables
-   WHERE table_schema = 'public'
-     AND table_name IN ('students', 'attendances', 'naf_services');
-   ```
-
-## Arquivos Modificados
-
-1. **`/src/app/api/coordinator/reports/advanced/route.ts`**
-   - Melhorado cálculo de satisfação
-   - Adicionados logs detalhados
-   - Filtros aprimorados para dados válidos
-   - Ordenação otimizada de rankings
-
-2. **`/src/components/reports/AdvancedReportsCenter.tsx`**
-   - Exibição de estrelas de satisfação
-   - Mensagens quando não há dados
-   - Design melhorado do ranking
-   - Alertas informativos
-
-3. **`/scripts/seed-attendances.sql`** (NOVO)
-   - Script de seed para dados de teste
-   - Queries de verificação
-   - Estatísticas rápidas
-
-## Estrutura de Dados Esperada
-
-### Tabela `attendances`
-
-```sql
-CREATE TABLE attendances (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  student_id UUID REFERENCES students(id),
-  service_type TEXT,
-  client_name TEXT,
-  status TEXT, -- 'AGENDADO', 'EM_ANDAMENTO', 'CONCLUIDO', 'CANCELADO'
-  client_satisfaction_rating INTEGER, -- 1 a 5 (estrelas)
-  duration_minutes INTEGER,
-  scheduled_date TIMESTAMP,
-  notes TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### Tabela `students`
-
-```sql
-CREATE TABLE students (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT,
-  email TEXT,
-  course TEXT,
-  semester TEXT,
-  status TEXT, -- 'ATIVO', 'INATIVO', 'TREINAMENTO'
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-## Resultados Esperados
-
-Após aplicar as correções e adicionar dados de teste:
-
-✅ **Ranking de Estudantes:** Mostra Top 10 ordenados por atendimentos
-✅ **Satisfação:** Exibe estrelas amarelas com valores reais (ex: 4.5 ⭐)
-✅ **Taxa de Conclusão:** Calcula corretamente (ex: 85.5%)
-✅ **Estudantes Ativos:** Conta correta de estudantes com atendimentos
-✅ **Produtividade:** Score calculado baseado em atendimentos/semana
-✅ **Logs Detalhados:** Console mostra informações de debugging
-
-## Performance
-
-A API está otimizada para:
-
-- **Busca Eficiente:** Queries com filtros de período
-- **Cálculos Rápidos:** Processamento em memória
-- **Cache:** Pode ser adicionado cache com React Query
-- **Limite de Resultados:** Top 20 rankings, Top 15 produtividade
-
-## Próximos Passos Sugeridos
-
-1. **Adicionar Filtros Avançados:**
-   - Filtrar por curso
-   - Filtrar por semestre
-   - Filtrar por faixa de satisfação
-
-2. **Gráficos Adicionais:**
-   - Evolução da satisfação ao longo do tempo
-   - Comparativo entre estudantes
-   - Distribuição de avaliações (1-5 estrelas)
-
-3. **Notificações:**
-   - Alertas para estudantes com satisfação < 3.0
-   - Parabenizações para top performers
-
-4. **Exportação:**
-   - Excel com rankings completos
-   - PDF com gráficos de performance
-
-## Suporte
-
-Em caso de dúvidas ou problemas:
-
-1. Verifique os logs no console do navegador (F12)
-2. Verifique os logs da API no terminal
-3. Execute as queries de verificação no Supabase SQL Editor
-4. Confirme que as credenciais do Supabase estão corretas
+**Solução aplicada:**
+- Modificada a API `/api/coordinator/business-intelligence` para incluir atendimentos de ambas as tabelas
+- Agora busca dados de:
+  - ✅ `attendances` (atendimentos normais)
+  - ✅ `fiscal_appointments` (atendimentos fiscais)
+  - ✅ `fiscal_appointment_feedbacks` (avaliações de atendimentos fiscais)
 
 ---
 
-**Documentação atualizada em:** 09/10/2025, 21:45
-**Versão:** 1.0.0
-**Status:** ✅ Implementado e Testado
+### ✅ 2. Análise de Produtividade (CORRIGIDO)
+**Problema:** Mostrava "Nenhum dado disponível" para mais produtivos
+
+**Causa:** Mesma causa - não incluía atendimentos fiscais no cálculo
+
+**Solução aplicada:**
+- Produtividade agora calculada com TODOS os atendimentos
+- Fórmula: `(atendimentos normais + atendimentos fiscais) / semanas ativas`
+
+---
+
+### ✅ 3. Estudantes Ativos (CORRIGIDO)
+**Problema:** Mostrava "0 estudantes com atendimentos realizados"
+
+**Causa:** A contagem não incluía atendimentos fiscais
+
+**Solução aplicada:**
+- Contagem agora inclui ambos os tipos de atendimento
+- Métricas atualizadas:
+  - Total de atendimentos
+  - Atendimentos concluídos
+  - Taxa de conclusão
+  - Avaliação média (combina ambas as fontes)
+
+---
+
+## 🔧 Detalhes Técnicos das Correções
+
+### Arquivo Modificado
+`/src/app/api/coordinator/business-intelligence/route.ts`
+
+### Mudanças Implementadas
+
+#### 1. Busca de Dados do Estudante (Linhas 26-59)
+
+**ANTES:**
+```typescript
+const { data: studentAttendances } = await supabase
+  .from('attendances')
+  .select('*')
+  .eq('student_id', student.id)
+
+const totalAttendances = studentAttendances?.length || 0
+const avgRating = studentAttendances?.filter(a => a.client_satisfaction_rating)
+  .reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / (...) || 0
+```
+
+**AGORA:**
+```typescript
+// Buscar atendimentos normais
+const { data: studentAttendances } = await supabase
+  .from('attendances')
+  .select('*')
+  .eq('student_id', student.id)
+
+// Buscar atendimentos fiscais
+const { data: fiscalAttendances } = await supabase
+  .from('fiscal_appointments')
+  .select('*')
+  .eq('assigned_student_id', student.id)
+
+// Buscar feedbacks de atendimentos fiscais
+const { data: fiscalFeedbacks } = await supabase
+  .from('fiscal_appointment_feedbacks')
+  .select('rating, fiscal_appointments!inner(assigned_student_id)')
+  .eq('fiscal_appointments.assigned_student_id', student.id)
+
+// Total combinado
+const totalAttendances = (studentAttendances?.length || 0) + (fiscalAttendances?.length || 0)
+
+// Média combinada de avaliações
+const normalRatings = studentAttendances?.filter(a => a.client_satisfaction_rating) || []
+const sumNormal = normalRatings.reduce((sum, a) => sum + a.client_satisfaction_rating, 0)
+const sumFiscal = fiscalFeedbacks?.reduce((sum, f) => sum + (f.rating || 0), 0) || 0
+const totalRatings = normalRatings.length + (fiscalFeedbacks?.length || 0)
+const avgRating = totalRatings > 0 ? (sumNormal + sumFiscal) / totalRatings : 0
+```
+
+#### 2. Serviços Mais Atendidos (Linhas 65-76)
+
+**ANTES:**
+```typescript
+const serviceCount: Record<string, number> = {}
+studentAttendances?.forEach((att) => {
+  serviceCount[att.service_type] = (serviceCount[att.service_type] || 0) + 1
+})
+```
+
+**AGORA:**
+```typescript
+const serviceCount: Record<string, number> = {}
+// Incluir atendimentos normais
+studentAttendances?.forEach((att) => {
+  serviceCount[att.service_type] = (serviceCount[att.service_type] || 0) + 1
+})
+// Incluir atendimentos fiscais
+fiscalAttendances?.forEach((att) => {
+  serviceCount[att.service_type] = (serviceCount[att.service_type] || 0) + 1
+})
+```
+
+#### 3. Horas Logadas (Linhas 78-81)
+
+**ANTES:**
+```typescript
+hours_logged: studentAttendances?.reduce((sum, a) => sum + (a.duration_minutes || 60), 0) || 0
+```
+
+**AGORA:**
+```typescript
+// Calcular horas logadas (normal + fiscal)
+const hoursNormal = studentAttendances?.reduce((sum, a) => sum + (a.duration_minutes || 60), 0) || 0
+const hoursFiscal = (fiscalAttendances?.length || 0) * 60 // 60 min por atendimento fiscal
+const totalHours = hoursNormal + hoursFiscal
+
+// No retorno:
+hours_logged: totalHours
+```
+
+#### 4. Última Atividade (Linha 98)
+
+**ANTES:**
+```typescript
+last_activity: studentAttendances?.[0]?.created_at || student.created_at
+```
+
+**AGORA:**
+```typescript
+last_activity: studentAttendances?.[0]?.created_at || fiscalAttendances?.[0]?.created_at || student.created_at
+```
+
+---
+
+## 📊 Estrutura de Dados Retornada
+
+A API agora retorna na seção `students`:
+
+```typescript
+{
+  students: {
+    all: [
+      {
+        student_id: "uuid",
+        student_name: "Nome do Estudante",
+        email: "email@example.com",
+        course: "Análise e Desenvolvimento de Sistemas",
+        semester: "5º Semestre",
+        status: "ATIVO",
+        total_attendances: 25,  // Normal + Fiscal
+        completed_attendances: 20,
+        completion_rate: 80,
+        avg_rating: 4.5,  // Média combinada
+        total_chat_conversations: 10,
+        productivity_score: 2.5,  // Atendimentos por semana
+        specialties: ["Declaração IRPF", "MEI"],
+        created_at: "2024-01-01",
+        last_activity: "2024-10-10",
+        hours_logged: 1500  // Normal + Fiscal (minutos)
+      }
+      // ... mais estudantes
+    ],
+    byStatus: {
+      active: [...],  // Estudantes ativos
+      inactive: [...],  // Estudantes inativos
+      suspended: [...]  // Estudantes suspensos
+    },
+    statistics: {
+      total: 10,
+      avg_productivity: 2.3,
+      avg_rating: 4.2,
+      total_hours: 15000
+    }
+  }
+}
+```
+
+---
+
+## 🧪 Como Testar
+
+### 1. Reiniciar o Servidor
+Se o servidor estiver rodando, as mudanças já foram aplicadas automaticamente.
+
+```bash
+# Se necessário, reinicie:
+npm run dev
+```
+
+### 2. Acessar o Business Intelligence
+
+1. Acesse: `http://localhost:4000/coordinator-dashboard`
+2. Clique na aba **"Business Intelligence"**
+3. Clique na sub-aba **"Estudantes"**
+
+### 3. Verificar os Dados
+
+**Ranking de Estudantes:**
+- ✅ Deve mostrar lista de estudantes com números reais
+- ✅ Total de atendimentos deve incluir normal + fiscal
+- ✅ Avaliação deve ser a média combinada
+
+**Análise de Produtividade:**
+- ✅ "Mais Produtivos" deve mostrar estudantes ordenados por produtividade
+- ✅ Deve considerar todos os atendimentos
+
+**Estudantes Ativos:**
+- ✅ Número deve corresponder aos estudantes com status ATIVO
+- ✅ Mensagem deve ser "X estudantes com atendimentos realizados"
+
+---
+
+## 🔍 Query de Verificação
+
+Para verificar os dados no Supabase SQL Editor:
+
+```sql
+-- Ver contagem completa de atendimentos por estudante
+SELECT
+  s.id,
+  s.name,
+  s.course,
+  s.status,
+  COUNT(DISTINCT a.id) as atendimentos_normais,
+  COUNT(DISTINCT fa.id) as atendimentos_fiscais,
+  COUNT(DISTINCT a.id) + COUNT(DISTINCT fa.id) as total_atendimentos,
+
+  -- Avaliação média combinada
+  COALESCE(AVG(a.client_satisfaction_rating), 0) as avg_normal,
+  COALESCE(AVG(faf.rating), 0) as avg_fiscal,
+  COALESCE(
+    (SUM(a.client_satisfaction_rating) + SUM(faf.rating)) /
+    NULLIF(
+      COUNT(a.client_satisfaction_rating) + COUNT(faf.rating),
+      0
+    ),
+    0
+  ) as avg_combinada
+
+FROM students s
+LEFT JOIN attendances a ON a.student_id = s.id
+LEFT JOIN fiscal_appointments fa ON fa.assigned_student_id = s.id
+LEFT JOIN fiscal_appointment_feedbacks faf ON faf.appointment_id = fa.id
+WHERE s.status = 'ATIVO'
+GROUP BY s.id, s.name, s.course, s.status
+ORDER BY total_atendimentos DESC
+LIMIT 10;
+```
+
+---
+
+## 📊 Exemplos de Dados Esperados
+
+### Antes da Correção:
+```
+Ranking de Estudantes: ⚠️ Nenhum estudante com atendimentos registrados
+Análise de Produtividade: ⚠️ Nenhum dado disponível
+Estudantes Ativos: 0 estudantes com atendimentos realizados
+```
+
+### Depois da Correção:
+```
+Ranking de Estudantes:
+#1 Estevam Souza Laureth
+   Análise e Desenvolvimento de Sistemas - 5º Semestre
+   25 atendimentos | ⭐ 4.5 | 2.5 pts
+
+#2 Maria Silva
+   Ciências Contábeis - 6º Semestre
+   18 atendimentos | ⭐ 4.8 | 2.1 pts
+
+Análise de Produtividade:
+   Mais Produtivos: [lista de estudantes]
+
+Estudantes Ativos: 10
+   estudantes com atendimentos realizados
+```
+
+---
+
+## 🚀 Métricas Calculadas
+
+### Produtividade
+```
+Produtividade = Total de Atendimentos / Semanas Ativas
+```
+- Semanas Ativas = tempo desde o cadastro do estudante / 7 dias
+
+### Avaliação Média
+```
+Avaliação Média = (Soma Ratings Normais + Soma Ratings Fiscais) / Total de Ratings
+```
+
+### Taxa de Conclusão
+```
+Taxa de Conclusão = (Atendimentos Concluídos / Total de Atendimentos) * 100
+```
+
+### Horas Logadas
+```
+Horas Logadas = Σ(duration_minutes de attendances) + (count fiscal * 60 min)
+```
+
+---
+
+## ✅ Checklist de Validação
+
+Após as correções, verifique:
+
+- [ ] Ranking mostra estudantes com dados reais
+- [ ] Números de atendimentos incluem ambas as tabelas
+- [ ] Avaliações são calculadas corretamente
+- [ ] "Mais Produtivos" exibe dados
+- [ ] "Estudantes Ativos" mostra contagem correta
+- [ ] Gráficos e estatísticas aparecem preenchidos
+- [ ] Não há mais mensagens de "Nenhum dado disponível"
+
+---
+
+## 🐛 Troubleshooting
+
+### Problema: Ainda mostra "Nenhum estudante"
+
+**Possíveis causas:**
+1. Não há estudantes cadastrados com atendimentos
+2. Todos os estudantes estão inativos
+3. Erro na conexão com o banco
+
+**Solução:**
+```sql
+-- Verificar se há estudantes com atendimentos
+SELECT COUNT(DISTINCT s.id) as estudantes_com_atendimentos
+FROM students s
+LEFT JOIN attendances a ON a.student_id = s.id
+LEFT JOIN fiscal_appointments fa ON fa.assigned_student_id = s.id
+WHERE (a.id IS NOT NULL OR fa.id IS NOT NULL)
+  AND s.status = 'ATIVO';
+```
+
+### Problema: Números parecem incorretos
+
+**Solução:**
+- Abra o console do navegador (F12)
+- Procure por logs do tipo: `📊 Business Intelligence API - Iniciando coleta de dados`
+- Verifique se há erros no terminal do servidor
+
+---
+
+## 📁 Arquivos Modificados
+
+1. **`/src/app/api/coordinator/business-intelligence/route.ts`**
+   - Linhas 26-59: Busca de atendimentos (normal + fiscal)
+   - Linhas 65-76: Contagem de serviços
+   - Linhas 78-81: Cálculo de horas
+   - Linha 98: Última atividade
+
+2. **`/src/components/coordinator/BusinessIntelligence.tsx`**
+   - Sem alterações (componente já estava correto)
+
+---
+
+**Data da correção:** 2025-10-11
+**Arquivo afetado:** 1
+**Correções aplicadas:** 4
+**Status:** ✅ Pronto para usar
