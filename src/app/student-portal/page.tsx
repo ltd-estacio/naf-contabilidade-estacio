@@ -319,6 +319,11 @@ export default function StudentPortal() {
 
         if (response.ok) {
           const data = await response.json()
+          console.log('📊 Dados do dashboard recebidos:', {
+            hasFiscalAppointments: !!data.fiscalAppointments,
+            fiscalAppointmentsCount: data.fiscalAppointments?.length || 0,
+            fiscalAppointments: data.fiscalAppointments
+          })
           setDashboardData(data)
         } else {
           // Se retornou 401, token inválido/expirado - fazer logout
@@ -1164,6 +1169,15 @@ export default function StudentPortal() {
                 <CardDescription>Seus atendimentos fiscais agendados para os próximos dias</CardDescription>
               </CardHeader>
               <CardContent>
+                {(() => {
+                  console.log('🔍 Renderizando seção fiscalAppointments:', {
+                    hasDashboardData: !!dashboardData,
+                    hasFiscalAppointments: !!dashboardData?.fiscalAppointments,
+                    fiscalAppointmentsLength: dashboardData?.fiscalAppointments?.length || 0,
+                    fiscalAppointments: dashboardData?.fiscalAppointments
+                  })
+                  return null
+                })()}
                 {dashboardData?.fiscalAppointments && dashboardData.fiscalAppointments.length > 0 ? (
                   <div className="space-y-4">
                     {dashboardData.fiscalAppointments
