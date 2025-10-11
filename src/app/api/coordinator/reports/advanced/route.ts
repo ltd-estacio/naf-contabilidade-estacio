@@ -150,10 +150,23 @@ class AdvancedReportsService {
 
       // 2. PROCESS GENERAL STATISTICS
       console.log('📈 Processing general statistics...')
-      const totalAttendances = attendances?.length || 0
-      const completedAttendances = attendances?.filter(a => a.status === 'CONCLUIDO') || []
-      const completionRate = totalAttendances > 0 ? (completedAttendances.length / totalAttendances) * 100 : 0
 
+      // Combinar atendimentos de ambas as tabelas
+      const totalAttendancesFromAttendances = attendances?.length || 0
+      const totalAttendancesFromFiscal = fiscalAppointments?.length || 0
+      const totalAttendances = totalAttendancesFromAttendances + totalAttendancesFromFiscal
+
+      console.log(`📊 Total de Atendimentos: ${totalAttendances} (${totalAttendancesFromAttendances} da tabela attendances + ${totalAttendancesFromFiscal} da tabela fiscal_appointments)`)
+
+      // Contar atendimentos concluídos de ambas as tabelas
+      const completedFromAttendances = attendances?.filter(a => a.status === 'CONCLUIDO') || []
+      const completedFromFiscal = fiscalAppointments?.filter(fa => fa.status === 'CONCLUIDO') || []
+      const totalCompleted = completedFromAttendances.length + completedFromFiscal.length
+      const completionRate = totalAttendances > 0 ? (totalCompleted / totalAttendances) * 100 : 0
+
+      console.log(`✅ Atendimentos Concluídos: ${totalCompleted} (${completedFromAttendances.length} attendances + ${completedFromFiscal.length} fiscal)`)
+
+      // Avaliações (só na tabela attendances por enquanto)
       const ratingsData = attendances?.filter(a => a.client_satisfaction_rating && a.client_satisfaction_rating > 0) || []
       const averageSatisfaction = ratingsData.length > 0
         ? ratingsData.reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / ratingsData.length
@@ -161,22 +174,35 @@ class AdvancedReportsService {
 
       console.log(`⭐ Satisfação: ${ratingsData.length} avaliações, média ${averageSatisfaction.toFixed(2)}`)
 
-      const durationData = completedAttendances.filter(a => a.duration_minutes)
+      // Duração média (só na tabela attendances por enquanto)
+      const durationData = completedFromAttendances.filter(a => a.duration_minutes)
       const averageDuration = durationData.length > 0
         ? durationData.reduce((sum, a) => sum + (a.duration_minutes || 0), 0) / durationData.length
         : 0
 
-      // Calculate monthly growth (simplified)
+      console.log(`⏱️ Duração Média: ${averageDuration.toFixed(0)} min (baseado em ${durationData.length} atendimentos)`)
+
+      // Calculate monthly growth (simplified) - combinar ambas as tabelas
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
 
-      const currentMonth = attendances?.filter(a => new Date(a.created_at) >= thirtyDaysAgo).length || 0
-      const previousMonth = attendances?.filter(a => {
+      const currentMonthAttendances = attendances?.filter(a => new Date(a.created_at) >= thirtyDaysAgo).length || 0
+      const currentMonthFiscal = fiscalAppointments?.filter(fa => new Date(fa.created_at) >= thirtyDaysAgo).length || 0
+      const currentMonth = currentMonthAttendances + currentMonthFiscal
+
+      const previousMonthAttendances = attendances?.filter(a => {
         const date = new Date(a.created_at)
         return date >= sixtyDaysAgo && date < thirtyDaysAgo
       }).length || 0
+      const previousMonthFiscal = fiscalAppointments?.filter(fa => {
+        const date = new Date(fa.created_at)
+        return date >= sixtyDaysAgo && date < thirtyDaysAgo
+      }).length || 0
+      const previousMonth = previousMonthAttendances + previousMonthFiscal
 
       const monthlyGrowth = previousMonth > 0 ? ((currentMonth - previousMonth) / previousMonth) * 100 : 0
+
+      console.log(`📈 Crescimento: ${monthlyGrowth.toFixed(1)}% (Mês atual: ${currentMonth}, Mês anterior: ${previousMonth})`)
 
       const generalStats = {
         totalAttendances,
