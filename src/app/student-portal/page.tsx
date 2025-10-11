@@ -323,7 +323,9 @@ export default function StudentPortal() {
             hasFiscalAppointments: !!data.fiscalAppointments,
             fiscalAppointmentsCount: data.fiscalAppointments?.length || 0,
             fiscalAppointments: data.fiscalAppointments,
-            hasProfile: !!data.profile
+            hasProfile: !!data.profile,
+            hasStats: !!data.stats,
+            stats: data.stats
           })
           setDashboardData(data)
 
@@ -690,15 +692,15 @@ export default function StudentPortal() {
     )
   }
 
-  if (!dashboardData || !user) {
+  if (!dashboardData || !user || !dashboardData.stats) {
     return null
   }
 
-  const pendingAttendances = Math.max(
+  const pendingAttendances = dashboardData?.stats ? Math.max(
     dashboardData.stats.totalAttendances - dashboardData.stats.completedAttendances,
     0
-  )
-  const openRequests = dashboardData.attendances?.filter(att =>
+  ) : 0
+  const openRequests = dashboardData?.attendances?.filter(att =>
     ['AGENDADO', 'EM_ANDAMENTO', 'PENDENTE'].includes(att.status)
   ).length || 0
 

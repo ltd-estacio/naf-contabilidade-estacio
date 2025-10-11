@@ -352,6 +352,24 @@ export async function GET(request: NextRequest) {
         console.error('❌ Erro ao buscar avaliações:', evaluationsError)
       }
 
+      // 4.1. Buscar feedbacks de atendimentos fiscais
+      const { data: fiscalFeedbacks, error: fiscalFeedbacksError } = await supabase
+        .from('fiscal_appointment_feedbacks')
+        .select(`
+          rating,
+          comment,
+          created_at,
+          fiscal_appointments!inner(assigned_student_id)
+        `)
+        .eq('fiscal_appointments.assigned_student_id', studentId)
+        .order('created_at', { ascending: false })
+
+      if (fiscalFeedbacksError) {
+        console.error('❌ Erro ao buscar feedbacks fiscais:', fiscalFeedbacksError)
+      } else {
+        console.log(`✅ Encontrados ${fiscalFeedbacks?.length || 0} feedbacks de atendimentos fiscais`)
+      }
+
       // 5. Calcular estatísticas (incluindo atendimentos fiscais)
       const regularAttendances = attendances?.length || 0
       const fiscalAttendancesCount = fiscalAppointments?.length || 0
@@ -361,13 +379,24 @@ export async function GET(request: NextRequest) {
       const completedFiscal = fiscalAppointments?.filter(a => a.status === 'CONCLUIDO').length || 0
       const completedAttendances = completedRegular + completedFiscal
 
-      // Calcular avaliação média (somente atendimentos regulares têm client_satisfaction_rating)
-      const ratingsCount = attendances?.filter(a => a.client_satisfaction_rating).length || 0
-      const avgRating = ratingsCount > 0
-        ? attendances
-            .filter(a => a.client_satisfaction_rating)
-            .reduce((sum, a) => sum + (a.client_satisfaction_rating || 0), 0) / ratingsCount
+      // Calcular avaliação média (atendimentos regulares + feedbacks fiscais)
+      const regularRatings = attendances?.filter(a => a.client_satisfaction_rating) || []
+      const fiscalRatings = fiscalFeedbacks?.filter(f => f.rating) || []
+
+      const sumRegularRatings = regularRatings.reduce((sum, a) => sum + (a.client_satisfaction_rating || 0), 0)
+      const sumFiscalRatings = fiscalRatings.reduce((sum, f) => sum + (f.rating || 0), 0)
+
+      const totalRatingsCount = regularRatings.length + fiscalRatings.length
+      const avgRating = totalRatingsCount > 0
+        ? (sumRegularRatings + sumFiscalRatings) / totalRatingsCount
         : 0
+
+      console.log('📊 Avaliações:', {
+        regularRatings: regularRatings.length,
+        fiscalRatings: fiscalRatings.length,
+        totalRatings: totalRatingsCount,
+        avgRating: Math.round(avgRating * 10) / 10
+      })
 
       const totalTrainings = trainingProgress?.length || 0
       const completedTrainings = trainingProgress?.filter(tp => tp.is_completed).length || 0
