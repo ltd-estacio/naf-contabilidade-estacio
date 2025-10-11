@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Users,
   Calendar,
@@ -189,6 +190,7 @@ export default function CoordinatorDashboard() {
   const [user, setUser] = useState<unknown>(null)
   const [chatNotifications, setChatNotifications] = useState(0)
   const [activeTab, setActiveTab] = useState('overview')
+  const [selectedStudentPortalView, setSelectedStudentPortalView] = useState<string | null>(null)
   const [backupForm, setBackupForm] = useState<BackupFormState>({
     format: 'zip',
     includeSchema: true,
@@ -1543,7 +1545,12 @@ export default function CoordinatorDashboard() {
                     <p className="text-xs text-gray-500 mb-3">
                       Estatísticas principais, próximos atendimentos e progresso
                     </p>
-                    <Button size="sm" variant="outline" className="w-full">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setSelectedStudentPortalView('dashboard')}
+                    >
                       <BarChart3 className="h-3 w-3 mr-1" />
                       Visualizar
                     </Button>
@@ -1562,7 +1569,12 @@ export default function CoordinatorDashboard() {
                     <p className="text-xs text-gray-500 mb-3">
                       Agendamentos, histórico, status e avaliações
                     </p>
-                    <Button size="sm" variant="outline" className="w-full">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setSelectedStudentPortalView('attendances')}
+                    >
                       <Clock className="h-3 w-3 mr-1" />
                       Gerenciar
                     </Button>
@@ -1581,7 +1593,12 @@ export default function CoordinatorDashboard() {
                     <p className="text-xs text-gray-500 mb-3">
                       Módulos, progresso, certificações e avaliações
                     </p>
-                    <Button size="sm" variant="outline" className="w-full">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setSelectedStudentPortalView('trainings')}
+                    >
                       <BookOpen className="h-3 w-3 mr-1" />
                       Acompanhar
                     </Button>
@@ -1600,7 +1617,12 @@ export default function CoordinatorDashboard() {
                     <p className="text-xs text-gray-500 mb-3">
                       Exportações, métricas pessoais e análises
                     </p>
-                    <Button size="sm" variant="outline" className="w-full">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setSelectedStudentPortalView('reports')}
+                    >
                       <Download className="h-3 w-3 mr-1" />
                       Exportar
                     </Button>
@@ -2264,6 +2286,189 @@ export default function CoordinatorDashboard() {
       </main>
 
       <NAFFooter />
+
+      {/* Student Portal Features Dialog */}
+      <Dialog open={selectedStudentPortalView !== null} onOpenChange={(open) => !open && setSelectedStudentPortalView(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedStudentPortalView === 'dashboard' && 'Dashboard do Estudante'}
+              {selectedStudentPortalView === 'attendances' && 'Atendimentos do Estudante'}
+              {selectedStudentPortalView === 'trainings' && 'Treinamentos do Estudante'}
+              {selectedStudentPortalView === 'reports' && 'Relatórios do Estudante'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedStudentPortalView === 'dashboard' && 'Visualização geral das estatísticas e progresso dos estudantes'}
+              {selectedStudentPortalView === 'attendances' && 'Gerenciamento completo dos atendimentos realizados pelos estudantes'}
+              {selectedStudentPortalView === 'trainings' && 'Acompanhamento de cursos, certificações e progresso dos estudantes'}
+              {selectedStudentPortalView === 'reports' && 'Exportação e análise de métricas de performance dos estudantes'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-4">
+            {selectedStudentPortalView === 'dashboard' && (
+              <div className="space-y-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Esta funcionalidade permite visualizar o dashboard completo de qualquer estudante.
+                  </AlertDescription>
+                </Alert>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Estatísticas Disponíveis</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm">Total de Atendimentos</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-sm">Taxa de Sucesso</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-purple-600" />
+                        <span className="text-sm">Performance Score</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm">Progresso Mensal</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {selectedStudentPortalView === 'attendances' && (
+              <div className="space-y-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Gerencie todos os atendimentos dos estudantes.
+                  </AlertDescription>
+                </Alert>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Funcionalidades de Gestão</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Agendamentos</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Gerencie agendamentos ativos</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Star className="h-5 w-5 text-yellow-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Avaliações</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Veja feedbacks dos clientes</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {selectedStudentPortalView === 'trainings' && (
+              <div className="space-y-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Acompanhe o progresso dos estudantes em treinamentos.
+                  </AlertDescription>
+                </Alert>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Módulos de Capacitação</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <BookOpen className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Cursos Disponíveis</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Visualize módulos de treinamento</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Award className="h-5 w-5 text-yellow-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Certificações</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Gerencie certificados</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {selectedStudentPortalView === 'reports' && (
+              <div className="space-y-4">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Exporte relatórios detalhados de performance.
+                  </AlertDescription>
+                </Alert>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Tipos de Relatórios</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <FileText className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Relatório de Performance</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Métricas completas de atendimentos</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Download className="h-5 w-5 text-orange-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Exportação Múltipla</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">PDF, Excel, CSV ou JSON</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setSelectedStudentPortalView(null)}
+            >
+              Fechar
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedStudentPortalView === 'dashboard') {
+                  setActiveTab('performance')
+                } else if (selectedStudentPortalView === 'attendances') {
+                  setActiveTab('appointments')
+                } else if (selectedStudentPortalView === 'reports') {
+                  setActiveTab('reports')
+                }
+                setSelectedStudentPortalView(null)
+              }}
+            >
+              Acessar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
