@@ -195,6 +195,7 @@ export default function StudentPortal() {
   const [user, setUser] = useState<StudentProfile | null>(null)
   const [_trainingsData, setTrainingsData] = useState<unknown>(null)
   const [profileData, setProfileData] = useState<unknown>(null)
+  const [studentToken, setStudentToken] = useState('')
   // AI Assistant state
   const [aiMessages, setAiMessages] = useState<{ role: 'user'|'assistant'|'system'; content: string; ts?: number }[]>([
     { role: 'system', content: 'Você é um assistente do NAF para estudantes, especializado em contabilidade brasileira (IRPF, MEI, tributos, obrigações acessórias). Explique de forma clara, com exemplos e checklists quando apropriado. Não ofereça aconselhamento jurídico; cite fontes oficiais (Receita Federal, gov.br) quando útil. Se a pergunta for pessoal/privada, sugira procurar um coordenador ou professor.' }
@@ -268,6 +269,9 @@ export default function StudentPortal() {
         router.push('/student-login-simple')
         return
       }
+
+      // Set token in state for child components
+      setStudentToken(token)
 
       try {
         setUser(JSON.parse(userData))
@@ -1263,7 +1267,7 @@ export default function StudentPortal() {
 
           {/* Atendimentos Fiscais Tab - Componente Completo */}
           <TabsContent value="attendances" className="mt-6">
-            <StudentFiscalAppointments token={localStorage.getItem('student_token') || ''} />
+            <StudentFiscalAppointments token={studentToken} />
           </TabsContent>
 
           {/* Treinamentos Tab */}
