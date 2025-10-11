@@ -23,34 +23,62 @@ export async function GET(request: NextRequest) {
     // Estatísticas detalhadas de cada estudante
     const studentsWithStats = await Promise.all(
       (students || []).map(async (student) => {
+        // Buscar atendimentos normais
         const { data: studentAttendances } = await supabase
           .from('attendances')
           .select('*')
           .eq('student_id', student.id)
+
+        // Buscar atendimentos fiscais
+        const { data: fiscalAttendances } = await supabase
+          .from('fiscal_appointments')
+          .select('*')
+          .eq('assigned_student_id', student.id)
+
+        // Buscar feedbacks de atendimentos fiscais
+        const { data: fiscalFeedbacks } = await supabase
+          .from('fiscal_appointment_feedbacks')
+          .select('rating, fiscal_appointments!inner(assigned_student_id)')
+          .eq('fiscal_appointments.assigned_student_id', student.id)
 
         const { data: chatConversations } = await supabase
           .from('chat_conversations')
           .select('*')
           .eq('coordinator_id', student.id)
 
-        const totalAttendances = studentAttendances?.length || 0
-        const completedAttendances = studentAttendances?.filter(a => a.status === 'CONCLUIDO').length || 0
-        const avgRating = studentAttendances?.filter(a => a.client_satisfaction_rating)
-          .reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / (studentAttendances?.filter(a => a.client_satisfaction_rating).length || 1) || 0
+        // Total de atendimentos (normal + fiscal)
+        const totalAttendances = (studentAttendances?.length || 0) + (fiscalAttendances?.length || 0)
+        const completedAttendances = (studentAttendances?.filter(a => a.status === 'CONCLUIDO').length || 0) +
+                                      (fiscalAttendances?.filter(a => a.status === 'CONCLUIDO').length || 0)
+
+        // Calcular média de avaliação (normal + fiscal)
+        const normalRatings = studentAttendances?.filter(a => a.client_satisfaction_rating) || []
+        const sumNormal = normalRatings.reduce((sum, a) => sum + a.client_satisfaction_rating, 0)
+        const sumFiscal = fiscalFeedbacks?.reduce((sum, f) => sum + (f.rating || 0), 0) || 0
+        const totalRatings = normalRatings.length + (fiscalFeedbacks?.length || 0)
+        const avgRating = totalRatings > 0 ? (sumNormal + sumFiscal) / totalRatings : 0
 
         // Calcular produtividade (atendimentos por semana)
         const weeksActive = Math.max(1, Math.ceil((Date.now() - new Date(student.created_at).getTime()) / (1000 * 60 * 60 * 24 * 7)))
         const productivity = totalAttendances / weeksActive
 
-        // Serviços mais atendidos
+        // Serviços mais atendidos (incluindo atendimentos fiscais)
         const serviceCount: Record<string, number> = {}
         studentAttendances?.forEach((att) => {
+          serviceCount[att.service_type] = (serviceCount[att.service_type] || 0) + 1
+        })
+        fiscalAttendances?.forEach((att) => {
           serviceCount[att.service_type] = (serviceCount[att.service_type] || 0) + 1
         })
         const topServices = Object.entries(serviceCount)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 3)
           .map(([service]) => service)
+
+        // Calcular horas logadas (normal + fiscal - estimativa 60min por atendimento fiscal)
+        const hoursNormal = studentAttendances?.reduce((sum, a) => sum + (a.duration_minutes || 60), 0) || 0
+        const hoursFiscal = (fiscalAttendances?.length || 0) * 60 // 60 min por atendimento fiscal
+        const totalHours = hoursNormal + hoursFiscal
 
         return {
           student_id: student.id,
@@ -67,8 +95,8 @@ export async function GET(request: NextRequest) {
           productivity_score: Math.round(productivity * 10) / 10,
           specialties: topServices,
           created_at: student.created_at,
-          last_activity: studentAttendances?.[0]?.created_at || student.created_at,
-          hours_logged: studentAttendances?.reduce((sum, a) => sum + (a.duration_minutes || 60), 0) || 0
+          last_activity: studentAttendances?.[0]?.created_at || fiscalAttendances?.[0]?.created_at || student.created_at,
+          hours_logged: totalHours
         }
       })
     )
