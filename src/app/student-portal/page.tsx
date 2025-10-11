@@ -1781,19 +1781,19 @@ export default function StudentPortal() {
                   <CardContent className="space-y-4 dark:bg-gray-900 dark:border-gray-800">
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Atendimentos</span>
-                      <span className="text-sm font-bold">{profileData.stats.totalAttendances}</span>
+                      <span className="text-sm font-bold">{dashboardData?.stats?.totalAttendances || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Atendimentos Concluídos</span>
-                      <span className="text-sm font-bold">{profileData.stats.completedAttendances}</span>
+                      <span className="text-sm font-bold">{dashboardData?.stats?.completedAttendances || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Taxa de Sucesso</span>
-                      <span className="text-sm font-bold">{profileData.stats.successRate}%</span>
+                      <span className="text-sm font-bold">{dashboardData?.stats?.successRate || 0}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Avaliação Média</span>
-                      <span className="text-sm font-bold">{profileData.stats.avgRating}/5</span>
+                      <span className="text-sm font-bold">{dashboardData?.stats?.avgRating || 0}/5</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</span>
