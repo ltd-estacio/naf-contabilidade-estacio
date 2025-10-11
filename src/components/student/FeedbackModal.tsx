@@ -94,7 +94,8 @@ export default function FeedbackModal({ appointment, onClose }: FeedbackModalPro
     onHoverChange?: (value: number) => void
     label: string
   }) => {
-    const displayValue = hover !== undefined && onHoverChange ? hover : value
+    // Se hover > 0, mostra hover. Caso contrário, mostra value
+    const displayValue = hover && hover > 0 ? hover : value
 
     return (
       <div className="space-y-2">
@@ -107,7 +108,7 @@ export default function FeedbackModal({ appointment, onClose }: FeedbackModalPro
               onClick={() => onValueChange(star)}
               onMouseEnter={() => onHoverChange && onHoverChange(star)}
               onMouseLeave={() => onHoverChange && onHoverChange(0)}
-              className="transition-transform hover:scale-110"
+              className="transition-transform hover:scale-110 focus:outline-none"
             >
               <Star
                 className={`h-8 w-8 ${
