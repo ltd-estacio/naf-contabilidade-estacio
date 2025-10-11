@@ -23,8 +23,11 @@ export default function FeedbackModal({ appointment, onClose }: FeedbackModalPro
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [serviceQuality, setServiceQuality] = useState(0)
+  const [hoverServiceQuality, setHoverServiceQuality] = useState(0)
   const [studentAttention, setStudentAttention] = useState(0)
+  const [hoverStudentAttention, setHoverStudentAttention] = useState(0)
   const [problemResolution, setProblemResolution] = useState(0)
+  const [hoverProblemResolution, setHoverProblemResolution] = useState(0)
   const [feedbackText, setFeedbackText] = useState('')
   const [additionalComments, setAdditionalComments] = useState('')
   const [wouldRecommend, setWouldRecommend] = useState<boolean | null>(null)
@@ -188,18 +191,24 @@ export default function FeedbackModal({ appointment, onClose }: FeedbackModalPro
             <StarRating
               value={serviceQuality}
               onValueChange={setServiceQuality}
+              hover={hoverServiceQuality}
+              onHoverChange={setHoverServiceQuality}
               label="Qualidade do Serviço"
             />
 
             <StarRating
               value={studentAttention}
               onValueChange={setStudentAttention}
+              hover={hoverStudentAttention}
+              onHoverChange={setHoverStudentAttention}
               label="Atenção do Estudante"
             />
 
             <StarRating
               value={problemResolution}
               onValueChange={setProblemResolution}
+              hover={hoverProblemResolution}
+              onHoverChange={setHoverProblemResolution}
               label="Resolução do Problema"
             />
           </div>

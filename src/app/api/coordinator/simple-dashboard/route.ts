@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
 
     if (feedbacksError) {
       console.error('Erro ao buscar feedbacks fiscais:', feedbacksError)
+      console.error('Detalhes do erro:', feedbacksError)
     }
 
     console.log(`⭐ Encontrados ${fiscalFeedbacks?.length || 0} feedbacks de atendimentos fiscais`)
@@ -76,6 +77,13 @@ export async function GET(request: NextRequest) {
       ? (sumAtendimentos + sumFiscais) / totalRatings
       : 0
 
+    console.log('⭐ CÁLCULO DE SATISFAÇÃO:')
+    console.log(`   - Ratings de atendimentos: ${ratingsAtendimentos.length} (soma: ${sumAtendimentos})`)
+    console.log(`   - Ratings de feedbacks fiscais: ${ratingsFiscais.length} (soma: ${sumFiscais})`)
+    console.log(`   - Total de ratings: ${totalRatings}`)
+    console.log(`   - Satisfação média calculada: ${satisfacaoMedia}`)
+    console.log(`   - Satisfação arredondada: ${Math.round(satisfacaoMedia * 10) / 10}`)
+
     console.log('📈 Métricas calculadas:', {
       totalAtendimentos,
       totalCompleted,
@@ -91,15 +99,17 @@ export async function GET(request: NextRequest) {
     const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
     for (let i = 0; i < 7; i++) {
-      // Atendimentos da tabela attendances
+      // Atendimentos da tabela attendances - usar created_at que sempre existe
       const dayAttendances = allAttendances?.filter(a => {
-        const date = new Date(a.scheduled_date)
+        if (!a.created_at) return false
+        const date = new Date(a.created_at)
         return date.getDay() === i
       }) || []
 
-      // Agendamentos da tabela fiscal_appointments
+      // Agendamentos da tabela fiscal_appointments - usar created_at que sempre existe
       const dayFiscalAppointments = fiscalAppointments?.filter(a => {
-        const date = new Date(a.preferred_date)
+        if (!a.created_at) return false
+        const date = new Date(a.created_at)
         return date.getDay() === i
       }) || []
 
@@ -115,6 +125,8 @@ export async function GET(request: NextRequest) {
       const naoCompareceu = dayAttendances.filter(a => a.status === 'NAO_COMPARECEU').length
 
       const totalDay = dayAttendances.length + dayFiscalAppointments.length
+
+      console.log(`📅 ${daysOfWeek[i]}: ${totalDay} total (${realizados} realizados, ${agendados} agendados)`)
 
       weeklyData.push({
         day: daysOfWeek[i],
