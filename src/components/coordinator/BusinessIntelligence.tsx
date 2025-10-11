@@ -96,58 +96,164 @@ export default function BusinessIntelligence() {
       return <div className="text-center py-8 text-gray-500">Carregando dados gerais...</div>
     }
 
+    // Calcular métricas para os novos cards
+    const totalAttendances = general.totals?.total_attendances || 0
+    const completedAttendances = general.totals?.completed_attendances || 0
+    const completionRate = totalAttendances > 0 ? (completedAttendances / totalAttendances) * 100 : 0
+
+    // Calcular satisfação média
+    const avgSatisfaction = data.satisfaction?.satisfactionDistribution?.avg_rating || 0
+
+    // Calcular crescimento (já vem calculado do backend)
+    const growthRate = data.growth?.growth_rate || 0
+
+    // Calcular duração média de atendimento
+    const avgDuration = data.performance?.performanceStats?.avg_attendance_duration || 0
+
     return (
       <div className="space-y-6">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Novos KPI Cards no topo */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Taxa de Conclusão */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <p className="text-sm text-gray-600">Taxa Concluído</p>
+                  </div>
+                  <div className="text-4xl font-bold text-green-600">
+                    {formatPercentage(completionRate)}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    {getTrendIcon(completionRate - 50)}
+                    <span className="text-xs text-gray-500">
+                      {completedAttendances} de {totalAttendances} concluídos
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Satisfação */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                    <p className="text-sm text-gray-600">Satisfação</p>
+                  </div>
+                  <div className="text-4xl font-bold text-yellow-600">
+                    {avgSatisfaction.toFixed(1)}
+                  </div>
+                  <div className="mt-2 flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`h-4 w-4 ${
+                          star <= avgSatisfaction
+                            ? 'text-yellow-400 fill-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Crescimento */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-5 w-5 text-blue-500" />
+                    <p className="text-sm text-gray-600">Crescimento</p>
+                  </div>
+                  <div className="text-4xl font-bold text-blue-600">
+                    {formatPercentage(growthRate)}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    {getTrendIcon(growthRate)}
+                    <span className="text-xs text-gray-500">
+                      nos últimos 30 dias
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Segunda linha de cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Total de Atendimentos */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center justify-between">
+                  <Activity className="h-8 w-8 text-blue-500" />
+                </div>
+                <div className="text-3xl font-bold">{formatNumber(general.totals?.total_attendances || 0)}</div>
+                <p className="text-sm text-gray-600">Atendimentos</p>
+                <div className="text-xs text-gray-500">
+                  ✓ Cadastrados no sistema
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Estudantes */}
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col space-y-2">
                 <div className="flex items-center justify-between">
                   <Users className="h-8 w-8 text-blue-500" />
-                  <Badge variant="secondary">{formatNumber(general.totals?.active_students || 0)} ativos</Badge>
                 </div>
                 <div className="text-3xl font-bold">{formatNumber(general.totals?.total_students || 0)}</div>
-                <p className="text-sm text-gray-600">Total de Estudantes</p>
+                <p className="text-sm text-gray-600">Estudantes</p>
+                <div className="text-xs text-gray-500">
+                  ✓ Disponíveis para agendamento
+                </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Serviços */}
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col space-y-2">
                 <div className="flex items-center justify-between">
                   <Settings className="h-8 w-8 text-green-500" />
-                  <Badge variant="secondary">{formatNumber(general.totals?.active_services || 0)} ativos</Badge>
                 </div>
                 <div className="text-3xl font-bold">{formatNumber(general.totals?.total_services || 0)}</div>
-                <p className="text-sm text-gray-600">Serviços Disponíveis</p>
+                <p className="text-sm text-gray-600">Serviços</p>
+                <div className="text-xs text-gray-500">
+                  ✓ Disponíveis para solicitação
+                </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Duração Média */}
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col space-y-2">
                 <div className="flex items-center justify-between">
-                  <Activity className="h-8 w-8 text-purple-500" />
-                  <Badge variant="secondary">{formatNumber(general.totals?.completed_attendances || 0)} concluídos</Badge>
+                  <Clock className="h-8 w-8 text-purple-500" />
                 </div>
-                <div className="text-3xl font-bold">{formatNumber(general.totals?.total_attendances || 0)}</div>
-                <p className="text-sm text-gray-600">Total de Atendimentos</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col space-y-2">
-                <div className="flex items-center justify-between">
-                  <MessageCircle className="h-8 w-8 text-orange-500" />
-                  <Badge variant="secondary">{formatNumber(general.totals?.total_conversations || 0)} conversas</Badge>
+                <div className="text-3xl font-bold text-purple-600">
+                  {avgDuration > 0 ? `${Math.round(avgDuration)} min` : '0 min'}
                 </div>
-                <div className="text-3xl font-bold">{formatNumber(general.totals?.total_chat_users || 0)}</div>
-                <p className="text-sm text-gray-600">Usuários do Chat</p>
+                <p className="text-sm text-gray-600">Duração Média</p>
+                <div className="text-xs text-gray-500">
+                  por atendimento
+                </div>
               </div>
             </CardContent>
           </Card>

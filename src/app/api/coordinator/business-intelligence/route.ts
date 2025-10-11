@@ -376,6 +376,24 @@ export async function GET(request: NextRequest) {
 
     // ==================== CRESCIMENTO ====================
 
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+
+    // Atendimentos dos últimos 30 dias
+    const appointmentsLast30Days = [...allAttendances || [], ...fiscalAppointments || []].filter(a =>
+      new Date(a.created_at).getTime() >= thirtyDaysAgo.getTime()
+    ).length
+
+    // Atendimentos dos 30 dias anteriores (31-60 dias atrás)
+    const appointmentsPrevious30Days = [...allAttendances || [], ...fiscalAppointments || []].filter(a => {
+      const createdAt = new Date(a.created_at).getTime()
+      return createdAt >= sixtyDaysAgo.getTime() && createdAt < thirtyDaysAgo.getTime()
+    }).length
+
+    // Calcular taxa de crescimento
+    const growthRate = appointmentsPrevious30Days > 0
+      ? ((appointmentsLast30Days - appointmentsPrevious30Days) / appointmentsPrevious30Days) * 100
+      : appointmentsLast30Days > 0 ? 100 : 0
+
     const growthStats = {
       new_users_last_7_days: chatUsers?.filter(u =>
         new Date(u.created_at).getTime() >= sevenDaysAgo.getTime()
@@ -386,9 +404,9 @@ export async function GET(request: NextRequest) {
       new_appointments_last_7_days: [...allAttendances || [], ...fiscalAppointments || []].filter(a =>
         new Date(a.created_at).getTime() >= sevenDaysAgo.getTime()
       ).length,
-      new_appointments_last_30_days: [...allAttendances || [], ...fiscalAppointments || []].filter(a =>
-        new Date(a.created_at).getTime() >= thirtyDaysAgo.getTime()
-      ).length,
+      new_appointments_last_30_days: appointmentsLast30Days,
+      appointments_previous_30_days: appointmentsPrevious30Days,
+      growth_rate: growthRate,
       active_students_current_month: studentsWithStats.filter(s =>
         s.status === 'ATIVO' && new Date(s.last_activity).getTime() >= thirtyDaysAgo.getTime()
       ).length

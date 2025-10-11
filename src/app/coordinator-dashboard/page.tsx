@@ -51,6 +51,7 @@ import AppointmentsPanel from '@/components/admin/AppointmentsPanel'
 import UsersPanel from '@/components/admin/UsersPanel'
 import StudentsPerformancePanel from '@/components/coordinator/StudentsPerformancePanel'
 import ChatLinkGenerator from '@/components/coordinator/ChatLinkGenerator'
+import BackupCenter from '@/components/coordinator/BackupCenter'
 // import { HistoryDashboard } from '@/components/coordinator/HistoryDashboard'
 
 interface ServiceMetrics {
@@ -822,6 +823,13 @@ export default function CoordinatorDashboard() {
       category: 'analytics'
     },
     {
+      value: 'security',
+      label: 'Segurança Digital',
+      description: 'Central de Backup Profissional',
+      icon: ShieldCheck,
+      category: 'security'
+    },
+    {
       value: 'chat-links',
       label: 'Links de Chat',
       description: 'Gerar Acesso ao Chat',
@@ -1060,6 +1068,10 @@ export default function CoordinatorDashboard() {
             <TabsTrigger className="w-full justify-center gap-2" value="intelligence">
               <BarChart3 className="h-4 w-4" />
               Business Intelligence
+            </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="security">
+              <ShieldCheck className="h-4 w-4" />
+              Segurança Digital
             </TabsTrigger>
             <TabsTrigger className="w-full justify-center" value="reports">Relatórios</TabsTrigger>
             <TabsTrigger className="w-full justify-center gap-2" value="backup">
@@ -1894,6 +1906,14 @@ export default function CoordinatorDashboard() {
 
           <TabsContent value="intelligence" className="space-y-6">
             <BusinessIntelligence />
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-6">
+            <BackupCenter
+              coordinatorId={user?.id || 'unknown'}
+              coordinatorName={user?.name || 'Coordenador'}
+              coordinatorEmail={user?.email || 'coordenador@naf.com'}
+            />
           </TabsContent>
 
           <TabsContent value="reports" className="space-y-6">
