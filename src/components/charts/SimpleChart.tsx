@@ -17,7 +17,21 @@ interface ChartProps {
 }
 
 export function SimpleChart({ data, type, title, className = '', height = 200 }: ChartProps) {
-  const maxValue = Math.max(...data.map(d => d.value))
+  // Validar se há dados
+  if (!data || data.length === 0) {
+    return (
+      <div className={`bg-white dark:bg-gray-950 rounded-lg p-4 ${className}`}>
+        {title && (
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">{title}</h3>
+        )}
+        <div style={{ height: `${height}px` }} className="flex items-center justify-center text-gray-500">
+          Sem dados disponíveis
+        </div>
+      </div>
+    )
+  }
+
+  const maxValue = Math.max(...data.map(d => d.value), 1) // Garantir mínimo de 1 para evitar -Infinity
 
   // Estácio-inspired palette (azul como primária)
   const brandBlue = '#0057B8'
@@ -142,7 +156,7 @@ export function SimpleChart({ data, type, title, className = '', height = 200 }:
     const chartHeight = height - 40
     const padding = 20
 
-    const xStep = (chartWidth - 2 * padding) / (data.length - 1)
+    const xStep = data.length > 1 ? (chartWidth - 2 * padding) / (data.length - 1) : 0
 
     const points = data.map((item, index) => {
       const x = padding + index * xStep
