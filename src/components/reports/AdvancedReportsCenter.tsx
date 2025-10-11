@@ -24,7 +24,8 @@ import {
   RefreshCw,
   Settings,
   Briefcase,
-  Clock
+  Clock,
+  Award
 } from 'lucide-react'
 
 interface ReportMetrics {
@@ -415,30 +416,81 @@ export default function AdvancedReportsCenter() {
           <CardContent>
             {hasStudentData ? (
               <div className="space-y-3">
-                {studentsData.studentRankings.slice(0, 10).map((student: unknown, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-sm">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">{student.student_name}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{student.course}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-blue-600">{student.total_attendances}</div>
-                      <div className="flex items-center justify-end gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                          <span>{student.avg_rating > 0 ? student.avg_rating.toFixed(1) : 'N/A'}</span>
+                {studentsData.studentRankings.slice(0, 10).map((student: unknown, index: number) => {
+                  // Definir cores e ícones para top 3
+                  const getTrophyStyle = (position: number) => {
+                    switch(position) {
+                      case 0: // 1º lugar
+                        return {
+                          bgColor: 'bg-gradient-to-br from-yellow-400 to-yellow-600',
+                          textColor: 'text-white',
+                          borderColor: 'border-yellow-400',
+                          showTrophy: true,
+                          trophyColor: 'text-yellow-500'
+                        }
+                      case 1: // 2º lugar
+                        return {
+                          bgColor: 'bg-gradient-to-br from-gray-300 to-gray-500',
+                          textColor: 'text-white',
+                          borderColor: 'border-gray-400',
+                          showTrophy: true,
+                          trophyColor: 'text-gray-400'
+                        }
+                      case 2: // 3º lugar
+                        return {
+                          bgColor: 'bg-gradient-to-br from-orange-400 to-orange-600',
+                          textColor: 'text-white',
+                          borderColor: 'border-orange-400',
+                          showTrophy: true,
+                          trophyColor: 'text-orange-500'
+                        }
+                      default:
+                        return {
+                          bgColor: 'bg-gradient-to-br from-blue-500 to-blue-600',
+                          textColor: 'text-white',
+                          borderColor: 'border-gray-200',
+                          showTrophy: false,
+                          trophyColor: ''
+                        }
+                    }
+                  }
+
+                  const style = getTrophyStyle(index)
+
+                  return (
+                    <div key={index} className={`flex items-center justify-between p-3 border ${style.borderColor} rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${index < 3 ? 'shadow-md' : ''}`}>
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 ${style.bgColor} ${style.textColor} rounded-full flex items-center justify-center text-sm font-bold shadow-sm relative`}>
+                          {style.showTrophy ? (
+                            <Award className="h-5 w-5" />
+                          ) : (
+                            <span>{index + 1}</span>
+                          )}
                         </div>
-                        <span>•</span>
-                        <span>{formatPercentage(student.completion_rate)}</span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900 dark:text-white">{student.student_name}</p>
+                            {style.showTrophy && (
+                              <Award className={`h-4 w-4 ${style.trophyColor} fill-current`} />
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{student.course}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-blue-600">{student.total_attendances}</div>
+                        <div className="flex items-center justify-end gap-2 text-sm text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <Star className="h-3 w-3 text-yellow-500 fill-current" />
+                            <span>{student.avg_rating > 0 ? student.avg_rating.toFixed(1) : 'N/A'}</span>
+                          </div>
+                          <span>•</span>
+                          <span>{formatPercentage(student.completion_rate)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="text-center py-8">
