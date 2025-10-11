@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+type StudentInfo = {
+  id: string
+  name: string | null
+  email: string | null
+  course: string | null
+  semester: string | null
+}
+
 export const dynamic = 'force-dynamic'
 
 /**
@@ -31,16 +39,7 @@ export async function POST(request: NextRequest) {
     // Construir query com filtros
     let query = supabase
       .from('fiscal_appointments')
-      .select(`
-        *,
-        assigned_student:students!fiscal_appointments_assigned_student_id_fkey(
-          id,
-          name,
-          email,
-          course,
-          semester
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
 
     // Aplicar filtros de status
@@ -76,6 +75,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Buscar dados dos estudantes associados aos atendimentos
+    let studentsMap: Record<string, StudentInfo> = {}
+    const studentIds = Array.from(
+      new Set(
+        (appointments || [])
+          .map(apt => apt.assigned_student_id)
+          .filter((id): id is string => Boolean(id))
+      )
+    )
+
+    if (studentIds.length > 0) {
+      const { data: students, error: studentsError } = await supabase
+        .from('students')
+        .select('id, name, email, course, semester')
+        .in('id', studentIds)
+
+      if (studentsError) {
+        console.error('Erro ao buscar estudantes para o backup:', studentsError)
+      } else if (students) {
+        studentsMap = students.reduce((acc: Record<string, StudentInfo>, student) => {
+          acc[student.id] = student
+          return acc
+        }, {})
+      }
+    }
+
     // Buscar feedbacks se solicitado
     let feedbacksMap: Record<string, any> = {}
     if (includeFeeback && appointments && appointments.length > 0) {
@@ -95,6 +120,7 @@ export async function POST(request: NextRequest) {
     // Preparar dados para exportação
     const exportData = appointments?.map(apt => {
       const feedback = feedbacksMap[apt.id]
+      const assignedStudent = apt.assigned_student_id ? studentsMap[apt.assigned_student_id] : undefined
       return {
         // Dados básicos do atendimento
         protocolo: apt.protocol || 'N/A',
@@ -121,10 +147,10 @@ export async function POST(request: NextRequest) {
         periodo_preferencia: apt.preferred_period || 'N/A',
 
         // Estudante responsável
-        estudante_nome: apt.assigned_student?.name || 'Não atribuído',
-        estudante_email: apt.assigned_student?.email || 'N/A',
-        estudante_curso: apt.assigned_student?.course || 'N/A',
-        estudante_semestre: apt.assigned_student?.semester || 'N/A',
+        estudante_nome: assignedStudent?.name || 'Não atribuído',
+        estudante_email: assignedStudent?.email || 'N/A',
+        estudante_curso: assignedStudent?.course || 'N/A',
+        estudante_semestre: assignedStudent?.semester || 'N/A',
 
         // Datas importantes
         data_criacao: new Date(apt.created_at).toLocaleString('pt-BR'),

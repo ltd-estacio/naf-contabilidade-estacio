@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS public.fiscal_appointment_feedbacks (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   appointment_id uuid NOT NULL,
-  student_id uuid NOT NULL,
+  student_id uuid,
   rating integer CHECK (rating >= 1 AND rating <= 5),
   feedback_text text,
   attendance_quality integer CHECK (attendance_quality >= 1 AND attendance_quality <= 5),
@@ -22,6 +22,32 @@ CREATE TABLE IF NOT EXISTS public.fiscal_appointment_feedbacks (
   CONSTRAINT fk_appointment FOREIGN KEY (appointment_id) REFERENCES public.fiscal_appointments(id) ON DELETE CASCADE,
   CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES public.students(id) ON DELETE SET NULL
 );
+
+-- Garantir atualização da tabela para instalações existentes
+ALTER TABLE IF EXISTS public.fiscal_appointment_feedbacks
+  ADD COLUMN IF NOT EXISTS student_id uuid,
+  ADD COLUMN IF NOT EXISTS attendance_quality integer CHECK (attendance_quality >= 1 AND attendance_quality <= 5),
+  ADD COLUMN IF NOT EXISTS punctuality integer CHECK (punctuality >= 1 AND punctuality <= 5),
+  ADD COLUMN IF NOT EXISTS professionalism integer CHECK (professionalism >= 1 AND professionalism <= 5),
+  ADD COLUMN IF NOT EXISTS problem_resolution integer CHECK (problem_resolution >= 1 AND problem_resolution <= 5),
+  ADD COLUMN IF NOT EXISTS would_recommend boolean DEFAULT true,
+  ADD COLUMN IF NOT EXISTS additional_comments text,
+  ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_student'
+      AND conrelid = 'public.fiscal_appointment_feedbacks'::regclass
+  ) THEN
+    ALTER TABLE public.fiscal_appointment_feedbacks
+      ADD CONSTRAINT fk_student FOREIGN KEY (student_id)
+      REFERENCES public.students(id) ON DELETE SET NULL;
+  END IF;
+END
+$$;
 
 -- Tabela de Logs de Backup
 CREATE TABLE IF NOT EXISTS public.backup_logs (
