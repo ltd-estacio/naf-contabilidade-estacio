@@ -253,9 +253,20 @@ class AdvancedReportsService {
       console.log(`👨‍🎓 Processing performance for ${students?.length || 0} students...`)
       const studentPerformanceData = await Promise.all(
         (students || []).map(async (student: unknown) => {
+          // Buscar atendimentos da tabela attendances
           const studentAttendances = attendances?.filter(a => a.student_id === student.id) || []
-          const totalAttendances = studentAttendances.length
-          const completedAttendances = studentAttendances.filter(a => a.status === 'CONCLUIDO').length
+
+          // Buscar atendimentos da tabela fiscal_appointments usando assigned_student_id
+          const studentFiscalAppointments = fiscalAppointments?.filter(fa => fa.assigned_student_id === student.id) || []
+
+          // Combinar ambos os tipos de atendimentos
+          const totalAttendances = studentAttendances.length + studentFiscalAppointments.length
+
+          // Contar atendimentos concluídos de ambas as tabelas
+          const completedAttendances = studentAttendances.filter(a => a.status === 'CONCLUIDO').length +
+                                       studentFiscalAppointments.filter(fa => fa.status === 'CONCLUIDO').length
+
+          // Avaliações só existem na tabela attendances por enquanto
           const studentRatings = studentAttendances.filter(a => a.client_satisfaction_rating && a.client_satisfaction_rating > 0)
           const avgRating = studentRatings.length > 0
             ? studentRatings.reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / studentRatings.length
@@ -283,7 +294,7 @@ class AdvancedReportsService {
           }
 
           if (totalAttendances > 0) {
-            console.log(`   ${student.name}: ${totalAttendances} atendimentos, ${avgRating.toFixed(1)} ⭐`)
+            console.log(`   ${student.name}: ${totalAttendances} atendimentos (${studentAttendances.length} attendances + ${studentFiscalAppointments.length} fiscal), ${avgRating.toFixed(1)} ⭐`)
           }
 
           return performanceData

@@ -73,6 +73,15 @@ export default function AdvancedReportsCenter() {
         if (type === 'general' && result.data.generalStats) {
           console.log('📈 General Stats:', result.data.generalStats)
         }
+
+        // Log específico para type students
+        if (type === 'students') {
+          console.log('👨‍🎓 Students Report Data:')
+          console.log('   - activeStudents:', result.data.activeStudents?.length || 0)
+          console.log('   - studentRankings:', result.data.studentRankings?.length || 0)
+          console.log('   - productivityAnalysis:', result.data.productivityAnalysis?.length || 0)
+          console.log('   - Full studentRankings:', result.data.studentRankings)
+        }
       } else {
         setError(result.error || `Erro ao carregar relatório ${type}`)
         console.error(`❌ Error loading ${type} report:`, result.error)
@@ -394,6 +403,14 @@ export default function AdvancedReportsCenter() {
   const renderStudentsReport = () => {
     const studentsData = data.students
 
+    console.log('🔍 Rendering Students Report')
+    console.log('   data.students:', data.students)
+    console.log('   studentsData:', studentsData)
+    console.log('   studentRankings:', studentsData?.studentRankings)
+    console.log('   studentRankings length:', studentsData?.studentRankings?.length)
+    console.log('   productivityAnalysis:', studentsData?.productivityAnalysis)
+    console.log('   activeStudents:', studentsData?.activeStudents)
+
     if (!studentsData) {
       return (
         <div className="text-center py-8">
@@ -404,6 +421,7 @@ export default function AdvancedReportsCenter() {
     }
 
     const hasStudentData = studentsData.studentRankings && studentsData.studentRankings.length > 0
+    console.log('   hasStudentData:', hasStudentData)
 
     return (
       <div className="space-y-6">
