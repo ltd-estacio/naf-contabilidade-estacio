@@ -30,24 +30,37 @@ export async function GET(request: NextRequest) {
     // Para cada estudante, buscar estatísticas detalhadas
     const studentsWithStats = await Promise.all(
       (students || []).map(async (student) => {
-        // Buscar atendimentos totais
+        // Buscar atendimentos totais da tabela attendances
         const { count: totalAttendances } = await supabase
           .from('attendances')
           .select('*', { count: 'exact', head: true })
           .eq('student_id', student.id)
 
-        // Buscar média de avaliação
+        // Buscar atendimentos fiscais totais
+        const { count: totalFiscalAppointments } = await supabase
+          .from('fiscal_appointments')
+          .select('*', { count: 'exact', head: true })
+          .eq('assigned_student_id', student.id)
+
+        // Buscar média de avaliação de attendances
         const { data: avgRatingData } = await supabase
           .from('attendances')
           .select('client_satisfaction_rating')
           .eq('student_id', student.id)
           .not('client_satisfaction_rating', 'is', null)
 
-        const avgRating =
-          avgRatingData && avgRatingData.length > 0
-            ? avgRatingData.reduce((sum, a) => sum + (a.client_satisfaction_rating || 0), 0) /
-              avgRatingData.length
-            : 0
+        // Buscar média de avaliação de fiscal feedbacks
+        const { data: fiscalFeedbacks } = await supabase
+          .from('fiscal_appointment_feedbacks')
+          .select('rating, fiscal_appointments!inner(assigned_student_id)')
+          .eq('fiscal_appointments.assigned_student_id', student.id)
+
+        // Calcular média combinada
+        const sumAttendances = avgRatingData?.reduce((sum, a) => sum + (a.client_satisfaction_rating || 0), 0) || 0
+        const sumFiscal = fiscalFeedbacks?.reduce((sum, f) => sum + (f.rating || 0), 0) || 0
+        const totalRatings = (avgRatingData?.length || 0) + (fiscalFeedbacks?.length || 0)
+
+        const avgRating = totalRatings > 0 ? (sumAttendances + sumFiscal) / totalRatings : 0
 
         // Calcular número do semestre
         const semesterNumber = parseInt(student.semester?.replace(/\D/g, '') || '1')
@@ -87,7 +100,7 @@ export async function GET(request: NextRequest) {
           graduationDate: student.graduation_date || null,
           registrationYear: student.registration_year || new Date().getFullYear(),
           registrationSemester: student.registration_semester || 1,
-          totalAttendances: totalAttendances || 0,
+          totalAttendances: (totalAttendances || 0) + (totalFiscalAppointments || 0),
           avgRating: Math.round(avgRating * 10) / 10,
           birthDate: student.birth_date,
           address: student.address,
