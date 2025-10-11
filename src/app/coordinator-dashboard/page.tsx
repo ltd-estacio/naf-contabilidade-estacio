@@ -795,18 +795,18 @@ export default function CoordinatorDashboard() {
       category: 'management'
     },
     {
-      value: 'fiscal',
-      label: 'Fiscal & Compliance',
-      description: 'Procedimentos e Orientações',
-      icon: BookOpen,
-      category: 'compliance'
-    },
-    {
       value: 'appointments',
       label: 'Atendimentos',
       description: 'Gestão Inteligente',
       icon: Calendar,
       category: 'operations'
+    },
+    {
+      value: 'fiscal',
+      label: 'Fiscal & Compliance',
+      description: 'Procedimentos e Orientações',
+      icon: BookOpen,
+      category: 'compliance'
     },
     {
       value: 'chat',
@@ -824,17 +824,10 @@ export default function CoordinatorDashboard() {
     },
     {
       value: 'security',
-      label: 'Segurança Digital',
+      label: 'Backup Atendimentos',
       description: 'Central de Backup Profissional',
       icon: ShieldCheck,
       category: 'security'
-    },
-    {
-      value: 'chat-links',
-      label: 'Links de Chat',
-      description: 'Gerar Acesso ao Chat',
-      icon: LinkIcon,
-      category: 'analytics'
     },
     {
       value: 'backup',
@@ -842,6 +835,13 @@ export default function CoordinatorDashboard() {
       description: 'Backup e Recuperação',
       icon: HardDriveDownload,
       category: 'management'
+    },
+    {
+      value: 'chat-links',
+      label: 'Links de Chat',
+      description: 'Gerar Acesso ao Chat',
+      icon: LinkIcon,
+      category: 'analytics'
     }
   ]
 
