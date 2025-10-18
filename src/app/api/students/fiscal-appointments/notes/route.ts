@@ -32,6 +32,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'appointmentId é obrigatório' }, { status: 400 })
     }
 
+    const isValidUUID = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+
+    if (!isValidUUID(appointmentId)) {
+      return NextResponse.json({ message: 'appointmentId inválido' }, { status: 400 })
+    }
+
     const { data: appointment, error: appointmentError } = await supabase
       .from('fiscal_appointments')
       .select('id')
@@ -51,7 +57,12 @@ export async function GET(request: NextRequest) {
 
     if (notesError) {
       console.error('Erro ao buscar notas do atendimento:', notesError)
-      return NextResponse.json({ message: 'Erro ao buscar notas' }, { status: 500 })
+      return NextResponse.json({
+        message: 'Erro ao buscar notas',
+        details: notesError.message,
+        hint: notesError.hint,
+        code: notesError.code
+      }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -97,6 +108,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'appointmentId é obrigatório' }, { status: 400 })
     }
 
+    const isValidUUID = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+
+    if (!isValidUUID(appointmentId)) {
+      return NextResponse.json({ message: 'appointmentId inválido' }, { status: 400 })
+    }
+
     const sanitizedNote = (note || '').toString().trim()
     if (!sanitizedNote) {
       return NextResponse.json({ message: 'A anotação não pode estar vazia' }, { status: 400 })
@@ -129,9 +146,16 @@ export async function POST(request: NextRequest) {
       studentName = userProfile?.name || null
     }
 
+    const normalizeStudentId = (value: string | undefined) => {
+      if (!value || typeof value !== 'string') {
+        return null
+      }
+      return isValidUUID(value) ? value : null
+    }
+
     const baseInsertPayload = {
       appointment_id: appointmentId,
-      student_id: studentId,
+      student_id: normalizeStudentId(studentId),
       student_name: studentName,
       note: sanitizedNote
     }
@@ -149,8 +173,11 @@ export async function POST(request: NextRequest) {
 
     const firstAttempt = await execInsert(baseInsertPayload)
 
-    if (firstAttempt.error && firstAttempt.error.code === '23503') {
-      console.warn('FK constraint ao registrar nota. Repetindo inserção sem student_id.', firstAttempt.error)
+    const shouldRetryWithoutStudent = firstAttempt.error &&
+      ['23503', '23505', '22P02'].includes(firstAttempt.error.code ?? '')
+
+    if (shouldRetryWithoutStudent) {
+      console.warn('Repetindo inserção de nota sem student_id devido ao erro:', firstAttempt.error)
       const fallbackAttempt = await execInsert({
         ...baseInsertPayload,
         student_id: null

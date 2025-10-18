@@ -662,7 +662,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const message = errorData.message || 'Não foi possível carregar as anotações no momento.'
+        const message = [errorData.message, errorData.details].filter(Boolean).join(' - ') || 'Não foi possível carregar as anotações no momento.'
         throw new Error(message)
       }
 
@@ -730,7 +730,8 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Erro ao salvar anotação')
+        const message = [errorData.message, errorData.details].filter(Boolean).join(' - ') || 'Erro ao salvar anotação'
+        throw new Error(message)
       }
 
       await response.json()

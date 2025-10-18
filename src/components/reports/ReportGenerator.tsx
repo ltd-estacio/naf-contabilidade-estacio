@@ -326,6 +326,14 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
 
   const selectedFormatInfo = formats.find(f => f.value === selectedFormat)
   const selectedTemplateInfo = templates.find(t => t.value === selectedTemplate)
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLElement>, callback: () => void) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      callback()
+    }
+  }
+  const titleInputId = 'report-title-input'
+  const subtitleInputId = 'report-subtitle-input'
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -366,15 +374,14 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
         </Card>
       )}
 
-      <Tabs defaultValue="quick" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="quick">Geração Rápida</TabsTrigger>
-          <TabsTrigger value="custom">Relatório Customizado</TabsTrigger>
+      <Tabs defaultValue="config" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="config">Configuração</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
 
-        {/* Aba: Geração Rápida */}
-        <TabsContent value="quick" className="space-y-6">
+        {/* Configuração completa (Geração rápida + customização) */}
+        <TabsContent value="config" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Seleção de Formato */}
             <Card>
@@ -394,12 +401,15 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
                     return (
                       <div
                         key={format.value}
+                        role="button"
+                        tabIndex={0}
                         className={`p-3 border rounded-lg cursor-pointer transition-all ${
                           selectedFormat === format.value
                             ? `border-emerald-500 ${format.bgColor} ring-1 ring-emerald-500`
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                         onClick={() => setSelectedFormat(format.value)}
+                        onKeyDown={(event) => handleCardKeyDown(event, () => setSelectedFormat(format.value))}
                       >
                         <div className="flex items-center space-x-3">
                           <Icon className={`h-5 w-5 ${format.color}`} />
@@ -436,12 +446,15 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
                     return (
                       <div
                         key={template.value}
+                        role="button"
+                        tabIndex={0}
                         className={`p-3 border rounded-lg cursor-pointer transition-all ${
                           selectedTemplate === template.value
                             ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                         onClick={() => setSelectedTemplate(template.value)}
+                        onKeyDown={(event) => handleCardKeyDown(event, () => setSelectedTemplate(template.value))}
                       >
                         <div className="flex items-center space-x-3">
                           <Icon className="h-5 w-5 text-emerald-600" />
@@ -536,10 +549,6 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Aba: Relatório Customizado */}
-        <TabsContent value="custom" className="space-y-6">
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
@@ -558,25 +567,39 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium mb-2">Título do Relatório</p>
-                    <p className="text-lg border rounded p-2">{customTemplate.title}</p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700" htmlFor={titleInputId}>Título do Relatório</label>
+                    <input
+                      type="text"
+                      value={customTemplate.title}
+                      onChange={event => updateCustomTemplate('title', event.target.value)}
+                      className="w-full rounded-md border border-gray-200 p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                      placeholder="Digite o título do relatório"
+                      id={titleInputId}
+                    />
                   </div>
 
-                  <div>
-                    <p className="text-sm font-medium mb-2">Subtítulo</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 border rounded p-2">{customTemplate.subtitle}</p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700" htmlFor={subtitleInputId}>Subtítulo</label>
+                    <input
+                      type="text"
+                      value={customTemplate.subtitle}
+                      onChange={event => updateCustomTemplate('subtitle', event.target.value)}
+                      className="w-full rounded-md border border-gray-200 p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                      placeholder="Ex: Sistema NAF - Núcleo de Apoio Contábil e Fiscal"
+                      id={subtitleInputId}
+                    />
                   </div>
 
-                  <div>
-                    <p className="text-sm font-medium mb-2">Formato de Saída</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Formato de Saída</p>
                     <div className="grid grid-cols-2 gap-2">
                       {formats.map(format => {
                         const Icon = format.icon
                         return (
                           <Button
                             key={format.value}
-                            variant={selectedFormat === format.value ? "default" : "outline"}
+                            variant={selectedFormat === format.value ? 'default' : 'outline'}
                             onClick={() => setSelectedFormat(format.value)}
                             className="flex items-center space-x-2 h-12"
                           >
@@ -619,6 +642,9 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
                       customTemplate.includeSummary ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'
                     }`}
                     onClick={() => updateCustomTemplate('includeSummary', !customTemplate.includeSummary)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => handleCardKeyDown(event, () => updateCustomTemplate('includeSummary', !customTemplate.includeSummary))}
                   >
                     <div className="flex items-center space-x-3">
                       <Target className="h-5 w-5 text-blue-600" />
@@ -635,6 +661,9 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
                       customTemplate.includeAttendances ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'
                     }`}
                     onClick={() => updateCustomTemplate('includeAttendances', !customTemplate.includeAttendances)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => handleCardKeyDown(event, () => updateCustomTemplate('includeAttendances', !customTemplate.includeAttendances))}
                   >
                     <div className="flex items-center space-x-3">
                       <User className="h-5 w-5 text-green-600" />
@@ -651,6 +680,9 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
                       customTemplate.includeTrainings ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'
                     }`}
                     onClick={() => updateCustomTemplate('includeTrainings', !customTemplate.includeTrainings)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => handleCardKeyDown(event, () => updateCustomTemplate('includeTrainings', !customTemplate.includeTrainings))}
                   >
                     <div className="flex items-center space-x-3">
                       <BookOpen className="h-5 w-5 text-purple-600" />
@@ -667,6 +699,9 @@ export default function ReportGenerator({ className }: ReportGeneratorProps) {
                       customTemplate.includeEvaluations ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'
                     }`}
                     onClick={() => updateCustomTemplate('includeEvaluations', !customTemplate.includeEvaluations)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => handleCardKeyDown(event, () => updateCustomTemplate('includeEvaluations', !customTemplate.includeEvaluations))}
                   >
                     <div className="flex items-center space-x-3">
                       <Trophy className="h-5 w-5 text-yellow-600" />

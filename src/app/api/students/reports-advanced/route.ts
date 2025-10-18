@@ -53,11 +53,49 @@ async function getStudentReportData(studentId: string): Promise<ReportData> {
     const { data: fiscalAppointments, error: fiscalError } = await supabase
       .from('fiscal_appointments')
       .select('*')
-      .eq('student_id', studentId)
-      .order('appointment_date', { ascending: false })
+      .eq('assigned_student_id', studentId)
+      .order('created_at', { ascending: false })
 
     if (fiscalError) {
       console.error('Erro ao buscar atendimentos fiscais:', fiscalError)
+    }
+
+    const fiscalAppointmentIds = (fiscalAppointments || [])
+      .map(appointment => appointment?.id)
+      .filter((id): id is string => typeof id === 'string')
+
+    let fiscalNotesMap: Record<string, Array<{ id: string; student_name?: string | null; note: string; created_at: string }>> = {}
+
+    if (fiscalAppointmentIds.length > 0) {
+      const { data: fiscalNotes, error: fiscalNotesError } = await supabase
+        .from('fiscal_appointment_notes')
+        .select('*')
+        .in('appointment_id', fiscalAppointmentIds)
+        .order('created_at', { ascending: true })
+
+      if (fiscalNotesError) {
+        console.error('Erro ao buscar notas dos atendimentos fiscais:', fiscalNotesError)
+      } else {
+        fiscalNotesMap = (fiscalNotes || []).reduce<typeof fiscalNotesMap>((acc, note) => {
+          const key = note.appointment_id
+          if (!key) {
+            return acc
+          }
+
+          if (!acc[key]) {
+            acc[key] = []
+          }
+
+          acc[key].push({
+            id: note.id,
+            student_name: note.student_name,
+            note: note.note,
+            created_at: note.created_at
+          })
+
+          return acc
+        }, {})
+      }
     }
 
     // Buscar feedbacks dos atendimentos fiscais
@@ -163,14 +201,16 @@ async function getStudentReportData(studentId: string): Promise<ReportData> {
       })) || [],
       fiscalAppointments: fiscalAppointments?.map(fiscal => {
         const appointmentFeedback = feedbacks?.find(f => f.appointment_id === fiscal.id)
+        const appointmentDate = fiscal.appointment_date || fiscal.scheduled_at || fiscal.preferred_date || fiscal.created_at
         return {
           id: fiscal.id,
           protocol: fiscal.protocol,
           client_name: fiscal.client_name,
           service_description: fiscal.service_description,
           status: fiscal.status,
-          appointment_date: fiscal.appointment_date,
+          appointment_date: appointmentDate,
           student_name: student.name,
+          progressNotes: fiscalNotesMap[fiscal.id] || [],
           feedback: appointmentFeedback ? {
             rating: appointmentFeedback.rating || 0,
             comment: appointmentFeedback.comment || '',

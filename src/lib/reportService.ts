@@ -50,6 +50,12 @@ export interface ReportData {
     status: string
     appointment_date: string
     student_name?: string
+    progressNotes?: Array<{
+      id: string
+      student_name?: string | null
+      note: string
+      created_at: string
+    }>
     feedback?: {
       rating: number
       comment: string
@@ -297,6 +303,45 @@ export class ReportService {
           yPosition = 20
         }
       }
+
+      const appointmentsWithNotes = data.fiscalAppointments.filter(f => f.progressNotes && f.progressNotes.length > 0)
+
+      if (appointmentsWithNotes.length > 0) {
+        yPosition += 15
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        yPosition = addText('REGISTRO DO ATENDIMENTO (NOTAS)', 20, yPosition)
+
+        appointmentsWithNotes.forEach(appointment => {
+          if (yPosition > 240) {
+            doc.addPage()
+            yPosition = 20
+          }
+
+          doc.setFontSize(12)
+          doc.setFont('helvetica', 'bold')
+          yPosition = addText(`Atendimento: ${appointment.protocol || appointment.id}`, 20, yPosition + 8)
+
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'normal')
+
+          appointment.progressNotes?.forEach(note => {
+            const noteDate = note.created_at ? new Date(note.created_at).toLocaleString('pt-BR') : ''
+            yPosition = addText(`• ${noteDate} - ${note.student_name || 'Estudante'}:`, 20, yPosition + 4)
+            yPosition = addText(`  ${note.note}`, 25, yPosition + 2)
+
+            if (yPosition > 250) {
+              doc.addPage()
+              yPosition = 20
+            }
+          })
+        })
+
+        if (yPosition > 220) {
+          doc.addPage()
+          yPosition = 20
+        }
+      }
     }
 
     // Tabela de Avaliações
@@ -459,6 +504,68 @@ export class ReportService {
       children.push(new Paragraph({ text: "" })) // Linha em branco
     }
 
+    // Atendimentos Fiscais
+    if (data.fiscalAppointments && data.fiscalAppointments.length > 0) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'ATENDIMENTOS FISCAIS', bold: true, size: 16 })],
+          heading: HeadingLevel.HEADING_1
+        })
+      )
+
+      data.fiscalAppointments.forEach((fiscal, index) => {
+        const appointmentLabel = fiscal.protocol || fiscal.id
+        const appointmentDate = fiscal.appointment_date
+          ? new Date(fiscal.appointment_date).toLocaleString('pt-BR')
+          : 'N/A'
+
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `${index + 1}. ${appointmentLabel}`, bold: true })]
+        }))
+
+        if (fiscal.client_name) {
+          children.push(new Paragraph({ children: [new TextRun({ text: `Cliente: ${fiscal.client_name}` })] }))
+        }
+
+        if (fiscal.service_description) {
+          children.push(new Paragraph({ children: [new TextRun({ text: `Serviço: ${fiscal.service_description}` })] }))
+        }
+
+        children.push(new Paragraph({ children: [new TextRun({ text: `Status: ${fiscal.status}` })] }))
+        children.push(new Paragraph({ children: [new TextRun({ text: `Data: ${appointmentDate}` })] }))
+
+        if (fiscal.feedback) {
+          children.push(new Paragraph({ children: [new TextRun({ text: `Feedback (${fiscal.feedback.rating}/5): ${fiscal.feedback.comment || '—'}` })] }))
+
+          if (fiscal.feedback.strengths?.length) {
+            children.push(new Paragraph({ children: [new TextRun({ text: 'Pontos Fortes:', bold: true })] }))
+            fiscal.feedback.strengths.forEach(strength => {
+              children.push(new Paragraph({ children: [new TextRun({ text: `• ${strength}` })] }))
+            })
+          }
+
+          if (fiscal.feedback.improvements?.length) {
+            children.push(new Paragraph({ children: [new TextRun({ text: 'Pontos a Melhorar:', bold: true })] }))
+            fiscal.feedback.improvements.forEach(item => {
+              children.push(new Paragraph({ children: [new TextRun({ text: `• ${item}` })] }))
+            })
+          }
+        }
+
+        if (fiscal.progressNotes && fiscal.progressNotes.length > 0) {
+          children.push(new Paragraph({ children: [new TextRun({ text: 'Registro do Atendimento:', bold: true })] }))
+          fiscal.progressNotes.forEach(note => {
+            const noteDate = note.created_at
+              ? new Date(note.created_at).toLocaleString('pt-BR')
+              : 'N/A'
+            children.push(new Paragraph({ children: [new TextRun({ text: `• ${noteDate} - ${note.student_name || 'Estudante'}: ${note.note}` })] }))
+          })
+        }
+
+        children.push(new Paragraph({ text: '' }))
+      })
+    }
+
     // Tabela de Treinamentos
     if (template.includeTrainings && data.trainings.length > 0) {
       children.push(
@@ -601,6 +708,40 @@ export class ReportService {
       csvData.push([])
     }
 
+    // Atendimentos Fiscais
+    if (data.fiscalAppointments && data.fiscalAppointments.length > 0) {
+      csvData.push(['ATENDIMENTOS FISCAIS'])
+      csvData.push(['Protocolo', 'Cliente', 'Status', 'Data', 'Feedback', 'Registro do Atendimento'])
+
+      data.fiscalAppointments.forEach(fiscal => {
+        const appointmentDate = fiscal.appointment_date
+          ? new Date(fiscal.appointment_date).toLocaleString('pt-BR')
+          : 'N/A'
+
+        const feedbackText = fiscal.feedback
+          ? `Nota: ${fiscal.feedback.rating}/5 - ${fiscal.feedback.comment || ''}`
+          : 'Sem feedback registrado'
+
+        const notesText = fiscal.progressNotes && fiscal.progressNotes.length > 0
+          ? fiscal.progressNotes.map(note => {
+              const noteDate = note.created_at ? new Date(note.created_at).toLocaleString('pt-BR') : 'N/A'
+              return `${noteDate} - ${note.student_name || 'Estudante'}: ${note.note}`
+            }).join(' | ')
+          : 'Sem registros'
+
+        csvData.push([
+          fiscal.protocol || fiscal.id,
+          fiscal.client_name || 'N/A',
+          fiscal.status,
+          appointmentDate,
+          feedbackText,
+          notesText
+        ])
+      })
+
+      csvData.push([])
+    }
+
     // Treinamentos
     if (data.trainings.length > 0) {
       csvData.push(['TREINAMENTOS'])
@@ -690,6 +831,52 @@ export class ReportService {
       XLSX.utils.book_append_sheet(workbook, attendanceWorksheet, 'Atendimentos')
     }
 
+    // Aba: Atendimentos Fiscais
+    if (data.fiscalAppointments && data.fiscalAppointments.length > 0) {
+      const fiscalAppointmentsData = [
+        ['Protocolo', 'Cliente', 'Status', 'Data', 'Feedback']
+      ]
+
+      data.fiscalAppointments.forEach(fiscal => {
+        const appointmentDate = fiscal.appointment_date
+          ? new Date(fiscal.appointment_date).toLocaleString('pt-BR')
+          : 'N/A'
+
+        const feedbackText = fiscal.feedback
+          ? `Nota ${fiscal.feedback.rating}/5 - ${fiscal.feedback.comment || ''}`
+          : 'Sem feedback registrado'
+
+        fiscalAppointmentsData.push([
+          fiscal.protocol || fiscal.id,
+          fiscal.client_name || 'N/A',
+          fiscal.status,
+          appointmentDate,
+          feedbackText
+        ])
+      })
+
+      const fiscalWorksheet = XLSX.utils.aoa_to_sheet(fiscalAppointmentsData)
+      XLSX.utils.book_append_sheet(workbook, fiscalWorksheet, 'Atend. Fiscais')
+
+      const notes = data.fiscalAppointments
+        .flatMap(fiscal => (fiscal.progressNotes || []).map(note => ({
+          protocol: fiscal.protocol || fiscal.id,
+          date: note.created_at ? new Date(note.created_at).toLocaleString('pt-BR') : 'N/A',
+          author: note.student_name || 'Estudante',
+          description: note.note
+        })))
+
+      if (notes.length > 0) {
+        const notesData = [
+          ['Atendimento', 'Data', 'Responsável', 'Descrição'],
+          ...notes.map(note => [note.protocol, note.date, note.author, note.description])
+        ]
+
+        const notesWorksheet = XLSX.utils.aoa_to_sheet(notesData)
+        XLSX.utils.book_append_sheet(workbook, notesWorksheet, 'Registros Atendimento')
+      }
+    }
+
     // Aba: Treinamentos
     if (data.trainings.length > 0) {
       const trainingData = [
@@ -776,6 +963,51 @@ export class ReportService {
         content += `   Urgência: ${att.urgency}\n`
         content += `   Tipo: ${att.is_online ? 'Online' : 'Presencial'}\n`
         content += `   Avaliação: ${att.client_satisfaction_rating || 'N/A'}\n\n`
+      })
+    }
+
+    // Atendimentos Fiscais
+    if (data.fiscalAppointments && data.fiscalAppointments.length > 0) {
+      content += `ATENDIMENTOS FISCAIS\n`
+      content += `${'-'.repeat(30)}\n`
+
+      data.fiscalAppointments.forEach((fiscal, index) => {
+        const appointmentDate = fiscal.appointment_date
+          ? new Date(fiscal.appointment_date).toLocaleString('pt-BR')
+          : 'N/A'
+
+        content += `${index + 1}. ${fiscal.protocol || fiscal.id}\n`
+        if (fiscal.client_name) {
+          content += `   Cliente: ${fiscal.client_name}\n`
+        }
+        content += `   Status: ${fiscal.status}\n`
+        content += `   Data: ${appointmentDate}\n`
+
+        if (fiscal.feedback) {
+          content += `   Feedback (${fiscal.feedback.rating}/5): ${fiscal.feedback.comment || '—'}\n`
+          if (fiscal.feedback.strengths?.length) {
+            content += `   Pontos Fortes:\n`
+            fiscal.feedback.strengths.forEach(strength => {
+              content += `     • ${strength}\n`
+            })
+          }
+          if (fiscal.feedback.improvements?.length) {
+            content += `   Pontos a Melhorar:\n`
+            fiscal.feedback.improvements.forEach(item => {
+              content += `     • ${item}\n`
+            })
+          }
+        }
+
+        if (fiscal.progressNotes && fiscal.progressNotes.length > 0) {
+          content += `   Registro do Atendimento:\n`
+          fiscal.progressNotes.forEach(note => {
+            const noteDate = note.created_at ? new Date(note.created_at).toLocaleString('pt-BR') : 'N/A'
+            content += `     • ${noteDate} - ${note.student_name || 'Estudante'}: ${note.note}\n`
+          })
+        }
+
+        content += '\n'
       })
     }
 

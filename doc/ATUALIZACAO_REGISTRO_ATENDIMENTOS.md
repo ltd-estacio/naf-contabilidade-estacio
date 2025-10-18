@@ -17,6 +17,9 @@ Implementamos um sistema de registro contínuo para os atendimentos fiscais, per
 - **Coordinator Dashboard (`/coordinator-dashboard`)**:
   - cartões de atendimentos fiscais mostram resumo da data/hora agendada e permitem abrir o log completo das anotações lançadas pelo estudante;
   - a listagem atualiza automaticamente a cada novo agendamento ou alteração de status, dispensando o recarregamento manual do painel.
+- **Gerador de Relatórios Avançado**:
+  - relatórios passaram a incluir o “Registro do Atendimento” (notas lançadas em tempo real) junto às seções de atendimentos fiscais;
+  - interface de configuração consolidada em uma única aba, facilitando a geração rápida ou customizada no mesmo fluxo.
 
 ### Fluxo recomendado para estudantes
 1. Abra o atendimento fiscal e confirme os dados.<br>
