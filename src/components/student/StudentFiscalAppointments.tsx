@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,7 +32,8 @@ import {
   TrendingUp,
   BarChart3,
   Trash2,
-  PlusCircle
+  PlusCircle,
+  Loader2
 } from 'lucide-react'
 import FeedbackModal from './FeedbackModal'
 
@@ -233,10 +234,16 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({})
   const [noteSaving, setNoteSaving] = useState<Record<string, boolean>>({})
   const [noteErrors, setNoteErrors] = useState<Record<string, string>>({})
+  const [notesLoading, setNotesLoading] = useState<Record<string, boolean>>({})
+  const [notesFetchErrors, setNotesFetchErrors] = useState<Record<string, string>>({})
 
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async (options?: { skipLoadingState?: boolean }) => {
+    const skipLoadingState = options?.skipLoadingState ?? false
+
     try {
-      setLoading(true)
+      if (!skipLoadingState) {
+        setLoading(true)
+      }
       setError('')
 
       const response = await fetch('/api/students/fiscal-appointments', {
@@ -267,21 +274,28 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
           cancelados: normalizedAppointments.filter((a) => a.status === 'CANCELADO').length,
           naoCompareceu: normalizedAppointments.filter((a) => a.status === 'NAO_COMPARECEU').length
         })
+
+        return normalizedAppointments
       } else {
         const errorData = await response.json()
-        setError(errorData.message || 'Erro ao carregar atendimentos')
+        const message = errorData.message || 'Erro ao carregar atendimentos'
+        setError(message)
+        return []
       }
     } catch (err) {
       setError('Erro ao carregar atendimentos fiscais')
       console.error(err)
+      return []
     } finally {
-      setLoading(false)
+      if (!skipLoadingState) {
+        setLoading(false)
+      }
     }
-  }
+  }, [token])
 
   useEffect(() => {
     loadAppointments()
-  }, [token])
+  }, [token, loadAppointments])
 
   const updateAppointmentStatus = async (appointmentId: string, newStatus: string, notes?: string) => {
     try {
@@ -303,13 +317,43 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       })
 
       if (response.ok) {
-        setSuccess('Atendimento atualizado com sucesso!')
-        await loadAppointments()
-        setShowDetails(false)
-        setInternalNotes('')
+        const statusMessages: Record<string, string> = {
+          CONFIRMADO: 'Atendimento confirmado com sucesso! Agora acompanhe a preparação.',
+          EM_ANDAMENTO: 'Atendimento iniciado! Registre o andamento enquanto realiza o atendimento.',
+          CONCLUIDO: 'Atendimento concluído com sucesso!',
+          CANCELADO: 'Atendimento cancelado.',
+          NAO_COMPARECEU: 'Atendimento marcado como não compareceu.'
+        }
 
-        // Se finalizou, abrir modal de feedback
-        if (newStatus === 'CONCLUIDO' && selectedAppointment) {
+        setSuccess(statusMessages[newStatus] || 'Atendimento atualizado com sucesso!')
+
+        const refreshed = await loadAppointments({ skipLoadingState: true })
+        const updatedAppointment = refreshed.find(apt => apt.id === appointmentId)
+        const fallbackAppointment = updatedAppointment || appointments.find(apt => apt.id === appointmentId) || null
+        const shouldCloseDetail = ['CONCLUIDO', 'CANCELADO', 'NAO_COMPARECEU'].includes(newStatus)
+        const shouldForceOpenDetails = newStatus === 'EM_ANDAMENTO'
+        const shouldKeepDetails = showDetails || shouldForceOpenDetails
+
+        if (shouldKeepDetails && fallbackAppointment) {
+          setSelectedAppointment(fallbackAppointment)
+          setInternalNotes(fallbackAppointment.internal_notes || '')
+          setShowDetails(true)
+        }
+
+        if (shouldForceOpenDetails && (updatedAppointment || fallbackAppointment)) {
+          await fetchAppointmentNotes(appointmentId)
+          setNoteDrafts(prev => ({ ...prev, [appointmentId]: '' }))
+        }
+
+        if (shouldCloseDetail) {
+          setShowDetails(false)
+          setInternalNotes('')
+        }
+
+        if (newStatus === 'CONCLUIDO') {
+          if (fallbackAppointment) {
+            setSelectedAppointment(fallbackAppointment)
+          }
           setShowFeedbackModal(true)
         }
       } else {
@@ -530,6 +574,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
     setSelectedAppointment(appointment)
     setInternalNotes(appointment.internal_notes || '')
     setShowDetails(true)
+    fetchAppointmentNotes(appointment.id)
   }
 
   const handleNoteDraftChange = (appointmentId: string, value: string) => {
@@ -541,6 +586,64 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       ...prev,
       [appointmentId]: ''
     }))
+    setNotesFetchErrors(prev => ({
+      ...prev,
+      [appointmentId]: ''
+    }))
+  }
+
+  const fetchAppointmentNotes = async (appointmentId: string) => {
+    setNotesLoading(prev => ({ ...prev, [appointmentId]: true }))
+
+    try {
+      const response = await fetch(`/api/students/fiscal-appointments/notes?appointmentId=${appointmentId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const message = errorData.message || 'Não foi possível carregar as anotações no momento.'
+        throw new Error(message)
+      }
+
+      const data = await response.json()
+      const notes = Array.isArray(data.notes) ? data.notes as AppointmentProgressNote[] : []
+
+      setNotesFetchErrors(prev => ({
+        ...prev,
+        [appointmentId]: ''
+      }))
+
+      setAppointments(prev => prev.map(apt => (
+        apt.id === appointmentId
+          ? { ...apt, progress_notes: notes }
+          : apt
+      )))
+
+      setSelectedAppointment(prev => {
+        if (!prev || prev.id !== appointmentId) {
+          return prev
+        }
+        return {
+          ...prev,
+          progress_notes: notes
+        }
+      })
+
+      return notes
+    } catch (error) {
+      console.error('Erro ao carregar notas do atendimento:', error)
+      const message = error instanceof Error ? error.message : 'Erro ao carregar as anotações do atendimento.'
+      setNotesFetchErrors(prev => ({
+        ...prev,
+        [appointmentId]: message
+      }))
+      return null
+    } finally {
+      setNotesLoading(prev => ({ ...prev, [appointmentId]: false }))
+    }
   }
 
   const handleSaveProgressNote = async (appointmentId: string) => {
@@ -572,24 +675,9 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
         throw new Error(errorData.message || 'Erro ao salvar anotação')
       }
 
-      const { note } = await response.json()
+      await response.json()
 
-      setAppointments(prev => prev.map(apt => (
-        apt.id === appointmentId
-          ? {
-              ...apt,
-              progress_notes: [...(apt.progress_notes || []), note]
-            }
-          : apt
-      )))
-
-      setSelectedAppointment(prev => {
-        if (!prev || prev.id !== appointmentId) return prev
-        return {
-          ...prev,
-          progress_notes: [...(prev.progress_notes || []), note]
-        }
-      })
+      await fetchAppointmentNotes(appointmentId)
 
       setNoteDrafts(prev => ({ ...prev, [appointmentId]: '' }))
     } catch (err) {
@@ -911,6 +999,13 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                   </div>
                 )}
 
+                <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300">
+                  <MessageSquare className="h-4 w-4" />
+                  {appointment.progress_notes && appointment.progress_notes.length > 0
+                    ? `${appointment.progress_notes.length} ${appointment.progress_notes.length === 1 ? 'registro lançado' : 'registros lançados'}`
+                    : 'Nenhum registro lançado até o momento'}
+                </div>
+
                 <div className="flex gap-2 pt-2 flex-wrap">
                   <Button
                     onClick={() => openDetails(appointment)}
@@ -976,18 +1071,30 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
 
                   {/* Botões para status EM_ANDAMENTO */}
                   {appointment.status === 'EM_ANDAMENTO' && (
-                    <Button
-                      onClick={() => {
-                        setSelectedAppointment(appointment)
-                        updateAppointmentStatus(appointment.id, 'CONCLUIDO', internalNotes)
-                      }}
-                      disabled={updating}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <CheckCheck className="h-4 w-4 mr-2" />
-                      Finalizar
-                    </Button>
+                    <>
+                      <Button
+                        onClick={() => openDetails(appointment)}
+                        disabled={updating}
+                        size="sm"
+                        variant="outline"
+                        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Registrar andamento
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setSelectedAppointment(appointment)
+                          updateAppointmentStatus(appointment.id, 'CONCLUIDO', internalNotes)
+                        }}
+                        disabled={updating}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <CheckCheck className="h-4 w-4 mr-2" />
+                        Finalizar
+                      </Button>
+                    </>
                   )}
 
                   {/* Botões para status CONCLUIDO */}
@@ -1148,7 +1255,20 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    {selectedAppointment.progress_notes && selectedAppointment.progress_notes.length > 0 ? (
+                    {notesLoading[selectedAppointment.id] && (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Atualizando registros do atendimento...
+                      </div>
+                    )}
+
+                    {notesFetchErrors[selectedAppointment.id] && (
+                      <p className="text-xs text-red-500">
+                        {notesFetchErrors[selectedAppointment.id]}
+                      </p>
+                    )}
+
+                    {selectedAppointment.progress_notes && selectedAppointment.progress_notes.length > 0 && (
                       selectedAppointment.progress_notes.map(note => (
                         <div key={note.id} className="border border-gray-200 dark:border-gray-800 rounded-lg p-3">
                           <div className="flex items-center justify-between mb-1">
@@ -1168,7 +1288,9 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                           <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{note.note}</p>
                         </div>
                       ))
-                    ) : (
+                    )}
+
+                    {(!selectedAppointment.progress_notes || selectedAppointment.progress_notes.length === 0) && !notesLoading[selectedAppointment.id] && !notesFetchErrors[selectedAppointment.id] && (
                       <p className="text-sm text-gray-500">
                         Nenhuma anotação registrada ainda para este atendimento.
                       </p>
