@@ -6,6 +6,16 @@ export const dynamic = 'force-dynamic'
 
 const supabase = supabaseAdmin
 
+const isMissingNotesTableError = (error: { message?: string; code?: string } | null | undefined) => {
+  if (!error) return false
+  const message = (error.message || '').toLowerCase()
+  return (
+    error.code === '42P01' ||
+    message.includes("fiscal_appointment_notes") &&
+    (message.includes('schema cache') || message.includes('does not exist') || message.includes('undefined table'))
+  )
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -57,6 +67,15 @@ export async function GET(request: NextRequest) {
 
     if (notesError) {
       console.error('Erro ao buscar notas do atendimento:', notesError)
+
+      if (isMissingNotesTableError(notesError)) {
+        return NextResponse.json({
+          notes: [],
+          schemaMissing: true,
+          message: 'Tabela fiscal_appointment_notes não encontrada. Execute src/sql/create_fiscal_appointment_notes.sql no banco.'
+        })
+      }
+
       return NextResponse.json({
         message: 'Erro ao buscar notas',
         details: notesError.message,
@@ -176,7 +195,7 @@ export async function POST(request: NextRequest) {
     const shouldRetryWithoutStudent = firstAttempt.error &&
       ['23503', '23505', '22P02'].includes(firstAttempt.error.code ?? '')
 
-    if (shouldRetryWithoutStudent) {
+    if (shouldRetryWithoutStudent && !isMissingNotesTableError(firstAttempt.error)) {
       console.warn('Repetindo inserção de nota sem student_id devido ao erro:', firstAttempt.error)
       const fallbackAttempt = await execInsert({
         ...baseInsertPayload,
@@ -191,6 +210,14 @@ export async function POST(request: NextRequest) {
 
     if (insertError || !insertedNote) {
       console.error('Erro ao registrar nota de atendimento:', insertError)
+
+      if (isMissingNotesTableError(insertError)) {
+        return NextResponse.json({
+          message: 'Tabela fiscal_appointment_notes não encontrada. Execute src/sql/create_fiscal_appointment_notes.sql no banco antes de registrar notas.',
+          code: insertError?.code
+        }, { status: 503 })
+      }
+
       return NextResponse.json({
         message: 'Erro ao salvar anotação',
         details: insertError?.message,

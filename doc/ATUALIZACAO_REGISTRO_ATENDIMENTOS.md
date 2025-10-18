@@ -47,3 +47,4 @@ O primeiro cria a tabela de notas e índices auxiliares; o segundo garante que o
 
 ## Ajustes no App Mobile
 Para manter paridade com o site, o aplicativo mobile deverá consumir os mesmos dados (incluindo `progress_notes`) e disponibilizar o formulário de registro quando o status do atendimento for `EM_ANDAMENTO`.
+- ⚠️ **Pré-requisito obrigatório**: execute `\i src/sql/create_fiscal_appointment_notes.sql` no banco (Supabase/Postgres) para criar a tabela `fiscal_appointment_notes`. Sem essa execução, o registro de andamento e os relatórios exibirão apenas uma mensagem de aviso.

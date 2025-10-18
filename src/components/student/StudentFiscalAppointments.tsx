@@ -667,6 +667,30 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       }
 
       const data = await response.json()
+
+      if (data.schemaMissing) {
+        const warningMessage = data.message || 'Tabela de registros do atendimento não encontrada. Execute o script de criação no banco para habilitar as anotações.'
+        setNotesFetchErrors(prev => ({
+          ...prev,
+          [appointmentId]: warningMessage
+        }))
+        setAppointments(prev => prev.map(apt => (
+          apt.id === appointmentId
+            ? { ...apt, progress_notes: [] }
+            : apt
+        )))
+        setSelectedAppointment(prev => {
+          if (!prev || prev.id !== appointmentId) {
+            return prev
+          }
+          return {
+            ...prev,
+            progress_notes: []
+          }
+        })
+        return []
+      }
+
       const notes = Array.isArray(data.notes) ? data.notes as AppointmentProgressNote[] : []
 
       setNotesFetchErrors(prev => ({
