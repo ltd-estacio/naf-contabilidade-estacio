@@ -1,0 +1,55 @@
+{
+  "plugins": [
+    "unused-imports"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "next/core-web-vitals",
+    "next/typescript",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:jsx-a11y/recommended"
+  ],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": [
+      "error",
+      {
+        "fixToUnknown": true,
+        "ignoreRestArgs": false
+      }
+    ],
+    "@typescript-eslint/no-unused-vars": "off",
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "warn",
+        {
+          "vars": "all",
+          "varsIgnorePattern": "^_",
+          "args": "after-used",
+          "argsIgnorePattern": "^_"
+        }
+    ]
+  },
+  "settings": {
+    "react": {
+      "version": "detect",
+      "pragma": "React",
+      "fragment": "Fragment"
+    },
+    "jsx-a11y": {
+      "polymorphicPropName": "as",
+      "components": {
+        "Button": "button",
+        "Link": "a",
+        "Card": "div",
+        "Input": "input",
+        "Label": "label",
+        "Select": "select",
+        "TextArea": "textarea"
+      }
+    },
+    "next": {
+      "rootDir": "./"
+    }
+  }
+}

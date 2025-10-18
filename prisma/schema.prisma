@@ -1,0 +1,460 @@
+// Schema otimizado para o sistema NAF com NextAuth.js
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Enums do Sistema NAF
+enum UserRole {
+  STUDENT     // Aluno
+  TEACHER     // Professor
+  COORDINATOR // Coordenador
+  USER        // Usuário comum
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum DemandStatus {
+  PENDING     // Pendente
+  IN_PROGRESS // Em andamento
+  COMPLETED   // Concluída
+  CANCELLED   // Cancelada
+}
+
+enum AttendanceStatus {
+  SCHEDULED   // Agendado
+  IN_PROGRESS // Em andamento
+  COMPLETED   // Concluído
+  CANCELLED   // Cancelado
+  NO_SHOW     // Não compareceu
+}
+
+enum ChatStatus {
+  ACTIVE
+  PAUSED
+  CLOSED
+  TRANSFERRED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Modelo principal de usuário
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // Para login local (hashed)
+  role          UserRole  @default(USER)
+  status        UserStatus @default(ACTIVE)
+  
+  // Dados pessoais
+  cpf           String?   @unique
+  phone         String?
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  
+  // Metadados
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+
+  // NextAuth relations
+  accounts Account[]
+  sessions Session[]
+
+  // NAF relations
+  demands           Demand[]
+  chatsAsUser       Chat[]        @relation("UserChats")
+  chatsAsAttendant  Chat[]        @relation("AttendantChats")
+  attendances       Attendance[]
+  schedules         Schedule[]
+  documents         Document[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  certificates      Certificate[]
+  performances      Performance[]
+
+  @@map("users")
+}
+
+// Modelo de serviços NAF
+model Service {
+  id                String   @id @default(cuid())
+  name              String
+  description       String
+  category          String
+  theme             String?  // Adicionado campo theme
+  requirements      String?
+  estimatedDuration Int?
+  estimatedTime     Int?     // Adicionado campo estimatedTime para compatibilidade
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relacionamentos
+  demands           Demand[]
+
+  @@map("services")
+}
+
+// Modelo de demandas
+model Demand {
+  id              String       @id @default(cuid())
+  protocolNumber  String       @unique // NAF-2025-000001
+  protocol        String?      // Adicionado para compatibilidade
+  title           String?      // Adicionado campo title
+  description     String
+  category        String?      // Adicionado campo category
+  theme           String?      // Adicionado campo theme
+  status          DemandStatus @default(PENDING)
+  priority        Priority     @default(MEDIUM)
+  urgency         String?      // Adicionado campo urgency
+  additionalInfo  String?
+  notes           String?
+  assignedTo      String?
+  
+  // Dados do cliente para preenchimento automático
+  clientName      String?
+  clientEmail     String?
+  clientPhone     String?
+  clientCpf       String?
+  clientAddress   String?
+  
+  // Relacionamentos
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  serviceId   String
+  service     Service      @relation(fields: [serviceId], references: [id])
+  
+  // Metadados
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  completedAt DateTime?
+  
+  // Relacionamentos
+  chats       Chat[]
+  attendances Attendance[]
+  documents   Document[]
+  
+  @@map("demands")
+}
+
+// Modelo de chat/mensagens
+model Chat {
+  id        String     @id @default(cuid())
+  message   String     
+  status    ChatStatus @default(ACTIVE)
+  channel   String     @default("SYSTEM") // WHATSAPP, EMAIL, SYSTEM
+  
+  // Relacionamentos
+  userId      String?
+  user        User?    @relation("UserChats", fields: [userId], references: [id])
+  attendantId String?
+  attendant   User?    @relation("AttendantChats", fields: [attendantId], references: [id])
+  demandId    String?
+  demand      Demand?  @relation(fields: [demandId], references: [id])
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+  
+  @@map("chats")
+}
+
+// Modelo de atendimentos
+model Attendance {
+  id              String           @id @default(cuid())
+  protocol        String           @unique // ATD-2025-000001
+  status          AttendanceStatus @default(SCHEDULED)
+  category        String
+  theme           String
+  subtheme        String?
+  type            String?          // Adicionado campo type
+  
+  // Dados do atendimento
+  hours           Float            @default(0)
+  description     String?
+  observations    String?
+  validationNotes String?          // Adicionado campo validationNotes
+  isValidated     Boolean          @default(false)
+  validatedBy     String?          // Adicionado campo validatedBy
+  requiresCert    Boolean          @default(false)
+  certIssued      Boolean          @default(false)
+  
+  // Relacionamentos
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  demandId  String?
+  demand    Demand? @relation(fields: [demandId], references: [id])
+  
+  // Metadados
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  scheduledAt DateTime?
+  completedAt DateTime?
+  validatedAt DateTime?
+  
+  @@map("attendances")
+}
+
+// Modelo de agendamentos
+model Schedule {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  isOnline    Boolean  @default(false)
+  meetingUrl  String?
+  
+  // Relacionamentos
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("schedules")
+}
+
+// Modelo de documentos
+model Document {
+  id          String  @id @default(cuid())
+  name        String
+  type        String
+  size        Int
+  url         String
+  mimeType    String
+  description String? 
+  
+  // Relacionamentos
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id])
+  demandId String?
+  demand   Demand? @relation(fields: [demandId], references: [id])
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("documents")
+}
+
+// Modelo de notificações
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String   
+  type      String   @default("INFO") // INFO, WARNING, ERROR, SUCCESS
+  isRead    Boolean  @default(false)
+  actionUrl String?
+  
+  // Relacionamentos
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+  
+  @@map("notifications")
+}
+
+// Modelo de configurações
+model Settings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String 
+  type  String @default("STRING") // STRING, JSON, BOOLEAN, NUMBER
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("settings")
+}
+
+// Modelo de logs de auditoria
+model AuditLog {
+  id       String @id @default(cuid())
+  action   String
+  entity   String
+  entityId String
+  oldData  Json?
+  newData  Json?
+  ip       String?
+  
+  // Relacionamentos
+  userId String?
+  user   User?  @relation(fields: [userId], references: [id])
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  
+  @@map("audit_logs")
+}
+
+// Modelo de certificados
+model Certificate {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  
+  hours       Float
+  issuedAt    DateTime @default(now())
+  validUntil  DateTime?
+  certificateUrl String?
+  
+  // Relacionamentos
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  
+  @@map("certificates")
+}
+
+// Modelo de performance/métricas
+model Performance {
+  id             String   @id @default(cuid())
+  month          Int
+  year           Int
+  attendances    Int      @default(0)
+  hoursWorked    Float    @default(0)
+  certificatesIssued Int  @default(0)
+  avgRating      Float?
+  
+  // Relacionamentos
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, month, year])
+  @@map("performances")
+}
+
+// Modelo de legislações/FAQ
+model Legislation {
+  id          String @id @default(cuid())
+  title       String
+  content     String 
+  category    String
+  tags        String // JSON array como string
+  isActive    Boolean @default(true)
+  sourceUrl   String?
+  
+  // Metadados
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("legislations")
+}
+
+// Modelo de FAQ
+model FAQ {
+  id          String @id @default(cuid())
+  question    String
+  answer      String
+  category    String
+  keywords    String // JSON array como string
+  viewCount   Int    @default(0)
+  isActive    Boolean @default(true)
+
+  // Metadados
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("faqs")
+}
+
+// Modelo de histórico de relatórios
+model ReportHistory {
+  id              String   @id @default(cuid())
+  studentId       String
+  studentName     String
+  studentEmail    String
+
+  // Configurações do relatório
+  reportType      String   // 'quick' ou 'custom'
+  template        String   // 'complete', 'performance', 'attendances', 'trainings'
+  format          String   // 'pdf', 'docx', 'excel', 'csv', 'txt'
+
+  // Template customizado (JSON)
+  customTemplate  Json?
+
+  // Estatísticas do relatório no momento da geração
+  stats           Json
+
+  // Informações sobre o conteúdo
+  totalAttendances      Int      @default(0)
+  completedAttendances  Int      @default(0)
+  totalTrainings        Int      @default(0)
+  completedTrainings    Int      @default(0)
+  successRate           Float    @default(0)
+  avgRating             Float    @default(0)
+
+  // Metadados
+  generatedAt     DateTime @default(now())
+  fileSize        Int?     // Tamanho do arquivo em bytes
+
+  @@map("report_history")
+}

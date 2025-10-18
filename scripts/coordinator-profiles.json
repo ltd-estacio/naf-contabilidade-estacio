@@ -1,0 +1,38 @@
+[
+  {
+    "id": "5f3fa043-f3f6-4322-a1e4-874677cdee58",
+    "name": "Dr. Carlos Silva",
+    "email": "admin@naf.com",
+    "specialties": [
+      "Imposto de Renda",
+      "Tributário",
+      "Pessoa Física"
+    ],
+    "is_online": true,
+    "phone": "(48) 99999-0001"
+  },
+  {
+    "id": "6774c415-d927-47af-af90-dd30e41d9783",
+    "name": "Dra. Ana Oliveira",
+    "email": "coordenador.estacio.ltd2025@developer.com.br",
+    "specialties": [
+      "MEI",
+      "Empresarial",
+      "e-Social"
+    ],
+    "is_online": true,
+    "phone": "(48) 99999-0002"
+  },
+  {
+    "id": "coord-003",
+    "name": "Prof. Roberto Santos",
+    "email": "roberto.santos@naf.edu.br",
+    "specialties": [
+      "ITR",
+      "Rural",
+      "Contabilidade"
+    ],
+    "is_online": false,
+    "phone": "(48) 99999-0003"
+  }
+]

@@ -1,0 +1,34 @@
+# Node / Vite
+node_modules/
+.vite/
+.dist/
+dist/
+build/
+
+# Next / React
+.next/
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*_log.txt
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
