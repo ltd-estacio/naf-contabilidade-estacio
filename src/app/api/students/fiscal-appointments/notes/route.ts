@@ -129,56 +129,58 @@ export async function POST(request: NextRequest) {
       studentName = userProfile?.name || null
     }
 
-    let studentIdToPersist: string | null = studentId
-
-    if (studentIdToPersist) {
-      try {
-        const { data: existingUser, error: existingUserError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('id', studentIdToPersist)
-          .maybeSingle()
-
-        if (existingUserError) {
-          console.error('Erro ao verificar existência do usuário do estudante:', existingUserError)
-        }
-
-        if (!existingUser) {
-          studentIdToPersist = null
-        }
-      } catch (verificationError) {
-        console.error('Falha ao validar referência do estudante em fiscal_appointment_notes:', verificationError)
-        studentIdToPersist = null
-      }
-    }
-
-    const insertPayload = {
+    const baseInsertPayload = {
       appointment_id: appointmentId,
-      student_id: studentIdToPersist,
+      student_id: studentId,
       student_name: studentName,
       note: sanitizedNote
     }
 
-    const { data: inserted, error: insertError } = await supabase
-      .from('fiscal_appointment_notes')
-      .insert(insertPayload)
-      .select()
-      .single()
+    const execInsert = async (payload: typeof baseInsertPayload) => {
+      return supabase
+        .from('fiscal_appointment_notes')
+        .insert(payload)
+        .select()
+        .single()
+    }
 
-    if (insertError || !inserted) {
+    let insertedNote = null
+    let insertError = null
+
+    const firstAttempt = await execInsert(baseInsertPayload)
+
+    if (firstAttempt.error && firstAttempt.error.code === '23503') {
+      console.warn('FK constraint ao registrar nota. Repetindo inserção sem student_id.', firstAttempt.error)
+      const fallbackAttempt = await execInsert({
+        ...baseInsertPayload,
+        student_id: null
+      })
+      insertedNote = fallbackAttempt.data
+      insertError = fallbackAttempt.error
+    } else {
+      insertedNote = firstAttempt.data
+      insertError = firstAttempt.error
+    }
+
+    if (insertError || !insertedNote) {
       console.error('Erro ao registrar nota de atendimento:', insertError)
-      return NextResponse.json({ message: 'Erro ao salvar anotação' }, { status: 500 })
+      return NextResponse.json({
+        message: 'Erro ao salvar anotação',
+        details: insertError?.message,
+        hint: insertError?.hint,
+        code: insertError?.code
+      }, { status: 500 })
     }
 
     return NextResponse.json({
       note: {
-        id: inserted.id,
-        appointment_id: inserted.appointment_id,
-        student_id: inserted.student_id,
-        student_name: inserted.student_name,
-        note: inserted.note,
-        created_at: inserted.created_at,
-        updated_at: inserted.updated_at
+        id: insertedNote.id,
+        appointment_id: insertedNote.appointment_id,
+        student_id: insertedNote.student_id,
+        student_name: insertedNote.student_name,
+        note: insertedNote.note,
+        created_at: insertedNote.created_at,
+        updated_at: insertedNote.updated_at
       }
     })
   } catch (error) {

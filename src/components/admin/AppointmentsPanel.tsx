@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,7 @@ import {
   Search,
   RefreshCw
 } from 'lucide-react'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 interface ChatUser {
   id: string
@@ -94,16 +95,15 @@ export default function AppointmentsPanel() {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({})
 
-  useEffect(() => {
-    loadAppointments()
-  }, [])
+  const supabaseRealtime = useMemo(() => getSupabaseBrowserClient(), [])
+  const realtimeRefreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => {
-    filterAppointments()
-  }, [appointments, statusFilter, dateFilter, searchTerm])
+  const loadAppointments = useCallback(async (options?: { skipLoadingState?: boolean }) => {
+    const skipLoadingState = options?.skipLoadingState ?? false
 
-  const loadAppointments = async () => {
-    setLoading(true)
+    if (!skipLoadingState) {
+      setLoading(true)
+    }
     try {
       // Buscar agendamentos do chat
       const chatResponse = await fetch('/api/chat/appointments?all=true')
@@ -179,9 +179,19 @@ export default function AppointmentsPanel() {
       console.error('Erro ao carregar agendamentos:', error)
       setError('Erro de conexão')
     } finally {
-      setLoading(false)
+      if (!skipLoadingState) {
+        setLoading(false)
+      }
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadAppointments()
+  }, [loadAppointments])
+
+  useEffect(() => {
+    filterAppointments()
+  }, [appointments, statusFilter, dateFilter, searchTerm])
 
   const filterAppointments = () => {
     let filtered = [...appointments]
@@ -218,6 +228,51 @@ export default function AppointmentsPanel() {
 
     setFilteredAppointments(filtered)
   }
+
+  const scheduleRealtimeRefresh = useCallback(() => {
+    if (realtimeRefreshTimeout.current) {
+      clearTimeout(realtimeRefreshTimeout.current)
+    }
+
+    realtimeRefreshTimeout.current = setTimeout(() => {
+      loadAppointments({ skipLoadingState: true })
+    }, 400)
+  }, [loadAppointments])
+
+  useEffect(() => {
+    const client = supabaseRealtime
+    if (!client) {
+      return
+    }
+
+    const channelName = `coordinator-fiscal-appointments-${Math.random().toString(36).slice(2, 10)}`
+    const channel = client
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'fiscal_appointments'
+      }, () => {
+        scheduleRealtimeRefresh()
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'fiscal_appointment_notes'
+      }, () => {
+        scheduleRealtimeRefresh()
+      })
+      .subscribe()
+
+    return () => {
+      if (realtimeRefreshTimeout.current) {
+        clearTimeout(realtimeRefreshTimeout.current)
+        realtimeRefreshTimeout.current = null
+      }
+
+      client.removeChannel(channel)
+    }
+  }, [supabaseRealtime, scheduleRealtimeRefresh])
 
   const updateAppointmentStatus = async (appointmentId: string, status: string, notes?: string, source?: 'chat' | 'fiscal') => {
     try {

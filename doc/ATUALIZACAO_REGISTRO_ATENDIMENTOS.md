@@ -12,21 +12,25 @@ Implementamos um sistema de registro contínuo para os atendimentos fiscais, per
   - cartões listados exibem o contador de registros já lançados pelo estudante;
   - botão “Registro do Atendimento” aparece ao lado de “Ver Detalhes” sempre que o status estiver em `EM_ANDAMENTO` e abre o formulário de notas em tempo real;
   - painel de detalhes exibe linha do tempo + seção “Registro do Atendimento” com textarea para novas notas, feedback visual de carregamento e mensagens de erro específicas;
+  - atualizações em tempo real via Supabase garantem que novos agendamentos, atribuições e mudanças de status apareçam imediatamente para o estudante;
   - registros ficam disponíveis mesmo após a conclusão.
 - **Coordinator Dashboard (`/coordinator-dashboard`)**:
-  - cartões de atendimentos fiscais mostram resumo da data/hora agendada e permitem abrir o log completo das anotações lançadas pelo estudante.
+  - cartões de atendimentos fiscais mostram resumo da data/hora agendada e permitem abrir o log completo das anotações lançadas pelo estudante;
+  - a listagem atualiza automaticamente a cada novo agendamento ou alteração de status, dispensando o recarregamento manual do painel.
 
 ### Fluxo recomendado para estudantes
 1. Abra o atendimento fiscal e confirme os dados.<br>
 2. Clique em **Iniciar**: o status migra para `EM_ANDAMENTO` e o painel detalhado é exibido automaticamente.
 3. Utilize o botão **Registro do Atendimento** ao lado de **Ver Detalhes** para abrir ou retornar ao formulário de notas a qualquer momento.
 4. Preencha a anotação e clique em **Registrar andamento** (dentro do painel). As notas são atualizadas imediatamente e ficam visíveis na linha do tempo.
-5. Finalize o atendimento com **Finalizar** quando todas as atividades forem concluídas.
+5. Caso um novo atendimento seja atribuído, ele aparecerá automaticamente na listagem enquanto o portal estiver aberto.
+6. Finalize o atendimento com **Finalizar** quando todas as atividades forem concluídas.
 
 ### Fluxo recomendado para coordenadores
 1. Acesse **Painel do Coordenador → Atendimentos Fiscais**.
 2. Utilize o marcador "Registro do atendimento" para verificar quantas notas já foram lançadas.
 3. Clique em **Ver registro** para abrir o histórico completo das anotações registradas pelo estudante.
+4. Novos agendamentos e mudanças de status surgem automaticamente, garantindo visibilidade em tempo real para decisões rápidas.
 
 ## Script de banco necessário
 Execute os scripts abaixo no banco (Supabase/Postgres) antes de publicar a atualização:

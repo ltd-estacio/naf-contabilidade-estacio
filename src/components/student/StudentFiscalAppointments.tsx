@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +36,7 @@ import {
   Loader2
 } from 'lucide-react'
 import FeedbackModal from './FeedbackModal'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 interface FiscalAppointment {
   id: string
@@ -236,6 +237,8 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
   const [noteErrors, setNoteErrors] = useState<Record<string, string>>({})
   const [notesLoading, setNotesLoading] = useState<Record<string, boolean>>({})
   const [notesFetchErrors, setNotesFetchErrors] = useState<Record<string, string>>({})
+  const supabaseRealtime = useMemo(() => getSupabaseBrowserClient(), [])
+  const realtimeRefreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadAppointments = useCallback(async (options?: { skipLoadingState?: boolean }) => {
     const skipLoadingState = options?.skipLoadingState ?? false
@@ -296,6 +299,51 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
   useEffect(() => {
     loadAppointments()
   }, [token, loadAppointments])
+
+  const scheduleRealtimeRefresh = useCallback(() => {
+    if (realtimeRefreshTimeout.current) {
+      clearTimeout(realtimeRefreshTimeout.current)
+    }
+
+    realtimeRefreshTimeout.current = setTimeout(() => {
+      loadAppointments({ skipLoadingState: true })
+    }, 400)
+  }, [loadAppointments])
+
+  useEffect(() => {
+    const client = supabaseRealtime
+    if (!client || !token) {
+      return
+    }
+
+    const channelName = `student-fiscal-appointments-${Math.random().toString(36).slice(2, 10)}`
+    const channel = client
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'fiscal_appointments'
+      }, () => {
+        scheduleRealtimeRefresh()
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'fiscal_appointment_notes'
+      }, () => {
+        scheduleRealtimeRefresh()
+      })
+      .subscribe()
+
+    return () => {
+      if (realtimeRefreshTimeout.current) {
+        clearTimeout(realtimeRefreshTimeout.current)
+        realtimeRefreshTimeout.current = null
+      }
+
+      client.removeChannel(channel)
+    }
+  }, [supabaseRealtime, token, scheduleRealtimeRefresh])
 
   const updateAppointmentStatus = async (appointmentId: string, newStatus: string, notes?: string) => {
     try {
