@@ -129,9 +129,32 @@ export async function POST(request: NextRequest) {
       studentName = userProfile?.name || null
     }
 
+    let studentIdToPersist: string | null = studentId
+
+    if (studentIdToPersist) {
+      try {
+        const { data: existingUser, error: existingUserError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', studentIdToPersist)
+          .maybeSingle()
+
+        if (existingUserError) {
+          console.error('Erro ao verificar existência do usuário do estudante:', existingUserError)
+        }
+
+        if (!existingUser) {
+          studentIdToPersist = null
+        }
+      } catch (verificationError) {
+        console.error('Falha ao validar referência do estudante em fiscal_appointment_notes:', verificationError)
+        studentIdToPersist = null
+      }
+    }
+
     const insertPayload = {
       appointment_id: appointmentId,
-      student_id: studentId,
+      student_id: studentIdToPersist,
       student_name: studentName,
       note: sanitizedNote
     }
@@ -163,4 +186,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Erro interno do servidor' }, { status: 500 })
   }
 }
-
