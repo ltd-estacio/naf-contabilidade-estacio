@@ -10,7 +10,7 @@ Implementamos um sistema de registro contínuo para os atendimentos fiscais, per
 - **Student Portal (`/student-portal`)**:
   - botão “Iniciar” ativa modo de registro e reabre automaticamente o painel detalhado para o atendimento em andamento;
   - cartões listados exibem o contador de registros já lançados pelo estudante;
-  - botão “Registrar andamento” fica disponível sempre que o atendimento estiver em `EM_ANDAMENTO` para abrir o formulário em tempo real;
+  - botão “Registro do Atendimento” aparece ao lado de “Ver Detalhes” sempre que o status estiver em `EM_ANDAMENTO` e abre o formulário de notas em tempo real;
   - painel de detalhes exibe linha do tempo + seção “Registro do Atendimento” com textarea para novas notas, feedback visual de carregamento e mensagens de erro específicas;
   - registros ficam disponíveis mesmo após a conclusão.
 - **Coordinator Dashboard (`/coordinator-dashboard`)**:
@@ -19,7 +19,7 @@ Implementamos um sistema de registro contínuo para os atendimentos fiscais, per
 ### Fluxo recomendado para estudantes
 1. Abra o atendimento fiscal e confirme os dados.<br>
 2. Clique em **Iniciar**: o status migra para `EM_ANDAMENTO` e o painel detalhado é exibido automaticamente.
-3. Utilize o botão **Registrar andamento** para abrir ou retornar ao formulário de notas a qualquer momento.
+3. Utilize o botão **Registro do Atendimento** ao lado de **Ver Detalhes** para abrir ou retornar ao formulário de notas a qualquer momento.
 4. Preencha a anotação e clique em **Registrar andamento** (dentro do painel). As notas são atualizadas imediatamente e ficam visíveis na linha do tempo.
 5. Finalize o atendimento com **Finalizar** quando todas as atividades forem concluídas.
 

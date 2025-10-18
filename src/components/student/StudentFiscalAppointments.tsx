@@ -570,11 +570,21 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
     return apt.status === filter
   })
 
-  const openDetails = (appointment: FiscalAppointment) => {
+  const openDetails = (appointment: FiscalAppointment, options?: { focusNotes?: boolean }) => {
     setSelectedAppointment(appointment)
     setInternalNotes(appointment.internal_notes || '')
     setShowDetails(true)
     fetchAppointmentNotes(appointment.id)
+
+    if (options?.focusNotes) {
+      const focusTargetId = `appointment-progress-note-${appointment.id}`
+      setTimeout(() => {
+        const textarea = document.getElementById(focusTargetId) as HTMLTextAreaElement | null
+        if (textarea) {
+          textarea.focus()
+        }
+      }, 200)
+    }
   }
 
   const handleNoteDraftChange = (appointmentId: string, value: string) => {
@@ -1016,6 +1026,18 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                     Ver Detalhes
                   </Button>
 
+                  {appointment.status === 'EM_ANDAMENTO' && (
+                    <Button
+                      onClick={() => openDetails(appointment, { focusNotes: true })}
+                      variant="outline"
+                      size="sm"
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Registro do Atendimento
+                    </Button>
+                  )}
+
                   {/* Botão CONFIRMAR - apenas para status PENDENTE */}
                   {appointment.status === 'PENDENTE' && (
                     <Button
@@ -1071,30 +1093,18 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
 
                   {/* Botões para status EM_ANDAMENTO */}
                   {appointment.status === 'EM_ANDAMENTO' && (
-                    <>
-                      <Button
-                        onClick={() => openDetails(appointment)}
-                        disabled={updating}
-                        size="sm"
-                        variant="outline"
-                        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                      >
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Registrar andamento
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSelectedAppointment(appointment)
-                          updateAppointmentStatus(appointment.id, 'CONCLUIDO', internalNotes)
-                        }}
-                        disabled={updating}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCheck className="h-4 w-4 mr-2" />
-                        Finalizar
-                      </Button>
-                    </>
+                    <Button
+                      onClick={() => {
+                        setSelectedAppointment(appointment)
+                        updateAppointmentStatus(appointment.id, 'CONCLUIDO', internalNotes)
+                      }}
+                      disabled={updating}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCheck className="h-4 w-4 mr-2" />
+                      Finalizar
+                    </Button>
                   )}
 
                   {/* Botões para status CONCLUIDO */}
@@ -1299,10 +1309,14 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
 
                   {selectedAppointment.status === 'EM_ANDAMENTO' && (
                     <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-3">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <label
+                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        htmlFor={`appointment-progress-note-${selectedAppointment.id}`}
+                      >
                         Adicionar anotação
                       </label>
                       <Textarea
+                        id={`appointment-progress-note-${selectedAppointment.id}`}
                         value={noteDrafts[selectedAppointment.id] || ''}
                         onChange={(event) => handleNoteDraftChange(selectedAppointment.id, event.target.value)}
                         placeholder="Registre as atividades realizadas, documentos coletados ou orientações fornecidas..."
