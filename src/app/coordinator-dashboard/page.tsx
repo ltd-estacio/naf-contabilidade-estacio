@@ -208,8 +208,9 @@ export default function CoordinatorDashboard() {
   const [automationFile, setAutomationFile] = useState<File | null>(null)
   const [automationPreview, setAutomationPreview] = useState<string[]>([])
   const [automationStatus, setAutomationStatus] = useState<'idle' | 'starting' | 'ready' | 'error'>('idle')
-  const [automationMessage, setAutomationMessage] = useState('Selecione um arquivo de dados para iniciar a automação.')
+  const [automationMessage, setAutomationMessage] = useState('Selecione um arquivo CSV para iniciar a automação.')
   const automationFileInputRef = useRef<HTMLInputElement | null>(null)
+  const [automationLogs, setAutomationLogs] = useState<string[]>([])
   const [selectedStudentPortalView, setSelectedStudentPortalView] = useState<string | null>(null)
   const [backupForm, setBackupForm] = useState<BackupFormState>({
     format: 'zip',
@@ -342,7 +343,7 @@ export default function CoordinatorDashboard() {
   const handleAutomationFormChange = (formId: string) => {
     setSelectedAutomationForm(formId)
     setAutomationStatus('idle')
-    setAutomationMessage('Selecione um arquivo de dados para iniciar a automação.')
+    setAutomationMessage('Selecione um arquivo CSV para iniciar a automação.')
     setAutomationPreview([])
   }
 
@@ -350,10 +351,11 @@ export default function CoordinatorDashboard() {
     const file = event.target.files?.[0]
     setAutomationFile(file ?? null)
     setAutomationPreview([])
+    setAutomationLogs([])
 
     if (!file) {
       setAutomationStatus('idle')
-      setAutomationMessage('Selecione um arquivo de dados para iniciar a automação.')
+      setAutomationMessage('Selecione um arquivo CSV para iniciar a automação.')
       return
     }
 
@@ -374,6 +376,7 @@ export default function CoordinatorDashboard() {
         setAutomationPreview([])
         setAutomationStatus('error')
         setAutomationMessage('Não foi possível ler o arquivo CSV. Tente novamente.')
+        setAutomationLogs(prev => [...prev, 'Erro ao ler o arquivo CSV local.'])
       }
       reader.readAsText(file, 'utf-8')
     }
@@ -382,7 +385,8 @@ export default function CoordinatorDashboard() {
   const handleAutomationStart = () => {
     if (!automationFile) {
       setAutomationStatus('error')
-      setAutomationMessage('Selecione um arquivo CSV ou PDF antes de iniciar a automação.')
+      setAutomationMessage('Selecione um arquivo CSV antes de iniciar a automação.')
+      setAutomationLogs(prev => [...prev, '⚠️ Nenhum arquivo selecionado.'])
       return
     }
 
@@ -390,18 +394,59 @@ export default function CoordinatorDashboard() {
     if (!form) {
       setAutomationStatus('error')
       setAutomationMessage('Selecione um formulário válido para continuar.')
+      setAutomationLogs(prev => [...prev, '⚠️ Formulário inválido ou não selecionado.'])
       return
     }
 
     setAutomationStatus('starting')
-    setAutomationMessage('Inicializando rotina de automação e abrindo o formulário oficial...')
+    setAutomationMessage('Inicializando rotina de automação em segundo plano...')
+    setAutomationLogs(['🚀 Iniciando automação em background...', `• Formulário: ${form.name}`, `• Arquivo: ${automationFile.name}`])
 
-    setTimeout(() => {
-      setAutomationStatus('ready')
-      setAutomationMessage('Formulário aberto. A automação pode ser acompanhada na aba recém-aberta.')
-    }, 1200)
+    const formData = new FormData()
+    formData.append('formId', form.id)
+    formData.append('file', automationFile)
 
-    window.open(form.url, '_blank', 'noopener,noreferrer')
+    ;(async () => {
+      try {
+        const response = await fetch('/api/automation/run', {
+          method: 'POST',
+          body: formData,
+        })
+
+        const payload = await response.json()
+
+        const logLines: string[] = []
+        if (Array.isArray(payload.logs)) {
+          logLines.push(...payload.logs)
+        }
+        if (payload.summary) {
+          logLines.push(
+            '',
+            'Resumo da execução:',
+            `• Registros processados: ${payload.summary.totalRows ?? '?'}`,
+            `• Sucessos: ${payload.summary.succeeded ?? '?'}`,
+            `• Falhas: ${payload.summary.failed ?? '?'}`,
+          )
+        }
+        if (logLines.length) {
+          setAutomationLogs(prev => [...prev, ...logLines])
+        }
+
+        if (!response.ok || !payload.success) {
+          setAutomationStatus('error')
+          setAutomationMessage(payload.error || 'Falha durante a automação. Consulte os logs para detalhes.')
+          return
+        }
+
+        setAutomationStatus('ready')
+        setAutomationMessage(payload.message || 'Automação concluída. Confira os logs de execução abaixo.')
+      } catch (automationError) {
+        console.error('Erro ao iniciar automação', automationError)
+        setAutomationStatus('error')
+        setAutomationMessage('Erro inesperado ao iniciar a automação. Consulte os logs para mais detalhes.')
+        setAutomationLogs(prev => [...prev, `❌ Erro inesperado: ${(automationError as Error).message}`])
+      }
+    })()
   }
 
   const generateId = () => {
@@ -1208,6 +1253,18 @@ export default function CoordinatorDashboard() {
                     </div>
                   </div>
                 </CardContent>
+                {automationLogs.length > 0 && (
+                  <div className="border-t border-slate-200/70 bg-slate-950/5 px-6 py-4">
+                    <h4 className="text-sm font-semibold text-slate-700">Logs da execução</h4>
+                    <div className="mt-3 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 font-mono text-[11px] text-slate-600 shadow-inner">
+                      {automationLogs.map((line, index) => (
+                        <div key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-100 py-1 last:border-none">
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </Card>
             )
           })}
@@ -2164,17 +2221,17 @@ export default function CoordinatorDashboard() {
                             <Upload className="h-6 w-6" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-slate-700">Arraste e solte o arquivo CSV ou PDF</p>
-                            <p className="text-xs text-slate-500">Arquivos exportados na planilha oficial do NAF</p>
+                            <p className="text-sm font-semibold text-slate-700">Arraste e solte o arquivo CSV</p>
+                            <p className="text-xs text-slate-500">Use a planilha exportada do painel NAF</p>
                           </div>
                           <input
                             type="file"
-                            accept=".csv,.pdf"
+                            accept=".csv"
                             className="hidden"
                             ref={automationFileInputRef}
                             onChange={handleAutomationFileChange}
                           />
-                          <Badge className="border-transparent bg-white text-blue-600">CSV preferencial • PDF compatível</Badge>
+                          <Badge className="border-transparent bg-white text-blue-600">Formato aceito: CSV</Badge>
                         </label>
                         {automationFile && (
                           <div className="mt-4 rounded-xl bg-white p-3 text-left shadow-sm">
@@ -2221,7 +2278,7 @@ export default function CoordinatorDashboard() {
                               setAutomationFile(null)
                               setAutomationPreview([])
                               setAutomationStatus('idle')
-                              setAutomationMessage('Selecione um arquivo de dados para iniciar a automação.')
+                              setAutomationMessage('Selecione um arquivo CSV para iniciar a automação.')
                               if (automationFileInputRef.current) {
                                 automationFileInputRef.current.value = ''
                               }
