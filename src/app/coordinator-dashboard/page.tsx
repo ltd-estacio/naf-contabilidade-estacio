@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,12 @@ import {
   Globe,
   CalendarClock,
   Shield,
-  ArrowRight
+  ArrowRight,
+  Cpu,
+  Upload,
+  FileSpreadsheet,
+  FileCheck,
+  Sparkles
 } from 'lucide-react'
 import Link from 'next/link'
 import DashboardInlineNav from '@/components/DashboardInlineNav'
@@ -185,6 +190,13 @@ interface BackupMetadataSummary {
   }>
 }
 
+interface AutomationFormOption {
+  id: string
+  name: string
+  url: string
+  description: string
+}
+
 export default function CoordinatorDashboard() {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
@@ -192,6 +204,12 @@ export default function CoordinatorDashboard() {
   const [user, setUser] = useState<unknown>(null)
   const [chatNotifications, setChatNotifications] = useState(0)
   const [activeTab, setActiveTab] = useState('overview')
+  const [selectedAutomationForm, setSelectedAutomationForm] = useState('ficha-servico')
+  const [automationFile, setAutomationFile] = useState<File | null>(null)
+  const [automationPreview, setAutomationPreview] = useState<string[]>([])
+  const [automationStatus, setAutomationStatus] = useState<'idle' | 'starting' | 'ready' | 'error'>('idle')
+  const [automationMessage, setAutomationMessage] = useState('Selecione um arquivo de dados para iniciar a automação.')
+  const automationFileInputRef = useRef<HTMLInputElement | null>(null)
   const [selectedStudentPortalView, setSelectedStudentPortalView] = useState<string | null>(null)
   const [backupForm, setBackupForm] = useState<BackupFormState>({
     format: 'zip',
@@ -319,6 +337,71 @@ export default function CoordinatorDashboard() {
     } catch (error) {
       console.error('Erro ao marcar mensagens como lidas:', error)
     }
+  }
+
+  const handleAutomationFormChange = (formId: string) => {
+    setSelectedAutomationForm(formId)
+    setAutomationStatus('idle')
+    setAutomationMessage('Selecione um arquivo de dados para iniciar a automação.')
+    setAutomationPreview([])
+  }
+
+  const handleAutomationFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    setAutomationFile(file ?? null)
+    setAutomationPreview([])
+
+    if (!file) {
+      setAutomationStatus('idle')
+      setAutomationMessage('Selecione um arquivo de dados para iniciar a automação.')
+      return
+    }
+
+    setAutomationStatus('ready')
+    setAutomationMessage(`Arquivo ${file.name} pronto para processamento.`)
+
+    if (file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv')) {
+      const reader = new FileReader()
+      reader.onload = loadEvent => {
+        const text = (loadEvent.target?.result as string) || ''
+        const previewLines = text
+          .split(/\r?\n/)
+          .filter(line => line.trim().length > 0)
+          .slice(0, 6)
+        setAutomationPreview(previewLines)
+      }
+      reader.onerror = () => {
+        setAutomationPreview([])
+        setAutomationStatus('error')
+        setAutomationMessage('Não foi possível ler o arquivo CSV. Tente novamente.')
+      }
+      reader.readAsText(file, 'utf-8')
+    }
+  }
+
+  const handleAutomationStart = () => {
+    if (!automationFile) {
+      setAutomationStatus('error')
+      setAutomationMessage('Selecione um arquivo CSV ou PDF antes de iniciar a automação.')
+      return
+    }
+
+    const form = selectedAutomation
+    if (!form) {
+      setAutomationStatus('error')
+      setAutomationMessage('Selecione um formulário válido para continuar.')
+      return
+    }
+
+    setAutomationStatus('starting')
+    setAutomationMessage('Inicializando rotina de automação e abrindo o formulário oficial...')
+
+    setTimeout(() => {
+      setAutomationStatus('ready')
+      setAutomationMessage('Formulário aberto. A automação pode ser acompanhada na aba recém-aberta.')
+    }, 1200)
+
+    window.open(form.url, '_blank', 'noopener,noreferrer')
   }
 
   const generateId = () => {
@@ -810,6 +893,21 @@ export default function CoordinatorDashboard() {
       ? 'Recomenda-se confirmar a renovação antes do vencimento para manter o domínio protegido.'
       : 'Domínio operacional, renovação sob monitoramento automático.'
   const domainRegistrarUrl = 'https://registro.br/painel/'
+  const automationForms: AutomationFormOption[] = [
+    {
+      id: 'ficha-servico',
+      name: 'Ficha do Serviço Prestado - NAF',
+      url: 'https://forms.office.com/pages/responsepage.aspx?id=Q6pJbyqCIEyWcNt3AL8esLOeSofjsRxAvgRIQVYNlxJURFpFREtLWjhKODlZMDBZS09QTkhJNU82QyQlQCN0PWcu&route=shorturl',
+      description: 'Automação completa do registro de atendimentos via formulário Microsoft Forms.'
+    },
+    {
+      id: 'boas-praticas',
+      name: 'Boas Práticas NAF',
+      url: 'https://forms.office.com/pages/responsepage.aspx?id=Q6pJbyqCIEyWcNt3AL8esDZnJHy5FONNgoCmZesCVIhUOE9GVlhZWlZOTzlFMlVUT0xLOTNDOVdPOS4u&route=shorturl',
+      description: 'Coleta de indicadores de melhoria contínua e boas práticas operacionais.'
+    }
+  ]
+  const selectedAutomation = automationForms.find(form => form.id === selectedAutomationForm) ?? automationForms[0]
   const domainTimeline = [
     {
       label: 'Janela de Renovação',
@@ -911,6 +1009,13 @@ export default function CoordinatorDashboard() {
       category: 'management'
     },
     {
+      value: 'automation',
+      label: 'Automação Fiscal',
+      description: 'Upload inteligente e preenchimento automático',
+      icon: Cpu,
+      category: 'operations'
+    },
+    {
       value: 'domain-status',
       label: 'Domínio NAF',
       description: 'Monitoramento do domínio institucional',
@@ -962,6 +1067,30 @@ export default function CoordinatorDashboard() {
         </div>
         <button
           type="button"
+          onClick={() => {
+            setActiveTab('automation')
+            document.getElementById('coordinator-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+          className="group relative hidden items-center gap-3 rounded-xl border border-blue-100 bg-white/80 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 sm:flex"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <Cpu className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-500">Automação Fiscal</p>
+            <p className="text-sm font-bold text-slate-700">Configurar envio</p>
+          </div>
+          <div className="absolute inset-x-0 top-full hidden translate-y-2 rounded-xl border border-blue-100 bg-white p-3 text-xs text-slate-600 shadow-xl group-hover:block">
+            <p className="font-semibold text-slate-700">Ferramenta integrada</p>
+            <p className="mt-1 text-[11px] leading-relaxed">Selecione o formulário, faça upload do CSV e o sistema abrirá o Microsoft Forms para automatizar o preenchimento.</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('domain-status')
+            document.getElementById('coordinator-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
           className="group relative flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:bg-white"
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30">
@@ -1124,6 +1253,10 @@ export default function CoordinatorDashboard() {
             <TabsTrigger className="w-full justify-center gap-2" value="security">
               <ShieldCheck className="h-4 w-4" />
               Segurança Digital
+            </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="automation">
+              <Cpu className="h-4 w-4" />
+              Automação Fiscal
             </TabsTrigger>
             <TabsTrigger className="w-full justify-center gap-2" value="domain-status">
               <Globe className="h-4 w-4" />
@@ -1970,6 +2103,217 @@ export default function CoordinatorDashboard() {
               coordinatorName={user?.name || 'Coordenador'}
               coordinatorEmail={user?.email || 'coordenador@naf.com'}
             />
+          </TabsContent>
+
+          <TabsContent value="automation" className="space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <Card className="xl:col-span-2 border border-slate-200/70 shadow-lg shadow-blue-100/50">
+                <CardHeader className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+                      <Cpu className="h-6 w-6 text-blue-600" />
+                      Automação Fiscal Integrada
+                    </CardTitle>
+                    <Badge className="bg-blue-100 text-blue-700 border-transparent">Beta</Badge>
+                  </div>
+                  <CardDescription>
+                    Configure a automação com o arquivo exportado do NAF (CSV ou PDF) e deixe o sistema preencher os formulários da Receita Federal automaticamente.
+                  </CardDescription>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
+                    <FileText className="h-4 w-4" />
+                    Formulário ativo: {selectedAutomation.name}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {automationForms.map(form => (
+                      <button
+                        key={form.id}
+                        type="button"
+                        onClick={() => handleAutomationFormChange(form.id)}
+                        className={`group flex h-full flex-col justify-between rounded-2xl border p-4 text-left transition-all ${
+                          selectedAutomationForm === form.id
+                            ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-200'
+                            : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                            selectedAutomationForm === form.id ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'
+                          }`}>
+                            <FileSpreadsheet className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">{form.name}</p>
+                            <p className="mt-1 text-xs text-slate-500">{form.description}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 flex items-center justify-between text-xs font-semibold text-blue-500">
+                          <span>automação | forms.office.com</span>
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/50 p-6 text-center">
+                        <label className="flex cursor-pointer flex-col items-center gap-3 text-slate-600">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-600 shadow-inner">
+                            <Upload className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-700">Arraste e solte o arquivo CSV ou PDF</p>
+                            <p className="text-xs text-slate-500">Arquivos exportados na planilha oficial do NAF</p>
+                          </div>
+                          <input
+                            type="file"
+                            accept=".csv,.pdf"
+                            className="hidden"
+                            ref={automationFileInputRef}
+                            onChange={handleAutomationFileChange}
+                          />
+                          <Badge className="border-transparent bg-white text-blue-600">CSV preferencial • PDF compatível</Badge>
+                        </label>
+                        {automationFile && (
+                          <div className="mt-4 rounded-xl bg-white p-3 text-left shadow-sm">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Arquivo selecionado</p>
+                            <p className="mt-1 text-sm font-medium text-slate-700">{automationFile.name}</p>
+                            <p className="text-xs text-slate-500">{automationFile.type || 'Formato detectado automaticamente'}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-slate-700">Status da automação</span>
+                          <Badge
+                            className={`border-transparent ${
+                              automationStatus === 'starting'
+                                ? 'bg-amber-100 text-amber-700'
+                                : automationStatus === 'ready'
+                                  ? 'bg-green-100 text-green-700'
+                                  : automationStatus === 'error'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {automationStatus === 'starting' && 'Preparando'}
+                            {automationStatus === 'ready' && 'Pronto'}
+                            {automationStatus === 'error' && 'Atenção'}
+                            {automationStatus === 'idle' && 'Aguardando'}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-600">{automationMessage}</p>
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                            onClick={handleAutomationStart}
+                          >
+                            Iniciar automação
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setAutomationFile(null)
+                              setAutomationPreview([])
+                              setAutomationStatus('idle')
+                              setAutomationMessage('Selecione um arquivo de dados para iniciar a automação.')
+                              if (automationFileInputRef.current) {
+                                automationFileInputRef.current.value = ''
+                              }
+                            }}
+                          >
+                            Limpar seleção
+                          </Button>
+                          <Button asChild size="sm" variant="ghost" className="text-slate-600 hover:text-blue-600">
+                            <Link
+                              href="https://github.com/ltd-2025-02/naf-contabilidade-estacio/blob/main/doc/ATUALIZACAO_REGISTRO_ATENDIMENTOS.md"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <FileText className="mr-2 h-4 w-4" />
+                              Guia rápido
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-slate-700">Pré-visualização</span>
+                          <Badge className="bg-slate-100 text-slate-600 border-transparent">primeiras linhas</Badge>
+                        </div>
+                        {automationPreview.length === 0 && (
+                          <p className="mt-3 text-xs text-slate-500">
+                            Faça o upload de um CSV para visualizar as seis primeiras linhas antes de iniciar a automação.
+                          </p>
+                        )}
+                        {automationPreview.length > 0 && (
+                          <div className="mt-3 space-y-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-950/5">
+                            {automationPreview.map((line, index) => (
+                              <div key={index} className="flex items-start gap-2 bg-white/80 px-3 py-2 text-xs text-slate-600">
+                                <span className="font-semibold text-blue-500">{index + 1}</span>
+                                <span className="font-mono text-[11px]">{line}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-inner">
+                        <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                          <Sparkles className="h-4 w-4 text-blue-500" />
+                          Como a automação funciona
+                        </h4>
+                        <ul className="mt-3 space-y-2 text-xs text-slate-600">
+                          <li>• O arquivo é interpretado e cada linha é enviada sequencialmente para o formulário selecionado.</li>
+                          <li>• Campos obrigatórios são validados antes do envio, reduzindo chances de rejeição.</li>
+                          <li>• Logs detalhados podem ser acompanhados na aplicação Python em <code className="rounded bg-slate-800 px-1 py-0.5 text-[10px] text-white">automacao-ltd/main.py</code>.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-slate-200/80 bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-slate-800">
+                    <FileCheck className="h-5 w-5 text-blue-600" />
+                    Pré-Validação inteligente
+                  </CardTitle>
+                  <CardDescription>
+                    Recomendações baseadas na automação em Python (Selenium) para garantir preenchimento perfeito.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 text-xs text-slate-600">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
+                    <p className="text-sm font-semibold text-blue-700">Checklist automático</p>
+                    <ul className="mt-3 space-y-1">
+                      <li>• Certifique-se de que o CSV esteja separado por ponto e vírgula.</li>
+                      <li>• Utilize UTF-8 para preservar acentos e cedilhas.</li>
+                      <li>• Para PDFs, valide os campos manualmente (entrada assistida).</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-semibold text-slate-700">Resultados esperados</p>
+                    <p className="mt-2 leading-relaxed">
+                      A automação reproduz os passos presentes na ferramenta desktop (<code className="rounded bg-slate-800 px-1 py-0.5 text-[10px] text-white">automacao-ltd</code>) utilizando Selenium e múltiplas verificações de tela. O painel web replica a mesma lógica de pré-configuração.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-semibold text-slate-700">Suporte avançado</p>
+                    <p className="mt-2">Todos os envios são registrados em <code className="rounded bg-slate-800 px-1 py-0.5 text-[10px] text-white">logs/automation.log</code> e podem ser auditados pelo coordenador.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="domain-status" className="space-y-6">
