@@ -35,7 +35,11 @@ import {
   HardDriveDownload,
   Info,
   History,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Globe,
+  CalendarClock,
+  Shield,
+  ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
 import DashboardInlineNav from '@/components/DashboardInlineNav'
@@ -776,6 +780,79 @@ export default function CoordinatorDashboard() {
   }
 
   const mainMetrics = getMainMetrics()
+  const domainExpiry = new Date('2026-05-03T00:00:00-03:00')
+  const domainCycleStart = new Date('2025-05-03T00:00:00-03:00')
+  const now = new Date()
+  const msInDay = 1000 * 60 * 60 * 24
+  const daysRemainingRaw = Math.ceil((domainExpiry.getTime() - now.getTime()) / msInDay)
+  const daysRemaining = daysRemainingRaw > 0 ? daysRemainingRaw : 0
+  const isExpired = daysRemainingRaw <= 0
+  const renewalWindowDays = 60
+  const renewalWindowStart = new Date(domainExpiry)
+  renewalWindowStart.setDate(renewalWindowStart.getDate() - renewalWindowDays)
+  const inRenewalWindow = !isExpired && now >= renewalWindowStart
+  const totalCycleDays = Math.max(1, Math.ceil((domainExpiry.getTime() - domainCycleStart.getTime()) / msInDay))
+  const daysElapsed = isExpired
+    ? totalCycleDays
+    : Math.min(totalCycleDays, Math.max(0, Math.ceil((now.getTime() - domainCycleStart.getTime()) / msInDay)))
+  const renewalProgress = Math.min(100, Math.max(0, Math.round((daysElapsed / totalCycleDays) * 100)))
+  const formatDate = (date: Date) =>
+    date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const domainStatusLabel = isExpired ? 'Expirado' : inRenewalWindow ? 'Em Renovação' : 'Ativo'
+  const domainStatusTone = isExpired
+    ? 'bg-red-100 text-red-700'
+    : inRenewalWindow
+      ? 'bg-amber-100 text-amber-700'
+      : 'bg-green-100 text-green-700'
+  const domainStatusSubtext = isExpired
+    ? 'Renove imediatamente para evitar indisponibilidade dos serviços.'
+    : inRenewalWindow
+      ? 'Recomenda-se confirmar a renovação antes do vencimento para manter o domínio protegido.'
+      : 'Domínio operacional, renovação sob monitoramento automático.'
+  const domainRegistrarUrl = 'https://registro.br/painel/'
+  const domainTimeline = [
+    {
+      label: 'Janela de Renovação',
+      value: formatDate(renewalWindowStart),
+      description: 'Período recomendado para iniciar pagamentos e documentação.',
+      icon: CalendarClock,
+      tone: 'text-amber-500'
+    },
+    {
+      label: 'Data de Expiração',
+      value: formatDate(domainExpiry),
+      description: 'Prazo final para renovação sem penalidades.',
+      icon: CalendarClock,
+      tone: 'text-blue-500'
+    },
+    {
+      label: 'Painel Registro.br',
+      value: 'https://registro.br/painel/',
+      description: 'Ambiente oficial de administração do domínio.',
+      icon: LinkIcon,
+      tone: 'text-slate-500'
+    }
+  ]
+  const domainChecklist = [
+    {
+      title: 'DNS primário operacional',
+      status: 'OK',
+      tone: 'text-green-600',
+      icon: ShieldCheck
+    },
+    {
+      title: 'Renovação automática monitorada',
+      status: inRenewalWindow ? 'Revisar' : 'OK',
+      tone: inRenewalWindow ? 'text-amber-600' : 'text-green-600',
+      icon: Activity
+    },
+    {
+      title: 'Contato técnico atualizado',
+      status: 'OK',
+      tone: 'text-green-600',
+      icon: Users
+    }
+  ]
   const quickLinks = [
     {
       value: 'overview',
@@ -834,6 +911,13 @@ export default function CoordinatorDashboard() {
       category: 'management'
     },
     {
+      value: 'domain-status',
+      label: 'Domínio NAF',
+      description: 'Monitoramento do domínio institucional',
+      icon: Globe,
+      category: 'security'
+    },
+    {
       value: 'chat-links',
       label: 'Links de Chat',
       description: 'Gerar Acesso ao Chat',
@@ -871,20 +955,59 @@ export default function CoordinatorDashboard() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 justify-start sm:justify-end">
-                <div className="flex items-center gap-2 px-3 py-2 bg-slate-100/60 rounded-lg">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                  <span className="text-xs text-slate-600 font-medium">ONLINE</span>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={handleLogout}
-                  className="border-slate-300 hover:border-red-300 hover:text-red-600 transition-colors"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sair
-                </Button>
+      <div className="flex items-center gap-3 justify-start sm:justify-end">
+        <div className="flex items-center gap-2 px-3 py-2 bg-slate-100/60 rounded-lg">
+          <div className="w-2 h-2 bg-blue-500 rounded-full" />
+          <span className="text-xs text-slate-600 font-medium">ONLINE</span>
+        </div>
+        <button
+          type="button"
+          className="group relative flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:bg-white"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30">
+            <Shield className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-semibold uppercase tracking-wide text-blue-500">Domínio</span>
+            <span className="text-sm font-bold text-slate-700">naf.ltdestacio.com.br</span>
+          </div>
+          <div className="flex flex-col text-right">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Expira em</span>
+            <span className="flex items-center gap-1 text-sm font-bold text-slate-800">
+              03/05/2026
+              <CalendarClock className="h-3.5 w-3.5 text-blue-500" />
+            </span>
+          </div>
+
+          <div className="absolute inset-x-0 top-full z-10 hidden translate-y-2 overflow-hidden rounded-xl border border-blue-100 bg-white p-4 shadow-2xl shadow-blue-500/20 group-hover:block">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Painel de Domínio</p>
+                <p className="mt-1 text-sm font-medium text-slate-700">Renovação em <span className="text-blue-600">03/05/2026</span></p>
+                <p className="mt-1 text-xs text-slate-500">Gerenciado via <span className="font-semibold text-blue-600">registro.br</span></p>
               </div>
+              <Button
+                asChild
+                size="sm"
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <Link href="https://registro.br/painel/" target="_blank" rel="noreferrer">
+                  Acessar Registro.br
+                  <ArrowRight className="ml-2 h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </button>
+        <Button
+          variant="outline"
+          onClick={handleLogout}
+          className="border-slate-300 hover:border-red-300 hover:text-red-600 transition-colors"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Sair
+        </Button>
+      </div>
             </div>
           </div>
         </div>
@@ -1001,6 +1124,10 @@ export default function CoordinatorDashboard() {
             <TabsTrigger className="w-full justify-center gap-2" value="security">
               <ShieldCheck className="h-4 w-4" />
               Segurança Digital
+            </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="domain-status">
+              <Globe className="h-4 w-4" />
+              Domínio NAF
             </TabsTrigger>
             <TabsTrigger className="w-full justify-center" value="reports">Relatórios</TabsTrigger>
             <TabsTrigger className="w-full justify-center gap-2" value="backup">
@@ -1843,6 +1970,153 @@ export default function CoordinatorDashboard() {
               coordinatorName={user?.name || 'Coordenador'}
               coordinatorEmail={user?.email || 'coordenador@naf.com'}
             />
+          </TabsContent>
+
+          <TabsContent value="domain-status" className="space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <Card className="relative overflow-hidden border border-blue-100 shadow-md shadow-blue-100/40 xl:col-span-2">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-50 via-transparent to-indigo-50" />
+                <CardHeader className="relative z-10 pb-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <CardTitle className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+                      <Shield className="h-6 w-6 text-blue-600" />
+                      Monitoramento do Domínio
+                    </CardTitle>
+                    <Badge className={`${domainStatusTone} border-transparent px-3 py-1 text-sm`}>{domainStatusLabel}</Badge>
+                  </div>
+                  <CardDescription className="text-sm text-slate-600">
+                    {domainStatusSubtext}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="relative z-10 space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div className="rounded-xl bg-white/70 p-4 shadow-sm shadow-blue-100/30 backdrop-blur sm:col-span-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Domínio</p>
+                      <p className="mt-1 text-lg font-bold text-slate-800">naf.ltdestacio.com.br</p>
+                      <p className="text-xs text-slate-500">Gerenciado via registro.br</p>
+                    </div>
+                    <div className="rounded-xl bg-white/70 p-4 shadow-sm shadow-blue-100/30 backdrop-blur sm:col-span-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Expiração</p>
+                      <p className="mt-1 text-lg font-bold text-slate-800">{formatDate(domainExpiry)}</p>
+                      <p className="text-xs text-slate-500">{daysRemaining} dias restantes</p>
+                    </div>
+                    <div className="rounded-xl bg-white/70 p-4 shadow-sm shadow-blue-100/30 backdrop-blur sm:col-span-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Janela de Renovação</p>
+                      <p className="mt-1 text-lg font-bold text-slate-800">{formatDate(renewalWindowStart)}</p>
+                      <p className="text-xs text-slate-500">Recomendada {renewalWindowDays} dias antes</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm font-semibold text-slate-600">
+                      <span>Progresso do ciclo 2025 / 2026</span>
+                      <span>{renewalProgress}%</span>
+                    </div>
+                    <Progress value={renewalProgress} className="h-2 bg-blue-100" />
+                    <p className="text-xs text-slate-500">
+                      A recomendação é confirmar a renovação ao menos 30 dias antes do vencimento para evitar períodos de carência.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    {domainChecklist.map((item, index) => {
+                      const Icon = item.icon
+                      return (
+                        <div
+                          key={`${item.title}-${index}`}
+                          className="flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm"
+                        >
+                          <Icon className={`h-3.5 w-3.5 ${item.tone}`} />
+                          <span>{item.title}</span>
+                          <Badge className={`border-transparent bg-slate-100 text-slate-700`}>{item.status}</Badge>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="space-y-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarClock className="h-5 w-5 text-blue-600" />
+                    Linha do tempo
+                  </CardTitle>
+                  <CardDescription>Eventos críticos e pontos de atenção do ciclo atual.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {domainTimeline.map((item, index) => {
+                    const Icon = item.icon
+                    return (
+                      <div key={index} className="flex gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
+                          <Icon className={`h-4 w-4 ${item.tone}`} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-slate-700">{item.label}</p>
+                            <span className="text-xs font-medium text-blue-600">{item.value}</span>
+                          </div>
+                          <p className="text-xs text-slate-500">{item.description}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border border-slate-200/70 shadow-sm shadow-blue-100/40">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-slate-800">
+                  <Globe className="h-5 w-5 text-blue-600" />
+                  Governança e trâmites de renovação
+                </CardTitle>
+                <CardDescription>
+                  Plano operacional para garantir disponibilidade do domínio institucional e continuidade dos serviços digitais.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
+                  <h4 className="text-sm font-semibold text-blue-700">Checklist Executivo</h4>
+                  <ul className="mt-3 space-y-2 text-xs text-blue-800">
+                    <li>• Confirmar pagamento até <strong>{formatDate(renewalWindowStart)}</strong></li>
+                    <li>• Validar dados de contato técnico e cobrança</li>
+                    <li>• Registrar evidências no basecamp de compliance</li>
+                  </ul>
+                </div>
+
+                <div className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-sm">
+                  <h4 className="text-sm font-semibold text-slate-700">Ações rápidas</h4>
+                  <div className="mt-3 flex flex-col gap-2">
+                    <Button asChild variant="outline" className="justify-start">
+                      <Link href={domainRegistrarUrl} target="_blank" rel="noreferrer">
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        Abrir painel do registro.br
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" className="justify-start text-slate-600 hover:text-blue-600">
+                      <CalendarClock className="mr-2 h-4 w-4 text-blue-500" />
+                      Agendar lembrete no calendário institucional
+                    </Button>
+                    <Button variant="ghost" className="justify-start text-slate-600 hover:text-blue-600">
+                      <Shield className="mr-2 h-4 w-4 text-blue-500" />
+                      Baixar relatório de auditoria DNS
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-sm">
+                  <h4 className="text-sm font-semibold text-slate-700">Status ampliado</h4>
+                  <div className="mt-3 space-y-2 text-xs text-slate-600">
+                    <p><span className="font-semibold">Dias restantes:</span> {daysRemaining}</p>
+                    <p><span className="font-semibold">Janela de renovação:</span> {formatDate(renewalWindowStart)} a {formatDate(domainExpiry)}</p>
+                    <p><span className="font-semibold">Responsável técnico:</span> Equipe de infraestrutura digital</p>
+                    <p><span className="font-semibold">Última auditoria:</span> {formatDate(new Date('2024-11-12T00:00:00-03:00'))}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="reports" className="space-y-6">
