@@ -1,13 +1,10 @@
 import type { Metadata } from 'next'
 import React from 'react'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
 import ScrollToTop from '@/components/ScrollToTop'
 import ChatWidget from '@/components/chat/ChatWidget'
 import { ChunkErrorHandler } from '@/components/ChunkErrorHandler'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'NAF - Núcleo de Apoio Contábil Fiscal',
@@ -20,11 +17,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
-      <body className={`${inter.className} bg-white text-gray-900 antialiased`}>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className="font-sans antialiased bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100" suppressHydrationWarning>
         <Providers>
-          <ChunkErrorHandler />
           <div className="min-h-screen flex flex-col">
+            <ChunkErrorHandler />
             <div className="flex-1 flex flex-col">
               {children}
             </div>
