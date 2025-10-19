@@ -1,6 +1,7 @@
 import type { Browser, BrowserContext, Page } from 'playwright'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { createRequire } from 'module'
 import Papa from 'papaparse'
 
 export type AutomationSummary = {
@@ -184,32 +185,45 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     '--use-mock-keychain',
   ]
 
+  const nodeRequire = createRequire(import.meta.url)
+
   const launchServerlessChromium = async (log: (message: string) => void): Promise<Browser> => {
     const { inflate } = (await import('lambdafs')) as { inflate: (archivePath: string) => Promise<string> }
     const { chromium } = await import('playwright')
-    const { createRequire } = await import('module')
-    const require = createRequire(import.meta.url)
+    const candidateDirs = [
+      path.join(process.cwd(), 'node_modules', 'playwright-aws-lambda', 'dist', 'src', 'bin'),
+      path.join(path.dirname(nodeRequire.resolve('playwright-aws-lambda/package.json')), 'dist', 'src', 'bin'),
+    ]
 
-    const archivePaths = {
-      chromium: require.resolve('playwright-aws-lambda/dist/src/bin/chromium.br'),
-      swiftshader: require.resolve('playwright-aws-lambda/dist/src/bin/swiftshader.tar.br'),
-      aws: require.resolve('playwright-aws-lambda/dist/src/bin/aws.tar.br'),
+    let binBase: string | null = null
+    for (const candidate of candidateDirs) {
+      try {
+        await fs.access(candidate)
+        binBase = candidate
+        break
+      } catch {
+        continue
+      }
     }
 
-    const inflateArchive = async (label: keyof typeof archivePaths) => {
-      const archivePath = archivePaths[label]
+    if (!binBase) {
+      throw new Error('Arquivos compactados do Chromium não foram encontrados no deploy.')
+    }
+
+    const inflateArchive = async (fileName: string) => {
+      const archivePath = path.join(binBase, fileName)
       try {
         return await inflate(archivePath)
       } catch (error) {
-        log(`⚠️ Falha ao extrair ${path.basename(archivePath)}: ${(error as Error).message}`)
+        log(`⚠️ Falha ao extrair ${fileName}: ${(error as Error).message}`)
         return null
       }
     }
 
     const [chromiumPath] = await Promise.all([
-      inflateArchive('chromium'),
-      inflateArchive('swiftshader'),
-      inflateArchive('aws'),
+      inflateArchive('chromium.br'),
+      inflateArchive('swiftshader.tar.br'),
+      inflateArchive('aws.tar.br'),
     ])
 
     if (!chromiumPath) {
