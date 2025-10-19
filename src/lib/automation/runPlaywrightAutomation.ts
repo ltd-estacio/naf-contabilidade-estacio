@@ -193,18 +193,36 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     throw error
   }
 
+  const ensureLambdaHints = () => {
+    if (
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.AWS_EXECUTION_ENV ||
+      process.env.AWS_LAMBDA_FUNCTION_VERSION
+    ) {
+      return
+    }
+
+    process.env.AWS_LAMBDA_FUNCTION_NAME = 'naf-automation-runner'
+    process.env.AWS_EXECUTION_ENV = 'AWS_Lambda_nodejs18.x'
+  }
+
   try {
     if (runningOnServerless) {
       log('☁️ Ambiente serverless detectado; preparando Chromium otimizado para Lambda')
+      ensureLambdaHints()
       const require = createRequire(import.meta.url)
-      const playwrightAws = require('playwright-aws-lambda') as {
-        launchChromium: (options?: Record<string, unknown>) => Promise<Browser>
-      }
+      try {
+        const playwrightAws = require('playwright-aws-lambda') as {
+          launchChromium: (options?: Record<string, unknown>) => Promise<Browser>
+        }
 
-      browser = await playwrightAws.launchChromium({
-        headless: true,
-        args: [...LAMBDA_CHROMIUM_ARGS],
-      })
+        browser = await playwrightAws.launchChromium({
+          headless: true,
+          args: [...LAMBDA_CHROMIUM_ARGS],
+        })
+      } catch (error) {
+        raise(`Falha ao iniciar Chromium otimizado: ${(error as Error).message}`)
+      }
     } else {
       const { chromium } = await import('playwright')
       log('🖥️ Executando automação com Chromium local do Playwright')
