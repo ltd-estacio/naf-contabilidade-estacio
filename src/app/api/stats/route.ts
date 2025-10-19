@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,8 +7,10 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🏠 Home Stats API - Iniciando busca de dados públicos')
 
+    const db = supabaseAdmin ?? supabase
+
     // 1. ATENDIMENTOS REALIZADOS - Contar todos os atendimentos concluídos
-    const { data: allAttendances, error: attendancesError } = await supabase
+    const { data: allAttendances, error: attendancesError } = await db
       .from('attendances')
       .select('id, status, client_satisfaction_rating')
       .eq('status', 'CONCLUIDO')
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
     console.log(`📊 Atendimentos concluídos encontrados: ${totalAttendances}`)
 
     // 2. AGENDAMENTOS FISCAIS - Contar orientações fiscais realizadas
-    const { data: fiscalAppointments, error: fiscalError } = await supabase
+    const { data: fiscalAppointments, error: fiscalError } = await db
       .from('fiscal_appointments')
       .select('id, status')
       .eq('status', 'CONCLUIDO')
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
     console.log(`📋 Orientações fiscais concluídas: ${fiscalCompleted}`)
 
     // 2.1 TODOS os agendamentos fiscais para estatística total
-    const { data: allFiscalAppointments, error: allFiscalError } = await supabase
+    const { data: allFiscalAppointments, error: allFiscalError } = await db
       .from('fiscal_appointments')
       .select('id, status')
 
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest) {
     const totalServices = totalAttendances + allFiscalCount
 
     // 3. SERVIÇOS DISPONÍVEIS - Contar serviços NAF ativos
-    const { data: nafServices, error: nafServicesError } = await supabase
+    const { data: nafServices, error: nafServicesError } = await db
       .from('services')
       .select('id')
       .eq('isActive', true)
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
     // 4. COORDENADORES ATIVOS - Contar usuários com papel de coordenador
     let totalActiveCoordinators = 0
     try {
-      const { data: coordinators, error: coordError } = await supabase
+      const { data: coordinators, error: coordError } = await db
         .from('users')
         .select('id, role, is_active')
         .eq('role', 'COORDINATOR')
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest) {
 
       if (coordError) {
         console.warn('Aviso: erro ao buscar coordenadores em users, tentando fallback coordinator_users:', coordError.message)
-        const { data: alt, error: altErr } = await supabase
+        const { data: alt, error: altErr } = await db
           .from('coordinator_users')
           .select('id, is_active')
           .eq('is_active', true)
