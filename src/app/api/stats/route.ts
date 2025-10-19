@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { getHomeStats } from '@/lib/homeStats'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,115 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🏠 Home Stats API - Iniciando busca de dados públicos')
 
-    const db = supabaseAdmin ?? supabase
-
-    // 1. ATENDIMENTOS REALIZADOS - Contar todos os atendimentos concluídos
-    const { data: allAttendances, error: attendancesError } = await db
-      .from('attendances')
-      .select('id, status, client_satisfaction_rating')
-      .eq('status', 'CONCLUIDO')
-
-    if (attendancesError) {
-      console.error('Erro ao buscar atendimentos:', attendancesError)
-    }
-
-    const totalAttendances = allAttendances?.length || 0
-    console.log(`📊 Atendimentos concluídos encontrados: ${totalAttendances}`)
-
-    // 2. AGENDAMENTOS FISCAIS - Contar orientações fiscais realizadas
-    const { data: fiscalAppointments, error: fiscalError } = await db
-      .from('fiscal_appointments')
-      .select('id, status')
-      .eq('status', 'CONCLUIDO')
-
-    if (fiscalError) {
-      console.error('Erro ao buscar agendamentos fiscais:', fiscalError)
-    }
-
-    const fiscalCompleted = fiscalAppointments?.length || 0
-    console.log(`📋 Orientações fiscais concluídas: ${fiscalCompleted}`)
-
-    // 2.1 TODOS os agendamentos fiscais para estatística total
-    const { data: allFiscalAppointments, error: allFiscalError } = await db
-      .from('fiscal_appointments')
-      .select('id, status')
-
-    if (allFiscalError) {
-      console.error('Erro ao buscar todos os agendamentos fiscais:', allFiscalError)
-    }
-
-    const allFiscalCount = allFiscalAppointments?.length || 0
-    console.log(`📋 Total de agendamentos fiscais na base: ${allFiscalCount}`)
-
-    // Total de atendimentos = atendimentos + TODOS os agendamentos fiscais
-    const totalServices = totalAttendances + allFiscalCount
-
-    // 3. SERVIÇOS DISPONÍVEIS - Contar serviços NAF ativos
-    const { data: nafServices, error: nafServicesError } = await db
-      .from('services')
-      .select('id')
-      .eq('isActive', true)
-
-    if (nafServicesError) {
-      console.error('Erro ao buscar serviços NAF:', nafServicesError)
-    }
-
-    const availableServices = nafServices?.length || 0
-    console.log(`🛠️ Serviços NAF disponíveis: ${availableServices}`)
-
-    // 4. COORDENADORES ATIVOS - Contar usuários com papel de coordenador
-    let totalActiveCoordinators = 0
-    try {
-      const { data: coordinators, error: coordError } = await db
-        .from('users')
-        .select('id, role, is_active')
-        .eq('role', 'COORDINATOR')
-        .eq('is_active', true)
-
-      if (coordError) {
-        console.warn('Aviso: erro ao buscar coordenadores em users, tentando fallback coordinator_users:', coordError.message)
-        const { data: alt, error: altErr } = await db
-          .from('coordinator_users')
-          .select('id, is_active')
-          .eq('is_active', true)
-        if (altErr) {
-          console.error('Erro no fallback coordinator_users:', altErr)
-        }
-        totalActiveCoordinators = alt?.length || 0
-      } else {
-        totalActiveCoordinators = coordinators?.length || 0
-      }
-    } catch (e) {
-      console.error('Erro ao calcular coordenadores ativos:', e)
-      totalActiveCoordinators = 0
-    }
-    console.log(`👥 Coordenadores ativos: ${totalActiveCoordinators}`)
-
-    // Calcular percentual de satisfação baseado nas avaliações existentes
-    let satisfactionPercentage = 0
-    const allRatings = allAttendances?.filter(a => a.client_satisfaction_rating) || []
-
-    if (allRatings.length > 0) {
-      const averageRating = allRatings.reduce((sum, a) => sum + a.client_satisfaction_rating, 0) / allRatings.length
-      satisfactionPercentage = Math.round((averageRating / 5) * 100) // Converter escala 1-5 para percentual
-    }
-
-    console.log(`⭐ Satisfação calculada: ${satisfactionPercentage}% (baseada em ${allRatings.length} avaliações)`)
-
-    // 5. SSL verification
-    const sslEnabled = ((process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || '').startsWith('https://'))
-      || (process.env.NEXT_PUBLIC_SUPABASE_URL || '').startsWith('https://')
-
-    // Retornar dados reais do banco - SEM valores mínimos artificiais
-    const finalStats = {
-      totalAttendances: totalServices, // Total real de atendimentos + fiscais
-      userSatisfaction: satisfactionPercentage > 0 ? satisfactionPercentage : 95, // Usar real ou padrão apenas se não houver dados
-      availableServices: availableServices, // Serviços reais cadastrados
-      onlineSupport: '24h', // Fixo - informação institucional
-      activeCoordinators: totalActiveCoordinators, // Coordenadores reais ativos
-      sslEnabled,
-      fiscalCompleted // Orientações fiscais concluídas (real)
-    }
+    const { stats: finalStats, breakdown } = await getHomeStats()
 
     console.log('✅ Home Stats API - Estatísticas finais:', finalStats)
 
@@ -125,16 +17,7 @@ export async function GET(request: NextRequest) {
       metadata: {
         lastUpdated: new Date().toISOString(),
         dataSource: 'Supabase - Dados Reais',
-        breakdown: {
-          attendancesCompleted: totalAttendances,
-          fiscalAppointmentsCompleted: fiscalCompleted,
-          allFiscalAppointments: allFiscalCount,
-          totalServicesCombined: totalServices,
-          nafServicesActive: availableServices,
-          coordinatorsActive: totalActiveCoordinators,
-          sslEnabled,
-          satisfactionBasedOnRatings: allRatings.length
-        }
+        breakdown
       }
     })
 

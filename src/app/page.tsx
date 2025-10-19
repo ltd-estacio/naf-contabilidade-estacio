@@ -1,5 +1,4 @@
 import React from 'react'
-import { headers } from 'next/headers'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
@@ -7,70 +6,27 @@ import { FileText, ArrowRight, Phone, Shield, TrendingUp, Clock, MapPin, Mail, C
 import NAFServicesShowcase from "@/components/NAFServicesShowcase"
 import MainNavigation from '@/components/MainNavigation'
 import NAFFooter from '@/components/layout/NAFFooter'
+import { getHomeStats } from '@/lib/homeStats'
 
 export const dynamic = 'force-dynamic'
 
-async function resolveBaseUrl() {
-  // Prioritize explicit environment configuration
-  let baseUrl = process.env.NEXT_PUBLIC_BASE_URL
-    || process.env.NEXTAUTH_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
-
-  if (!baseUrl) {
-    // Use incoming request headers when rendering on the server
-    const headersList = headers()
-    const protocol = headersList.get('x-forwarded-proto') ?? 'https'
-    const host = headersList.get('host')
-    if (host) {
-      baseUrl = `${protocol}://${host}`
-    }
-  }
-
-  // Development fallback keeps legacy localhost behaviour
-  if (!baseUrl && process.env.NODE_ENV !== 'production') {
-    baseUrl = 'http://localhost:4000'
-  }
-
-  if (!baseUrl) {
-    baseUrl = 'https://naf.ltdestacio.com.br'
-  }
-
-  if (baseUrl && !baseUrl.includes('localhost') && baseUrl.startsWith('http://')) {
-    baseUrl = baseUrl.replace('http://', 'https://')
-  }
-
-  return baseUrl
-}
-
-async function getStatistics() {
+export default async function Home() {
+  let statisticsData
   try {
-    const baseUrl = await resolveBaseUrl()
-
-    const response = await fetch(`${baseUrl}/api/stats`, {
-      cache: 'no-store' // Always fetch fresh data
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch statistics')
-    }
-
-    const result = await response.json()
-    return result.data
+    const { stats } = await getHomeStats()
+    statisticsData = stats
   } catch (error) {
-    console.error('Error fetching statistics:', error)
-    // Return fallback data if API fails
-    return {
+    console.error('Error fetching home stats:', error)
+    statisticsData = {
       totalAttendances: 2000,
       userSatisfaction: 95,
       availableServices: 21,
-      onlineSupport: '24h'
+      onlineSupport: '24h',
+      activeCoordinators: 0,
+      sslEnabled: true,
+      fiscalCompleted: 0,
     }
   }
-}
-
-export default async function Home() {
-  // Fetch real statistics from API
-  const statisticsData = await getStatistics()
 
   // Use real statistics from API
   const stats = [
