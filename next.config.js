@@ -8,12 +8,12 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ['bcryptjs', 'playwright-aws-lambda', 'playwright-core', 'lambdafs']
-  },
-  outputFileTracingIncludes: {
-    'app/api/automation/run/route': [
-      './node_modules/playwright-aws-lambda/dist/src/bin/**',
-    ]
+    serverComponentsExternalPackages: ['bcryptjs', 'playwright-aws-lambda', 'playwright-core', 'lambdafs'],
+    outputFileTracingIncludes: {
+      'app/api/automation/run/route': [
+        './node_modules/playwright-aws-lambda/dist/src/bin/**'
+      ]
+    }
   },
   images: {
     domains: ['localhost', 'naf-contabil.netlify.app'],

@@ -191,6 +191,7 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     const nodeRequire = createRequire(import.meta.url)
     const candidateDirs: string[] = [
       path.join(process.cwd(), 'node_modules', 'playwright-aws-lambda', 'dist', 'src', 'bin'),
+      path.join(process.cwd(), '.next', 'server', 'playwright-aws-lambda', 'bin'),
     ]
 
     try {
