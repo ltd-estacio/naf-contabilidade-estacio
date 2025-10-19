@@ -1,6 +1,6 @@
 import { supabase, supabaseAdmin } from '@/lib/supabase'
 
-type AttendanceRow = {
+type FiscalAppointmentRow = {
   client_satisfaction_rating?: number | null
 }
 
@@ -33,47 +33,33 @@ export type HomeStatsResult = {
 export async function getHomeStats(): Promise<HomeStatsResult> {
   const db = supabaseAdmin ?? supabase
 
-  // 1. atendimentos concluídos
-  const { data: allAttendances, error: attendancesError } = await db
-    .from('attendances')
-    .select('id, status, client_satisfaction_rating')
-    .eq('status', 'CONCLUIDO')
-
-  if (attendancesError) {
-    throw attendancesError
-  }
-
-  const totalAttendances = allAttendances?.length ?? 0
-
-  // 2. agendamentos fiscais concluídos
-  const { data: fiscalAppointments, error: fiscalError } = await db
+  // Fiscal appointments (orientações fiscais)
+  const { data: completedFiscal, error: fiscalCompletedError } = await db
     .from('fiscal_appointments')
-    .select('id, status')
+    .select('id, client_satisfaction_rating')
     .eq('status', 'CONCLUIDO')
 
-  if (fiscalError) {
-    throw fiscalError
+  if (fiscalCompletedError) {
+    throw fiscalCompletedError
   }
 
-  const fiscalCompleted = fiscalAppointments?.length ?? 0
+  const fiscalCompleted = completedFiscal?.length ?? 0
 
-  // total agendamentos fiscais (para total geral)
   const { data: allFiscalAppointments, error: allFiscalError } = await db
     .from('fiscal_appointments')
-    .select('id, status')
+    .select('id')
 
   if (allFiscalError) {
     throw allFiscalError
   }
 
   const allFiscalCount = allFiscalAppointments?.length ?? 0
-  const totalServices = totalAttendances + allFiscalCount
 
-  // serviços ativos
+  // Serviços NAF ativos
   const { data: nafServices, error: nafServicesError } = await db
-    .from('services')
-    .select('id')
-    .eq('isActive', true)
+    .from('naf_services')
+    .select('id, status')
+    .eq('status', 'ativo')
 
   if (nafServicesError) {
     throw nafServicesError
@@ -81,40 +67,33 @@ export async function getHomeStats(): Promise<HomeStatsResult> {
 
   const availableServices = nafServices?.length ?? 0
 
-  // coordenadores ativos
-  let activeCoordinators = 0
-  const { data: coordinators, error: coordError } = await db
-    .from('users')
-    .select('id, role, is_active')
-    .eq('role', 'COORDINATOR')
+  // Coordenadores ativos
+  const { data: coordinators, error: coordinatorsError } = await db
+    .from('coordinator_users')
+    .select('id')
     .eq('is_active', true)
 
-  if (coordError) {
-    const { data: alt, error: altErr } = await db
-      .from('coordinator_users')
-      .select('id, is_active')
-      .eq('is_active', true)
-
-    if (altErr) {
-      throw altErr
-    }
-
-    activeCoordinators = alt?.length ?? 0
-  } else {
-    activeCoordinators = coordinators?.length ?? 0
+  if (coordinatorsError) {
+    throw coordinatorsError
   }
 
-  // satisfação
-  let satisfactionPercentage = 0
-  const ratings = (allAttendances as AttendanceRow[] | null)?.filter(
+  const activeCoordinators = coordinators?.length ?? 0
+
+  // Satisfação (quando houver avaliações em fiscal appointments)
+  const ratings = (completedFiscal as FiscalAppointmentRow[] | null)?.filter(
     (a) => typeof a.client_satisfaction_rating === 'number'
   ) ?? []
+
+  let satisfactionPercentage = 0
   if (ratings.length > 0) {
     const average =
       ratings.reduce((sum, item) => sum + (item.client_satisfaction_rating ?? 0), 0) /
       ratings.length
     satisfactionPercentage = Math.round((average / 5) * 100)
   }
+
+  const totalAttendances = fiscalCompleted
+  const totalServices = fiscalCompleted
 
   const sslEnabled =
     ((process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || '').startsWith('https://')) ||
