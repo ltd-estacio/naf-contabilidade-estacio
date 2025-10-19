@@ -1,5 +1,6 @@
 import type { Browser, BrowserContext, Page } from 'playwright'
 import { promises as fs } from 'fs'
+import path from 'path'
 import Papa from 'papaparse'
 
 export type AutomationSummary = {
@@ -138,42 +139,107 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     process.env.VERCEL || process.env.AWS_REGION || process.env.AWS_EXECUTION_ENV,
   )
 
-  const ensureLambdaHints = () => {
-    if (process.env.IS_LOCAL !== undefined) return
-    if (
-      !process.env.AWS_LAMBDA_FUNCTION_NAME &&
-      !process.env.FUNCTION_NAME &&
-      !process.env.FUNCTION_TARGET
-    ) {
-      process.env.AWS_LAMBDA_FUNCTION_NAME = 'naf-automation-runner'
+  const LAMBDA_CHROMIUM_ARGS = [
+    '--disable-background-timer-throttling',
+    '--disable-breakpad',
+    '--disable-client-side-phishing-detection',
+    '--disable-cloud-import',
+    '--disable-default-apps',
+    '--disable-dev-shm-usage',
+    '--disable-extensions',
+    '--disable-gesture-typing',
+    '--disable-hang-monitor',
+    '--disable-infobars',
+    '--disable-notifications',
+    '--disable-offer-store-unmasked-wallet-cards',
+    '--disable-offer-upload-credit-cards',
+    '--disable-popup-blocking',
+    '--disable-print-preview',
+    '--disable-prompt-on-repost',
+    '--disable-setuid-sandbox',
+    '--disable-speech-api',
+    '--disable-sync',
+    '--disable-tab-for-desktop-share',
+    '--disable-translate',
+    '--disable-voice-input',
+    '--disable-wake-on-wifi',
+    '--disk-cache-size=33554432',
+    '--enable-async-dns',
+    '--enable-simple-cache-backend',
+    '--enable-tcp-fast-open',
+    '--enable-webgl',
+    '--hide-scrollbars',
+    '--ignore-gpu-blacklist',
+    '--media-cache-size=33554432',
+    '--metrics-recording-only',
+    '--mute-audio',
+    '--no-default-browser-check',
+    '--no-first-run',
+    '--no-pings',
+    '--no-sandbox',
+    '--no-zygote',
+    '--password-store=basic',
+    '--prerender-from-omnibox=disabled',
+    '--use-gl=swiftshader',
+    '--use-mock-keychain',
+  ]
+
+  const launchServerlessChromium = async (log: (message: string) => void): Promise<Browser> => {
+    const { inflate } = (await import('lambdafs')) as { inflate: (archivePath: string) => Promise<string> }
+    const { chromium } = await import('playwright')
+
+    const binBase = path.join(process.cwd(), 'node_modules', 'playwright-aws-lambda', 'dist', 'src', 'bin')
+    try {
+      await fs.access(binBase)
+    } catch {
+      throw new Error('Arquivos compactados do Chromium não foram encontrados no deploy.')
     }
-    process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '0'
+    const inflateArchive = async (fileName: string) => {
+      const archivePath = path.join(binBase, fileName)
+      try {
+        return await inflate(archivePath)
+      } catch (error) {
+        log(`⚠️ Falha ao extrair ${fileName}: ${(error as Error).message}`)
+        return null
+      }
+    }
+
+    const [chromiumPath] = await Promise.all([
+      inflateArchive('chromium.br'),
+      inflateArchive('swiftshader.tar.br'),
+      inflateArchive('aws.tar.br'),
+    ])
+
+    if (!chromiumPath) {
+      throw new Error('Chromium compactado não pôde ser preparado.')
+    }
+
+    if (!process.env.FONTCONFIG_PATH) {
+      process.env.FONTCONFIG_PATH = '/tmp/aws'
+    }
+    if (!process.env.LD_LIBRARY_PATH?.includes('/tmp/aws/lib')) {
+      const current = process.env.LD_LIBRARY_PATH ? `${process.env.LD_LIBRARY_PATH}` : ''
+      process.env.LD_LIBRARY_PATH = ['/tmp/aws/lib', current].filter(Boolean).join(':')
+    }
+    process.env.PLAYWRIGHT_BROWSERS_PATH = '0'
+
+    const launchArgs = [...LAMBDA_CHROMIUM_ARGS, '--single-process']
+
+    return chromium.launch({
+      args: launchArgs,
+      executablePath: chromiumPath,
+      headless: true,
+      ignoreHTTPSErrors: true,
+    })
   }
 
   try {
     if (runningOnServerless) {
-      try {
-        ensureLambdaHints()
-        const playwrightAwsModule = await import('playwright-aws-lambda')
-        const launchChromium =
-          (playwrightAwsModule as { launchChromium?: () => Promise<Browser> }).launchChromium ??
-          (playwrightAwsModule as { default?: { launchChromium?: () => Promise<Browser> } }).default
-            ?.launchChromium
-
-        if (!launchChromium) {
-          throw new Error('Função launchChromium não encontrada no pacote playwright-aws-lambda')
-        }
-
-        log('☁️ Ambiente serverless detectado; iniciando Chromium otimizado para Lambda')
-        browser = await launchChromium()
-      } catch (lambdaError) {
-        log(`⚠️ Falha ao iniciar Chromium otimizado: ${(lambdaError as Error).message}`)
-      }
-    }
-
-    if (!browser) {
+      log('☁️ Ambiente serverless detectado; preparando Chromium otimizado')
+      browser = await launchServerlessChromium(log)
+    } else {
       const { chromium } = await import('playwright')
-      log('🖥️ Utilizando Chromium fornecido pelo Playwright padrão')
+      log('🖥️ Executando automação com Chromium local do Playwright')
       browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
     }
 
