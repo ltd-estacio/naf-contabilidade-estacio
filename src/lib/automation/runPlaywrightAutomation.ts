@@ -196,35 +196,48 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
   try {
     if (runningOnServerless) {
       log('☁️ Ambiente serverless detectado; preparando Chromium do Playwright')
-      process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '0'
+      const browsersRoot = process.env.PLAYWRIGHT_BROWSERS_PATH
+        ? path.resolve(process.cwd(), process.env.PLAYWRIGHT_BROWSERS_PATH)
+        : path.join(process.cwd(), 'playwright-browsers')
 
-      const { chromium } = await import('playwright')
-      const localBrowsersDir = path.join(process.cwd(), 'node_modules', 'playwright-core', '.local-browsers')
-      let executablePath = ''
+      const chromiumCandidates: string[] = []
 
       try {
-        const entries = await fs.readdir(localBrowsersDir)
-        const chromiumDir = entries.find(entry => entry.startsWith('chromium-'))
-        if (chromiumDir) {
-          executablePath = path.join(localBrowsersDir, chromiumDir, 'chrome-linux', 'chrome')
-          log(`🔍 Executável Chromium localizado em bundle: ${executablePath}`)
+        const entries = await fs.readdir(browsersRoot)
+        for (const entry of entries) {
+          if (!entry.startsWith('chromium-')) continue
+          chromiumCandidates.push(path.join(browsersRoot, entry, 'chrome-linux', 'chrome'))
         }
       } catch (error) {
-        log(`⚠️ Não foi possível inspecionar .local-browsers: ${(error as Error).message}`)
+        log(`⚠️ Diretório de navegadores não acessível (${browsersRoot}): ${(error as Error).message}`)
       }
+
+      const { chromium } = await import('playwright')
+      const fallbackExecutable = chromium.executablePath()
+      if (fallbackExecutable) {
+        chromiumCandidates.push(fallbackExecutable)
+      }
+
+      const executablePath = await (async () => {
+        for (const candidate of chromiumCandidates) {
+          try {
+            await fs.access(candidate)
+            log(`🔍 Executável Chromium encontrado: ${candidate}`)
+            return candidate
+          } catch {
+            log(`⚠️ Executável indisponível em ${candidate}`)
+          }
+        }
+        return ''
+      })()
 
       if (!executablePath) {
-        executablePath = chromium.executablePath()
-        log(`🔍 Executável Chromium informado pelo Playwright: ${executablePath}`)
-      }
-
-      try {
-        await fs.access(executablePath)
-      } catch (error) {
         raise(
-          `Executável do Chromium não localizado em ${executablePath}. Garanta que "npx playwright install chromium" seja executado durante o build e que .local-browsers esteja incluído no deploy.`,
+          'Executável do Chromium não localizado. Garanta que "PLAYWRIGHT_BROWSERS_PATH=./playwright-browsers npx playwright install chromium --target=linux" seja executado durante o build.',
         )
       }
+
+      process.env.PLAYWRIGHT_BROWSERS_PATH = browsersRoot
 
       browser = await chromium.launch({
         headless: true,
