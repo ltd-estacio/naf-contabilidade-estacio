@@ -22,7 +22,6 @@ import {
   Menu,
   X
 } from 'lucide-react'
-import { ThemeToggle } from '@/components/ThemeToggle'
 
 interface MainNavigationProps {
   showBrand?: boolean
@@ -335,9 +334,6 @@ const MainNavigation = ({ showBrand = true }: MainNavigationProps) => {
 
           {/* Right Side Actions */}
           <div className="flex items-center space-x-3">
-            {/* Theme Toggle */}
-            <ThemeToggle />
-
             {/* Notification Center */}
 
             {/* Quick Access Button */}
@@ -447,15 +443,6 @@ const MainNavigation = ({ showBrand = true }: MainNavigationProps) => {
                 })}
               </div>
 
-              {/* Theme Toggle for Mobile */}
-              <div className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-4">
-                <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Tema
-                </div>
-                <div className="px-3 py-3">
-                  <ThemeToggle />
-                </div>
-              </div>
             </div>
           </div>
         )}

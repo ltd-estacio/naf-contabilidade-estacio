@@ -237,7 +237,7 @@ export default async function Home() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 justify-items-center">
             <Link href="/student-login-simple">
-              <Card className="w-full max-w-sm bg-white dark:bg-gray-950 dark:bg-gray-950/10 backdrop-blur border-white/20 hover:bg-white/20 transition-all duration-300 cursor-pointer">
+              <Card className="w-full max-w-sm bg-white/10 backdrop-blur border-white/20 hover:bg-white/20 transition-all duration-300 cursor-pointer">
                 <CardContent className="p-6 text-center">
                   <UserCheck className="h-12 w-12 text-white mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-white mb-2">Portal do Estudante</h3>
@@ -247,7 +247,7 @@ export default async function Home() {
             </Link>
             
             <Link href="/coordinator-dashboard">
-              <Card className="w-full max-w-sm bg-white dark:bg-gray-950 dark:bg-gray-950/10 backdrop-blur border-white/20 hover:bg-white/20 transition-all duration-300 cursor-pointer">
+              <Card className="w-full max-w-sm bg-white/10 backdrop-blur border-white/20 hover:bg-white/20 transition-all duration-300 cursor-pointer">
                 <CardContent className="p-6 text-center">
                   <BarChart3 className="h-12 w-12 text-white mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-white mb-2">Dashboard Coordenador</h3>
@@ -257,7 +257,7 @@ export default async function Home() {
             </Link>
             
             <Link href="/fiscal-guides">
-              <Card className="w-full max-w-sm bg-white dark:bg-gray-950 dark:bg-gray-950/10 backdrop-blur border-white/20 hover:bg-white/20 transition-all duration-300 cursor-pointer">
+              <Card className="w-full max-w-sm bg-white/10 backdrop-blur border-white/20 hover:bg-white/20 transition-all duration-300 cursor-pointer">
                 <CardContent className="p-6 text-center">
                   <BookOpen className="h-12 w-12 text-white mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-white mb-2">Guias Fiscais</h3>
@@ -330,7 +330,7 @@ export default async function Home() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {contactInfo.map((contact, index) => (
-              <Card key={index} className="bg-white dark:bg-gray-950 dark:bg-gray-950/10 backdrop-blur border-white/20 hover:bg-white/20 transition-all duration-300 text-center">
+              <Card key={index} className="bg-white/10 backdrop-blur border-white/25 hover:bg-white/20 transition-all duration-300 text-center">
                 <CardHeader>
                   <div className="w-12 h-12 bg-white/20 text-white rounded-full flex items-center justify-center mx-auto mb-4">
                     <contact.icon className="h-6 w-6" />
@@ -346,7 +346,7 @@ export default async function Home() {
 
           <div className="text-center mt-12">
             <Link href="/naf-scheduling">
-              <Button size="lg" className="bg-white dark:bg-gray-950 dark:bg-gray-950/10 backdrop-blur border-white/20 hover:bg-white/20 text-white">
+              <Button size="lg" className="bg-white/15 text-white border-white/30 hover:bg-white/25 backdrop-blur">
                 <Calendar className="mr-2 h-5 w-5" />
                 Agendar Atendimento
               </Button>

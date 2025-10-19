@@ -2,7 +2,6 @@ import React from 'react'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { TrendingUp, LogOut } from 'lucide-react'
-import { ThemeToggle } from '@/components/ThemeToggle'
 
 interface NAFHeaderProps {
   user?: { email?: string } | null
@@ -64,7 +63,6 @@ export default function NAFHeader({ user, onLogout, className = '' }: NAFHeaderP
                 <div className="w-2 h-2 bg-blue-500 rounded-full" />
                 <span className="text-xs text-slate-600 dark:text-gray-400 font-medium">ONLINE</span>
               </div>
-              <ThemeToggle />
               {user && onLogout && (
                 <Button
                   variant="outline"
