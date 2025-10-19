@@ -15,7 +15,7 @@
   },
   "scripts": {
     "dev": "next dev -p 4000",
-    "build": "PLAYWRIGHT_BROWSERS_PATH=./playwright-browsers npx playwright install chromium && prisma generate && next build",
+    "build": "prisma generate && next build",
     "start": "next start -p 4000",
     "lint": "next lint",
     "lint:fix": "next lint --fix",

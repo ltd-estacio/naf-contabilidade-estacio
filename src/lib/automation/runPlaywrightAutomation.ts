@@ -1,6 +1,6 @@
 import type { Browser, BrowserContext, Page } from 'playwright'
 import { promises as fs } from 'fs'
-import path from 'path'
+import { createRequire } from 'module'
 import Papa from 'papaparse'
 
 export type AutomationSummary = {
@@ -195,55 +195,15 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
 
   try {
     if (runningOnServerless) {
-      log('☁️ Ambiente serverless detectado; preparando Chromium do Playwright')
-      const browsersRoot = process.env.PLAYWRIGHT_BROWSERS_PATH
-        ? path.resolve(process.cwd(), process.env.PLAYWRIGHT_BROWSERS_PATH)
-        : path.join(process.cwd(), 'playwright-browsers')
-
-      const chromiumCandidates: string[] = []
-
-      try {
-        const entries = await fs.readdir(browsersRoot)
-        for (const entry of entries) {
-          if (!entry.startsWith('chromium-')) continue
-          chromiumCandidates.push(path.join(browsersRoot, entry, 'chrome-linux', 'chrome'))
-        }
-      } catch (error) {
-        log(`⚠️ Diretório de navegadores não acessível (${browsersRoot}): ${(error as Error).message}`)
+      log('☁️ Ambiente serverless detectado; preparando Chromium otimizado para Lambda')
+      const require = createRequire(import.meta.url)
+      const playwrightAws = require('playwright-aws-lambda') as {
+        launchChromium: (options?: Record<string, unknown>) => Promise<Browser>
       }
 
-      const { chromium } = await import('playwright')
-      const fallbackExecutable = chromium.executablePath()
-      if (fallbackExecutable) {
-        chromiumCandidates.push(fallbackExecutable)
-      }
-
-      const executablePath = await (async () => {
-        for (const candidate of chromiumCandidates) {
-          try {
-            await fs.access(candidate)
-            log(`🔍 Executável Chromium encontrado: ${candidate}`)
-            return candidate
-          } catch {
-            log(`⚠️ Executável indisponível em ${candidate}`)
-          }
-        }
-        return ''
-      })()
-
-      if (!executablePath) {
-        raise(
-          'Executável do Chromium não localizado. Garanta que "PLAYWRIGHT_BROWSERS_PATH=./playwright-browsers npx playwright install chromium --target=linux" seja executado durante o build.',
-        )
-      }
-
-      process.env.PLAYWRIGHT_BROWSERS_PATH = browsersRoot
-
-      browser = await chromium.launch({
+      browser = await playwrightAws.launchChromium({
         headless: true,
-        executablePath,
-        args: [...LAMBDA_CHROMIUM_ARGS, '--single-process'],
-        ignoreHTTPSErrors: true,
+        args: [...LAMBDA_CHROMIUM_ARGS],
       })
     } else {
       const { chromium } = await import('playwright')

@@ -32,5 +32,4 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
-playwright-browsers/
 playwright-bin/

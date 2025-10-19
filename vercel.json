@@ -4,10 +4,10 @@
   "framework": "nextjs",
   "functions": {
     "app/api/automation/run/route.js": {
-      "includeFiles": "playwright-browsers/**"
+      "includeFiles": "node_modules/playwright-aws-lambda/dist/src/bin/**"
     },
     "app/api/automation/run/route.mjs": {
-      "includeFiles": "playwright-browsers/**"
+      "includeFiles": "node_modules/playwright-aws-lambda/dist/src/bin/**"
     }
   }
 }
