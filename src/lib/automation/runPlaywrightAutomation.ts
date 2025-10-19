@@ -1,4 +1,4 @@
-import { chromium, type Page } from 'playwright'
+import type { Browser, BrowserContext, Page } from 'playwright'
 import { promises as fs } from 'fs'
 import Papa from 'papaparse'
 
@@ -119,7 +119,7 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     throw new Error(`Erro ao interpretar CSV: ${errorMessages}`)
   }
 
-  const fields = parsed.meta.fields ?? []
+  const headers = (parsed.meta.fields ?? []) as string[]
   const rows = parsed.data.filter(row =>
     Object.values(row).some(value => value !== undefined && value !== null && `${value}`.trim().length > 0)
   )
@@ -131,14 +131,20 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
   summary.totalRows = rows.length
   log(`📑 Registros detectados: ${rows.length}`)
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  })
-
-  const context = await browser.newContext()
+  let browser: Browser | null = null
+  let context: BrowserContext | null = null
 
   try {
+    if (process.env.VERCEL || process.env.AWS_REGION || process.env.AWS_EXECUTION_ENV) {
+      const playwrightAws = await import('playwright-aws-lambda')
+      browser = await playwrightAws.launchChromium({ headless: true })
+    } else {
+      const { chromium } = await import('playwright')
+      browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+    }
+
+    context = await browser.newContext()
+
     for (let index = 0; index < rows.length; index++) {
       const record = rows[index]
       const humanIndex = index + 1
@@ -151,7 +157,7 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
         await page.waitForTimeout(1500)
         log('  • Formulário carregado')
 
-        const entries = fields.map(fieldName => [fieldName, record[fieldName]]) as Array<[string, unknown]>
+        const entries = headers.map(fieldName => [fieldName, record[fieldName]]) as Array<[string, unknown]>
         let filledCount = 0
 
         for (const [rawHeader, rawValue] of entries) {
@@ -200,8 +206,8 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
       }
     }
   } finally {
-    await context.close().catch(() => undefined)
-    await browser.close().catch(() => undefined)
+    await context?.close().catch(() => undefined)
+    await browser?.close().catch(() => undefined)
   }
 
   log('\n📊 Resumo da execução:')
