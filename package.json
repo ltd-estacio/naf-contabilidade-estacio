@@ -21,7 +21,7 @@
     "lint:fix": "next lint --fix",
     "export": "next build",
     "type-check": "tsc --noEmit",
-    "postinstall": "prisma generate",
+    "postinstall": "node scripts/ensure-playwright-browsers-json.js && prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx scripts/seed.ts",
