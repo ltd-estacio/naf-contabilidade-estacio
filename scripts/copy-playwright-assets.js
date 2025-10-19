@@ -12,13 +12,19 @@ function copyLambdaBin() {
     return
   }
 
-  const outDir = path.join(cwd, '.next', 'server', 'playwright-aws-lambda', 'bin')
+  const destinations = [
+    path.join(cwd, '.next', 'server', 'playwright-aws-lambda', 'bin'),
+    path.join(cwd, 'public', 'playwright-aws-lambda', 'bin'),
+  ]
+
   const files = fs.readdirSync(srcDir)
   for (const file of files) {
     const srcPath = path.join(srcDir, file)
-    const destPath = path.join(outDir, file)
-    ensureDirectory(destPath)
-    fs.copyFileSync(srcPath, destPath)
+    for (const destRoot of destinations) {
+      const destPath = path.join(destRoot, file)
+      ensureDirectory(destPath)
+      fs.copyFileSync(srcPath, destPath)
+    }
   }
 }
 

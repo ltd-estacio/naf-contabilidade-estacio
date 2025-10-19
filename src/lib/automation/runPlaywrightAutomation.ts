@@ -192,6 +192,7 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     const candidateDirs: string[] = [
       path.join(process.cwd(), 'node_modules', 'playwright-aws-lambda', 'dist', 'src', 'bin'),
       path.join(process.cwd(), '.next', 'server', 'playwright-aws-lambda', 'bin'),
+      path.join(process.cwd(), 'public', 'playwright-aws-lambda', 'bin'),
     ]
 
     try {

@@ -32,3 +32,4 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+public/playwright-aws-lambda/
