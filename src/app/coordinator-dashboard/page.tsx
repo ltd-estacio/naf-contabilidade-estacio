@@ -28,7 +28,6 @@ import {
   LogOut,
   MessageCircle,
   Award,
-  User,
   BookOpen,
   Database,
   ShieldCheck,
@@ -211,6 +210,14 @@ export default function CoordinatorDashboard() {
   const [automationMessage, setAutomationMessage] = useState('Selecione um arquivo CSV para iniciar a automação.')
   const automationFileInputRef = useRef<HTMLInputElement | null>(null)
   const [automationLogs, setAutomationLogs] = useState<string[]>([])
+  const [automationDialogOpen, setAutomationDialogOpen] = useState(false)
+  const automationLogContainerRef = useRef<HTMLDivElement | null>(null)
+  const automationStatusStyles: Record<'idle' | 'starting' | 'ready' | 'error', { label: string; badge: string }> = {
+    idle: { label: 'Aguardando', badge: 'bg-slate-100 text-slate-600' },
+    starting: { label: 'Preparando', badge: 'bg-amber-100 text-amber-700' },
+    ready: { label: 'Pronto', badge: 'bg-green-100 text-green-700' },
+    error: { label: 'Atenção', badge: 'bg-red-100 text-red-700' },
+  }
   const [selectedStudentPortalView, setSelectedStudentPortalView] = useState<string | null>(null)
   const [backupForm, setBackupForm] = useState<BackupFormState>({
     format: 'zip',
@@ -312,6 +319,13 @@ export default function CoordinatorDashboard() {
     }
   }, [user?.id])
 
+  useEffect(() => {
+    if (!automationDialogOpen) return
+    const container = automationLogContainerRef.current
+    if (!container) return
+    container.scrollTop = container.scrollHeight
+  }, [automationLogs, automationDialogOpen])
+
   // Função para tocar som de notificação (DESABILITADA)
   const playNotificationSound = () => {
     // Som desabilitado a pedido do usuário
@@ -387,6 +401,7 @@ export default function CoordinatorDashboard() {
       setAutomationStatus('error')
       setAutomationMessage('Selecione um arquivo CSV antes de iniciar a automação.')
       setAutomationLogs(prev => [...prev, '⚠️ Nenhum arquivo selecionado.'])
+      setAutomationDialogOpen(true)
       return
     }
 
@@ -395,12 +410,14 @@ export default function CoordinatorDashboard() {
       setAutomationStatus('error')
       setAutomationMessage('Selecione um formulário válido para continuar.')
       setAutomationLogs(prev => [...prev, '⚠️ Formulário inválido ou não selecionado.'])
+      setAutomationDialogOpen(true)
       return
     }
 
     setAutomationStatus('starting')
     setAutomationMessage('Inicializando rotina de automação em segundo plano...')
     setAutomationLogs(['🚀 Iniciando automação em background...', `• Formulário: ${form.name}`, `• Arquivo: ${automationFile.name}`])
+    setAutomationDialogOpen(true)
 
     const formData = new FormData()
     formData.append('formId', form.id)
@@ -2245,21 +2262,8 @@ export default function CoordinatorDashboard() {
                       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-semibold text-slate-700">Status da automação</span>
-                          <Badge
-                            className={`border-transparent ${
-                              automationStatus === 'starting'
-                                ? 'bg-amber-100 text-amber-700'
-                                : automationStatus === 'ready'
-                                  ? 'bg-green-100 text-green-700'
-                                  : automationStatus === 'error'
-                                    ? 'bg-red-100 text-red-700'
-                                    : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {automationStatus === 'starting' && 'Preparando'}
-                            {automationStatus === 'ready' && 'Pronto'}
-                            {automationStatus === 'error' && 'Atenção'}
-                            {automationStatus === 'idle' && 'Aguardando'}
+                          <Badge className={`border-transparent ${automationStatusStyles[automationStatus].badge}`}>
+                            {automationStatusStyles[automationStatus].label}
                           </Badge>
                         </div>
                         <p className="mt-2 text-xs text-slate-600">{automationMessage}</p>
@@ -2274,6 +2278,13 @@ export default function CoordinatorDashboard() {
                           <Button
                             size="sm"
                             variant="outline"
+                            onClick={() => setAutomationDialogOpen(true)}
+                          >
+                            Ver logs em tempo real
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             onClick={() => {
                               setAutomationFile(null)
                               setAutomationPreview([])
@@ -2908,6 +2919,56 @@ export default function CoordinatorDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={automationDialogOpen} onOpenChange={setAutomationDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Monitoramento da automação</DialogTitle>
+            <DialogDescription>
+              Acompanhe em tempo real os registros enviados para o Microsoft Forms.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="font-semibold text-slate-600">Status atual</span>
+              <Badge className={`border-transparent ${automationStatusStyles[automationStatus].badge}`}>
+                {automationStatusStyles[automationStatus].label}
+              </Badge>
+            </div>
+            <p className="text-xs text-slate-500">
+              {automationMessage}
+            </p>
+            <div
+              ref={automationLogContainerRef}
+              className="max-h-[420px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-950/5 p-4 font-mono text-[11px] text-slate-600 shadow-inner"
+            >
+              {automationLogs.length === 0 ? (
+                <div className="text-center text-slate-400">Nenhum log disponível ainda.</div>
+              ) : (
+                automationLogs.map((line, index) => (
+                  <div
+                    key={`${line}-${index}`}
+                    className="whitespace-pre-wrap border-b border-slate-200/70 py-1 last:border-none"
+                  >
+                    {line}
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+              <span>Esta janela é atualizada automaticamente enquanto a automação estiver em execução.</span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={automationLogs.length === 0}
+                onClick={() => setAutomationLogs([])}
+              >
+                Limpar logs
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <NAFFooter />
 

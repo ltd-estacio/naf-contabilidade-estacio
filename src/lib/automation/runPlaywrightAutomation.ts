@@ -134,12 +134,46 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
   let browser: Browser | null = null
   let context: BrowserContext | null = null
 
+  const runningOnServerless = Boolean(
+    process.env.VERCEL || process.env.AWS_REGION || process.env.AWS_EXECUTION_ENV,
+  )
+
+  const ensureLambdaHints = () => {
+    if (process.env.IS_LOCAL !== undefined) return
+    if (
+      !process.env.AWS_LAMBDA_FUNCTION_NAME &&
+      !process.env.FUNCTION_NAME &&
+      !process.env.FUNCTION_TARGET
+    ) {
+      process.env.AWS_LAMBDA_FUNCTION_NAME = 'naf-automation-runner'
+    }
+    process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '0'
+  }
+
   try {
-    if (process.env.VERCEL || process.env.AWS_REGION || process.env.AWS_EXECUTION_ENV) {
-      const playwrightAws = await import('playwright-aws-lambda')
-      browser = await playwrightAws.launchChromium({ headless: true })
-    } else {
+    if (runningOnServerless) {
+      try {
+        ensureLambdaHints()
+        const playwrightAwsModule = await import('playwright-aws-lambda')
+        const launchChromium =
+          (playwrightAwsModule as { launchChromium?: () => Promise<Browser> }).launchChromium ??
+          (playwrightAwsModule as { default?: { launchChromium?: () => Promise<Browser> } }).default
+            ?.launchChromium
+
+        if (!launchChromium) {
+          throw new Error('Função launchChromium não encontrada no pacote playwright-aws-lambda')
+        }
+
+        log('☁️ Ambiente serverless detectado; iniciando Chromium otimizado para Lambda')
+        browser = await launchChromium()
+      } catch (lambdaError) {
+        log(`⚠️ Falha ao iniciar Chromium otimizado: ${(lambdaError as Error).message}`)
+      }
+    }
+
+    if (!browser) {
       const { chromium } = await import('playwright')
+      log('🖥️ Utilizando Chromium fornecido pelo Playwright padrão')
       browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
     }
 

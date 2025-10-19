@@ -8,7 +8,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ['bcryptjs']
+    serverComponentsExternalPackages: ['bcryptjs', 'playwright-aws-lambda', 'playwright-core', 'lambdafs']
   },
   images: {
     domains: ['localhost', 'naf-contabil.netlify.app'],
