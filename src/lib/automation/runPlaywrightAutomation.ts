@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext, Page } from 'playwright'
+import type { Browser, BrowserContext, Page } from 'playwright-core'
 import { promises as fs } from 'fs'
 import { createRequire } from 'module'
 import Papa from 'papaparse'
@@ -229,7 +229,7 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
         raise(`Falha ao iniciar Chromium otimizado: ${(error as Error).message}`)
       }
     } else {
-      const { chromium } = await import('playwright')
+      const { chromium } = await import('playwright-core')
       log('🖥️ Executando automação com Chromium local do Playwright')
       browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
     }
