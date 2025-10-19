@@ -185,15 +185,22 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     '--use-mock-keychain',
   ]
 
-  const nodeRequire = createRequire(import.meta.url)
-
   const launchServerlessChromium = async (log: (message: string) => void): Promise<Browser> => {
     const { inflate } = (await import('lambdafs')) as { inflate: (archivePath: string) => Promise<string> }
     const { chromium } = await import('playwright')
-    const candidateDirs = [
+    const nodeRequire = createRequire(import.meta.url)
+    const candidateDirs: string[] = [
       path.join(process.cwd(), 'node_modules', 'playwright-aws-lambda', 'dist', 'src', 'bin'),
-      path.join(path.dirname(nodeRequire.resolve('playwright-aws-lambda/package.json')), 'dist', 'src', 'bin'),
     ]
+
+    try {
+      const resolved = nodeRequire.resolve('playwright-aws-lambda/package.json')
+      if (typeof resolved === 'string') {
+        candidateDirs.push(path.join(path.dirname(resolved), 'dist', 'src', 'bin'))
+      }
+    } catch {
+      // ignore, fallback to process cwd
+    }
 
     let binBase: string | null = null
     for (const candidate of candidateDirs) {
