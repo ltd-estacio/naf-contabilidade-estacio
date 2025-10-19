@@ -188,9 +188,21 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
   ]
 
   const launchServerlessChromium = async (log: (message: string) => void): Promise<Browser> => {
-    const { inflate } = (await import('lambdafs')) as { inflate: (archivePath: string) => Promise<string> }
-    const { chromium } = await import('playwright')
     const nodeRequire = createRequire(import.meta.url)
+
+    const lambdaFsModule = nodeRequire('lambdafs') as {
+      inflate?: (archivePath: string) => Promise<string>
+      default?: { inflate?: (archivePath: string) => Promise<string> }
+    }
+
+    const inflate: (archivePath: string) => Promise<string> =
+      lambdaFsModule.inflate?.bind(lambdaFsModule) ??
+      lambdaFsModule.default?.inflate?.bind(lambdaFsModule.default) ??
+      (async () => {
+        raise('Função lambdafs.inflate não está disponível no ambiente de execução.')
+      })
+
+    const { chromium } = await import('playwright')
     const candidateDirs: string[] = [
       path.join(process.cwd(), 'node_modules', 'playwright-aws-lambda', 'dist', 'src', 'bin'),
       path.join(process.cwd(), '.next', 'server', 'playwright-aws-lambda', 'bin'),
