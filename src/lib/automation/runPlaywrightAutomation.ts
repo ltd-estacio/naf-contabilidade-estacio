@@ -15,6 +15,8 @@ export type AutomationResult = {
   summary: AutomationSummary
 }
 
+type AutomationError = Error & { logs?: string[] }
+
 type AutomationFormConfig = {
   id: string
   url: string
@@ -220,7 +222,7 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     }
 
     if (!binBase) {
-      throw new Error(`Arquivos compactados do Chromium não foram encontrados. Diretórios analisados: ${candidateDirs.join(', ')}`)
+      raise(`Arquivos compactados do Chromium não foram encontrados. Diretórios analisados: ${candidateDirs.join(', ')}`)
     }
 
     const inflateArchive = async (fileName: string) => {
@@ -247,7 +249,7 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     await inflateArchive('aws.tar.br')
 
     if (!chromiumPath) {
-      throw new Error(`Chromium compactado não pôde ser preparado. Fonte considerada: ${binBase}`)
+      raise(`Chromium compactado não pôde ser preparado. Fonte considerada: ${binBase}`)
     }
 
     if (!process.env.FONTCONFIG_PATH) {
@@ -267,6 +269,13 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
       headless: true,
       ignoreHTTPSErrors: true,
     })
+  }
+
+  const raise = (message: string): never => {
+    log(`❌ ${message}`)
+    const error = new Error(message) as AutomationError
+    error.logs = [...logs]
+    throw error
   }
 
   try {
@@ -341,6 +350,13 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
         await page.close().catch(() => undefined)
       }
     }
+  } catch (error) {
+    const automationError = error as AutomationError
+    if (!automationError.logs) {
+      log(`❌ Erro inesperado: ${automationError.message}`)
+      automationError.logs = [...logs]
+    }
+    throw automationError
   } finally {
     await context?.close().catch(() => undefined)
     await browser?.close().catch(() => undefined)

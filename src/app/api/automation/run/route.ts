@@ -4,6 +4,8 @@ import os from 'os'
 import path from 'path'
 import { runPlaywrightAutomation } from '@/lib/automation/runPlaywrightAutomation'
 
+type AutomationError = Error & { logs?: string[] }
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +46,15 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Erro na automação:', error)
-    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
+    const automationError = error as AutomationError
+    return NextResponse.json(
+      {
+        success: false,
+        error: automationError.message,
+        logs: automationError.logs ?? [],
+      },
+      { status: 500 },
+    )
   } finally {
     if (tmpDir) {
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
