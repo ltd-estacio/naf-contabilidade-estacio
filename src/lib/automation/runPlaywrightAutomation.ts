@@ -212,14 +212,19 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
       ensureLambdaHints()
       const require = createRequire(import.meta.url)
       try {
-        const playwrightAws = require('playwright-aws-lambda') as {
-          launchChromium: (options?: Record<string, unknown>) => Promise<Browser>
+        const playwrightAwsModule = require('playwright-aws-lambda') as {
+          launchChromium?: (options?: Record<string, unknown>) => Promise<Browser>
+          default?: { launchChromium?: (options?: Record<string, unknown>) => Promise<Browser> }
         }
 
-        browser = await playwrightAws.launchChromium({
-          headless: true,
-          args: [...LAMBDA_CHROMIUM_ARGS],
-        })
+        const launchChromium =
+          playwrightAwsModule.launchChromium ?? playwrightAwsModule.default?.launchChromium
+
+        if (!launchChromium) {
+          raise('Pacote playwright-aws-lambda não expôs a função launchChromium esperada.')
+        }
+
+        browser = await launchChromium({ headless: true })
       } catch (error) {
         raise(`Falha ao iniciar Chromium otimizado: ${(error as Error).message}`)
       }
