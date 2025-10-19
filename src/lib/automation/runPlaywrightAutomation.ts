@@ -1,7 +1,5 @@
 import type { Browser, BrowserContext, Page } from 'playwright'
 import { promises as fs } from 'fs'
-import path from 'path'
-import { createRequire } from 'module'
 import Papa from 'papaparse'
 
 export type AutomationSummary = {
@@ -187,102 +185,6 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     '--use-mock-keychain',
   ]
 
-  const launchServerlessChromium = async (log: (message: string) => void): Promise<Browser> => {
-    const nodeRequire = createRequire(import.meta.url)
-
-    const lambdaFsModule = nodeRequire('lambdafs') as {
-      inflate?: (archivePath: string) => Promise<string>
-      default?: { inflate?: (archivePath: string) => Promise<string> }
-    }
-
-    const inflate: (archivePath: string) => Promise<string> =
-      lambdaFsModule.inflate?.bind(lambdaFsModule) ??
-      lambdaFsModule.default?.inflate?.bind(lambdaFsModule.default) ??
-      (async () => {
-        raise('Função lambdafs.inflate não está disponível no ambiente de execução.')
-      })
-
-    const { chromium } = await import('playwright')
-    const candidateDirs: string[] = [
-      path.join(process.cwd(), 'node_modules', 'playwright-aws-lambda', 'dist', 'src', 'bin'),
-      path.join(process.cwd(), '.next', 'server', 'playwright-aws-lambda', 'bin'),
-      path.join(process.cwd(), 'public', 'playwright-aws-lambda', 'bin'),
-    ]
-
-    try {
-      const resolved = nodeRequire.resolve('playwright-aws-lambda/package.json')
-      if (typeof resolved === 'string') {
-        candidateDirs.push(path.join(path.dirname(resolved), 'dist', 'src', 'bin'))
-      }
-    } catch {
-      // ignore, fallback to process cwd
-    }
-
-    log(`🔍 Procurando binários do Chromium em: ${candidateDirs.join(', ')}`)
-
-    let binBase: string | null = null
-    for (const candidate of candidateDirs) {
-      try {
-        await fs.access(candidate)
-        const contents = await fs.readdir(candidate)
-        log(`📦 Conteúdo disponível em ${candidate}: ${contents.join(', ') || '—'}`)
-        binBase = candidate
-        break
-      } catch (error) {
-        log(`⚠️ Diretório indisponível: ${candidate} (${(error as Error).message})`)
-      }
-    }
-
-    if (!binBase) {
-      raise(`Arquivos compactados do Chromium não foram encontrados. Diretórios analisados: ${candidateDirs.join(', ')}`)
-    }
-
-    const inflateArchive = async (fileName: string) => {
-      const archivePath = path.join(binBase!, fileName)
-      try {
-        await fs.access(archivePath)
-      } catch (missingError) {
-        log(`⚠️ Arquivo ${fileName} não encontrado em ${binBase}: ${(missingError as Error).message}`)
-        return null
-      }
-
-      try {
-        const result = await inflate(archivePath)
-        log(`📂 ${fileName} extraído para ${result}`)
-        return result
-      } catch (error) {
-        log(`⚠️ Falha ao extrair ${fileName}: ${(error as Error).message}`)
-        return null
-      }
-    }
-
-    const chromiumPath = await inflateArchive('chromium.br')
-    await inflateArchive('swiftshader.tar.br')
-    await inflateArchive('aws.tar.br')
-
-    if (!chromiumPath) {
-      raise(`Chromium compactado não pôde ser preparado. Fonte considerada: ${binBase}`)
-    }
-
-    if (!process.env.FONTCONFIG_PATH) {
-      process.env.FONTCONFIG_PATH = '/tmp/aws'
-    }
-    if (!process.env.LD_LIBRARY_PATH?.includes('/tmp/aws/lib')) {
-      const current = process.env.LD_LIBRARY_PATH ? `${process.env.LD_LIBRARY_PATH}` : ''
-      process.env.LD_LIBRARY_PATH = ['/tmp/aws/lib', current].filter(Boolean).join(':')
-    }
-    process.env.PLAYWRIGHT_BROWSERS_PATH = '0'
-
-    const launchArgs = [...LAMBDA_CHROMIUM_ARGS, '--single-process']
-
-    return chromium.launch({
-      args: launchArgs,
-      executablePath: chromiumPath,
-      headless: true,
-      ignoreHTTPSErrors: true,
-    })
-  }
-
   const raise = (message: string): never => {
     log(`❌ ${message}`)
     const error = new Error(message) as AutomationError
@@ -292,8 +194,20 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
 
   try {
     if (runningOnServerless) {
-      log('☁️ Ambiente serverless detectado; preparando Chromium otimizado')
-      browser = await launchServerlessChromium(log)
+      log('☁️ Ambiente serverless detectado; preparando Chromium do Playwright')
+      const { chromium } = await import('playwright')
+      process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '0'
+      const executablePath = chromium.executablePath()
+      if (!executablePath) {
+        raise('Executável do Chromium não localizado. Garanta que "npx playwright install chromium --with-deps" seja executado durante o build.')
+      }
+      log(`🔍 Executável Chromium detectado em: ${executablePath}`)
+      browser = await chromium.launch({
+        headless: true,
+        executablePath,
+        args: [...LAMBDA_CHROMIUM_ARGS, '--single-process'],
+        ignoreHTTPSErrors: true,
+      })
     } else {
       const { chromium } = await import('playwright')
       log('🖥️ Executando automação com Chromium local do Playwright')
