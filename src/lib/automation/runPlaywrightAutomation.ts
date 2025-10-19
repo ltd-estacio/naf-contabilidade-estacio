@@ -1,5 +1,6 @@
 import type { Browser, BrowserContext, Page } from 'playwright'
 import { promises as fs } from 'fs'
+import path from 'path'
 import Papa from 'papaparse'
 
 export type AutomationSummary = {
@@ -195,13 +196,36 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
   try {
     if (runningOnServerless) {
       log('☁️ Ambiente serverless detectado; preparando Chromium do Playwright')
-      const { chromium } = await import('playwright')
       process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '0'
-      const executablePath = chromium.executablePath()
-      if (!executablePath) {
-        raise('Executável do Chromium não localizado. Garanta que "npx playwright install chromium --with-deps" seja executado durante o build.')
+
+      const { chromium } = await import('playwright')
+      const localBrowsersDir = path.join(process.cwd(), 'node_modules', 'playwright-core', '.local-browsers')
+      let executablePath = ''
+
+      try {
+        const entries = await fs.readdir(localBrowsersDir)
+        const chromiumDir = entries.find(entry => entry.startsWith('chromium-'))
+        if (chromiumDir) {
+          executablePath = path.join(localBrowsersDir, chromiumDir, 'chrome-linux', 'chrome')
+          log(`🔍 Executável Chromium localizado em bundle: ${executablePath}`)
+        }
+      } catch (error) {
+        log(`⚠️ Não foi possível inspecionar .local-browsers: ${(error as Error).message}`)
       }
-      log(`🔍 Executável Chromium detectado em: ${executablePath}`)
+
+      if (!executablePath) {
+        executablePath = chromium.executablePath()
+        log(`🔍 Executável Chromium informado pelo Playwright: ${executablePath}`)
+      }
+
+      try {
+        await fs.access(executablePath)
+      } catch (error) {
+        raise(
+          `Executável do Chromium não localizado em ${executablePath}. Garanta que "npx playwright install chromium" seja executado durante o build e que .local-browsers esteja incluído no deploy.`,
+        )
+      }
+
       browser = await chromium.launch({
         headless: true,
         executablePath,
