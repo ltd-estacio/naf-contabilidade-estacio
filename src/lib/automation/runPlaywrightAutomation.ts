@@ -187,27 +187,29 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
   const launchServerlessChromium = async (log: (message: string) => void): Promise<Browser> => {
     const { inflate } = (await import('lambdafs')) as { inflate: (archivePath: string) => Promise<string> }
     const { chromium } = await import('playwright')
+    const { createRequire } = await import('module')
+    const require = createRequire(import.meta.url)
 
-    const binBase = path.join(process.cwd(), 'node_modules', 'playwright-aws-lambda', 'dist', 'src', 'bin')
-    try {
-      await fs.access(binBase)
-    } catch {
-      throw new Error('Arquivos compactados do Chromium não foram encontrados no deploy.')
+    const archivePaths = {
+      chromium: require.resolve('playwright-aws-lambda/dist/src/bin/chromium.br'),
+      swiftshader: require.resolve('playwright-aws-lambda/dist/src/bin/swiftshader.tar.br'),
+      aws: require.resolve('playwright-aws-lambda/dist/src/bin/aws.tar.br'),
     }
-    const inflateArchive = async (fileName: string) => {
-      const archivePath = path.join(binBase, fileName)
+
+    const inflateArchive = async (label: keyof typeof archivePaths) => {
+      const archivePath = archivePaths[label]
       try {
         return await inflate(archivePath)
       } catch (error) {
-        log(`⚠️ Falha ao extrair ${fileName}: ${(error as Error).message}`)
+        log(`⚠️ Falha ao extrair ${path.basename(archivePath)}: ${(error as Error).message}`)
         return null
       }
     }
 
     const [chromiumPath] = await Promise.all([
-      inflateArchive('chromium.br'),
-      inflateArchive('swiftshader.tar.br'),
-      inflateArchive('aws.tar.br'),
+      inflateArchive('chromium'),
+      inflateArchive('swiftshader'),
+      inflateArchive('aws'),
     ])
 
     if (!chromiumPath) {
