@@ -12,10 +12,16 @@ function copyLambdaBin() {
     return
   }
 
-  const destinations = [
-    path.join(cwd, '.next', 'server', 'playwright-aws-lambda', 'bin'),
-    path.join(cwd, 'public', 'playwright-aws-lambda', 'bin'),
-  ]
+  const args = new Set(process.argv.slice(2))
+  const destinations = []
+
+  if (args.size === 0 || args.has('pre')) {
+    destinations.push(path.join(cwd, 'public', 'playwright-aws-lambda', 'bin'))
+  }
+
+  if (args.size === 0 || args.has('post')) {
+    destinations.push(path.join(cwd, '.next', 'server', 'playwright-aws-lambda', 'bin'))
+  }
 
   const files = fs.readdirSync(srcDir)
   for (const file of files) {

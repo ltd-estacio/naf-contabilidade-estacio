@@ -11,7 +11,8 @@ const nextConfig = {
     serverComponentsExternalPackages: ['bcryptjs', 'playwright-aws-lambda', 'playwright-core', 'lambdafs'],
     outputFileTracingIncludes: {
       'app/api/automation/run/route': [
-        './node_modules/playwright-aws-lambda/dist/src/bin/**'
+        './node_modules/playwright-aws-lambda/dist/src/bin/**',
+        './public/playwright-aws-lambda/bin/**'
       ]
     }
   },
