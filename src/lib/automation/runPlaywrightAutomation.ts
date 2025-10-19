@@ -204,39 +204,50 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
       // ignore, fallback to process cwd
     }
 
+    log(`🔍 Procurando binários do Chromium em: ${candidateDirs.join(', ')}`)
+
     let binBase: string | null = null
     for (const candidate of candidateDirs) {
       try {
         await fs.access(candidate)
+        const contents = await fs.readdir(candidate)
+        log(`📦 Conteúdo disponível em ${candidate}: ${contents.join(', ') || '—'}`)
         binBase = candidate
         break
-      } catch {
-        continue
+      } catch (error) {
+        log(`⚠️ Diretório indisponível: ${candidate} (${(error as Error).message})`)
       }
     }
 
     if (!binBase) {
-      throw new Error('Arquivos compactados do Chromium não foram encontrados no deploy.')
+      throw new Error(`Arquivos compactados do Chromium não foram encontrados. Diretórios analisados: ${candidateDirs.join(', ')}`)
     }
 
     const inflateArchive = async (fileName: string) => {
-      const archivePath = path.join(binBase, fileName)
+      const archivePath = path.join(binBase!, fileName)
       try {
-        return await inflate(archivePath)
+        await fs.access(archivePath)
+      } catch (missingError) {
+        log(`⚠️ Arquivo ${fileName} não encontrado em ${binBase}: ${(missingError as Error).message}`)
+        return null
+      }
+
+      try {
+        const result = await inflate(archivePath)
+        log(`📂 ${fileName} extraído para ${result}`)
+        return result
       } catch (error) {
         log(`⚠️ Falha ao extrair ${fileName}: ${(error as Error).message}`)
         return null
       }
     }
 
-    const [chromiumPath] = await Promise.all([
-      inflateArchive('chromium.br'),
-      inflateArchive('swiftshader.tar.br'),
-      inflateArchive('aws.tar.br'),
-    ])
+    const chromiumPath = await inflateArchive('chromium.br')
+    await inflateArchive('swiftshader.tar.br')
+    await inflateArchive('aws.tar.br')
 
     if (!chromiumPath) {
-      throw new Error('Chromium compactado não pôde ser preparado.')
+      throw new Error(`Chromium compactado não pôde ser preparado. Fonte considerada: ${binBase}`)
     }
 
     if (!process.env.FONTCONFIG_PATH) {
