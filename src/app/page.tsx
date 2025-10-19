@@ -139,17 +139,29 @@ export default async function Home() {
               </Button>
             </Link>
             <Link href="/eligibility">
-              <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white">
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full sm:w-auto bg-white text-gray-900 border border-gray-200 hover:bg-gray-100"
+              >
                 Verificar Elegibilidade
               </Button>
             </Link>
             <Link href="/faq">
-              <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white">
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full sm:w-auto bg-white text-gray-900 border border-gray-200 hover:bg-gray-100"
+              >
                 Perguntas Frequentes
               </Button>
             </Link>
             <Link href="/about-naf">
-              <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white">
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full sm:w-auto bg-white text-gray-900 border border-gray-200 hover:bg-gray-100"
+              >
                 Sobre o NAF Estácio
               </Button>
             </Link>
