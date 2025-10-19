@@ -610,8 +610,11 @@ export default function StudentPortal() {
       setAiMessages((prev) => [...prev, { role: 'assistant', content: answer, ts: Date.now() }])
     } catch (e: unknown) {
       console.error('AI error', e)
-      const detail = (e?.message || '').slice(0, 220)
-      setAiMessages((prev) => [...prev, { role: 'assistant', content: `❌ Ocorreu um erro ao consultar a IA. Verifique a conexão e a variável .env (GEMINI_API_KEY).\n\nDetalhe: ${detail}`, ts: Date.now() }])
+      const detail = (e as Error)?.message?.slice(0, 220)
+      const friendly = detail
+        ? `❌ Não consegui falar com a IA agora. Mensagem técnica: ${detail}.`
+        : '❌ Não consegui falar com a IA agora. Tente novamente em instantes ou peça ajuda a um coordenador.'
+      setAiMessages((prev) => [...prev, { role: 'assistant', content: friendly, ts: Date.now() }])
     } finally {
       setAiLoading(false)
     }

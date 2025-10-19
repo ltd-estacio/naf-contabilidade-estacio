@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const GEMINI_API_KEY = 'AIzaSyCRfarEDTrIlXNPdonkf-KNAU414KrGnEQ'
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+const GEMINI_API_KEY =
+  process.env.GEMINI_API_KEY ||
+  process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+  process.env.GOOGLE_API_KEY ||
+  process.env.NEXT_PUBLIC_GOOGLE_API_KEY ||
+  process.env.GOOGLE_GEMINI_API_KEY ||
+  ''
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+const GEMINI_API_URL =
+  process.env.GEMINI_API_URL ||
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
 export const dynamic = 'force-dynamic'
 
@@ -69,7 +79,11 @@ export async function POST(request: NextRequest) {
     Responda de forma útil e precisa, usando markdown quando apropriado. Se a pergunta não for relacionada aos serviços do NAF, redirecione educadamente para temas fiscais e contábeis.
     `
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY ausente no ambiente')
+    }
+
+    const response = await fetch(`${GEMINI_API_URL}${GEMINI_API_URL.includes('?') ? '&' : '?'}key=${encodeURIComponent(GEMINI_API_KEY)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -108,7 +122,11 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`)
+      const errorText = await response.text().catch(() => '')
+      const enrichedError = new Error(`Gemini API error: ${response.status}`)
+      ;(enrichedError as Record<string, unknown>).status = response.status
+      ;(enrichedError as Record<string, unknown>).body = errorText
+      throw enrichedError
     }
 
     const geminiData = await response.json()
@@ -127,20 +145,34 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Erro na API do Gemini:', error)
 
-    // Fallback inteligente baseado na mensagem
-    const aiResponse = generateFallbackResponse(message)
+    let diagnostic = ''
+    if (error instanceof Error) {
+      diagnostic = error.message
+      const status = (error as Record<string, unknown>).status as number | undefined
+      const body = (error as Record<string, unknown>).body as string | undefined
+      if (status === 403) {
+        diagnostic = 'A chave da API Gemini foi rejeitada. Verifique se a conta possui acesso ativo e substitua a variável GEMINI_API_KEY.'
+      } else if (status === 401) {
+        diagnostic = 'Credenciais inválidas para o serviço de IA. Atualize a GEMINI_API_KEY.'
+      } else if (body) {
+        diagnostic += ` | Detalhes: ${body}`
+      }
+    }
+
+    const aiResponse = generateFallbackResponse(message || '')
 
     return NextResponse.json({
       response: aiResponse,
       timestamp: new Date().toISOString(),
-      fallback: true
+      fallback: true,
+      detail: diagnostic
     })
   }
 }
 
 // Função para gerar respostas de fallback inteligentes
 function generateFallbackResponse(message: string): string {
-  const messageContent = message.toLowerCase()
+  const messageContent = (message || '').toLowerCase()
 
   // Respostas para CNPJ - verificar primeiro para evitar conflito com IR
   if (messageContent.includes('cnpj') || messageContent.includes('empresa') || messageContent.includes('abrir')) {

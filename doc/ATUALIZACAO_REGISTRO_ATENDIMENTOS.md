@@ -20,6 +20,9 @@ Implementamos um sistema de registro contínuo para os atendimentos fiscais, per
 - **Gerador de Relatórios Avançado**:
   - relatórios passaram a incluir o “Registro do Atendimento” (notas lançadas em tempo real) junto às seções de atendimentos fiscais;
   - interface de configuração consolidada em uma única aba, facilitando a geração rápida ou customizada no mesmo fluxo.
+- **Assistente IA**:
+  - o chat passa a usar a chave `GEMINI_API_KEY` definida no ambiente (sem valores embutidos no código);
+  - em caso de falha ou chave suspensa, o sistema registra o fallback e mantém a conversa ativa sem interromper o atendimento.
 
 ### Fluxo recomendado para estudantes
 1. Abra o atendimento fiscal e confirme os dados.<br>

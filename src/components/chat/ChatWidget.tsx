@@ -493,14 +493,16 @@ Estou online e pronto para ajudar! Como posso auxiliá-lo(a) hoje? 😊`,
       })
 
       if (!aiResponse.ok) {
-        throw new Error(`HTTP error! status: ${aiResponse.status}`)
+        const payload = await aiResponse.json().catch(() => ({})) as { detail?: string; message?: string }
+        const detail = payload.detail || payload.message || `HTTP ${aiResponse.status}`
+        throw new Error(detail)
       }
 
-      const aiData = await aiResponse.json()
+      const aiData = await aiResponse.json() as { response?: string; fallback?: boolean; detail?: string }
 
       const assistantMessage: Message = {
         id: generateId(),
-        content: aiData.response,
+        content: aiData.response || 'Não foi possível gerar uma resposta automática no momento. Nossa equipe foi notificada.',
         sender_type: 'assistant',
         sender_name: 'Assistente NAF',
         is_ai_response: true,
@@ -528,6 +530,13 @@ Estou online e pronto para ajudar! Como posso auxiliá-lo(a) hoje? 😊`,
           is_ai_response: true
         })
       })
+
+      if (aiData.fallback) {
+        setAIFallback(true)
+        if (aiData.detail) {
+          console.warn('Fallback IA:', aiData.detail)
+        }
+      }
 
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error)
