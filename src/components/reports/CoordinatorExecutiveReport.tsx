@@ -163,7 +163,7 @@ const formatPercentage = (value: number) => `${(Math.round(value * 10) / 10).toF
 
 const CoordinatorExecutiveReport: React.FC = () => {
   const [filters, setFilters] = useState({
-    period: '90d',
+    period: 'all',
     status: 'all',
     service: 'all',
     student: 'all'

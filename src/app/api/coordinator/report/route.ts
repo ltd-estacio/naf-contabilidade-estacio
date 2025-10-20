@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const format = (searchParams.get('format') || 'pdf').toLowerCase()
-    const period = (searchParams.get('period') || '90d').toLowerCase()
+    const period = (searchParams.get('period') || 'all').toLowerCase()
     const statusFilterParam = (searchParams.get('status') || 'all').toUpperCase()
     const categoryFilterParam = searchParams.get('category') || 'all'
     const studentFilterParam = searchParams.get('studentId') || searchParams.get('student') || ''

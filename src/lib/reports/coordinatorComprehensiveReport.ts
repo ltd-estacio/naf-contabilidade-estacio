@@ -182,7 +182,7 @@ export async function buildCoordinatorComprehensiveReport(
   const hasServiceKey = !!(process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY.trim())
   const client = clientOverride ?? (hasServiceKey ? supabaseAdmin : supabase)
 
-  const period = filters.period ?? '90d'
+  const period = filters.period ?? 'all'
   let startDateISO: string | undefined
   let endDateISO: string | undefined
 
@@ -222,6 +222,19 @@ export async function buildCoordinatorComprehensiveReport(
     client.from('students').select('*'),
     client.from('naf_services').select('*'),
   ])
+
+  if (attendancesResult.error) {
+    throw new Error(`Erro ao carregar atendimentos: ${attendancesResult.error.message}`)
+  }
+  if (fiscalAppointmentsResult.error) {
+    throw new Error(`Erro ao carregar atendimentos fiscais: ${fiscalAppointmentsResult.error.message}`)
+  }
+  if (studentsResult.error) {
+    throw new Error(`Erro ao carregar estudantes: ${studentsResult.error.message}`)
+  }
+  if (servicesResult.error) {
+    throw new Error(`Erro ao carregar serviços: ${servicesResult.error.message}`)
+  }
 
   const attendances = attendancesResult.data ?? []
   const fiscalAppointments = fiscalAppointmentsResult.data ?? []
