@@ -6,7 +6,7 @@ export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const period = searchParams.get('period') ?? '90d'
+  const period = searchParams.get('period') ?? 'all'
   const statusFilter = searchParams.get('status') ?? ''
   const serviceFilter = searchParams.get('serviceType') ?? ''
   const studentFilter = searchParams.get('studentId') ?? ''
