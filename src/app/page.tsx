@@ -285,22 +285,25 @@ export default async function Home() {
       </section>
 
       {/* Contact Section */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-[#2563eb]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               Entre em Contato
             </h2>
-            <p className="text-xl text-slate-600">
+            <p className="text-xl text-blue-100">
               Estamos aqui para ajudar com seus problemas contábeis e fiscais
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {contactInfo.map((contact, index) => (
-              <Card key={index} className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 text-center">
+              <Card
+                key={index}
+                className="bg-white text-center shadow-lg border-0 rounded-2xl hover:-translate-y-1 transition-transform duration-200"
+              >
                 <CardHeader>
-                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                     <contact.icon className="h-6 w-6" />
                   </div>
                   <CardTitle className="text-lg mb-2 text-slate-900">{contact.label}</CardTitle>
@@ -314,7 +317,10 @@ export default async function Home() {
 
           <div className="text-center mt-12">
             <Link href="/naf-scheduling">
-              <Button size="lg" className="bg-black text-white hover:bg-gray-900 border border-transparent">
+              <Button
+                size="lg"
+                className="bg-white text-slate-900 hover:bg-blue-50 border border-blue-100 shadow-md"
+              >
                 <Calendar className="mr-2 h-5 w-5" />
                 Agendar Atendimento
               </Button>
