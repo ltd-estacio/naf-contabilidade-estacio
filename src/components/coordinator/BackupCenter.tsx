@@ -446,108 +446,203 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
 
         {/* ABA: Gerar Backup */}
         <TabsContent value="backup" className="space-y-6">
-          <Card>
-            <CardHeader>
+          {/* Card de Filtros */}
+          <Card className="border-2 border-blue-100 dark:border-blue-900">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Filter className="h-5 w-5" />
-                    Filtros de Exportação
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <div className="p-2 bg-blue-600 rounded-lg">
+                      <Filter className="h-5 w-5 text-white" />
+                    </div>
+                    Configurar Exportação
                   </CardTitle>
-                  <CardDescription>Configure os filtros para o backup dos atendimentos</CardDescription>
+                  <CardDescription className="text-base">
+                    Personalize os filtros e formato para gerar seu backup
+                  </CardDescription>
                 </div>
                 <Button
                   onClick={applyDefaultConfig}
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 border-blue-300 hover:bg-blue-50"
                 >
                   <Settings className="h-4 w-4" />
-                  Aplicar Config. Padrão
+                  Aplicar Padrão
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Formato de Exportação */}
-              <div className="space-y-2">
-                <Label htmlFor="format">Formato de Exportação</Label>
-                <Select value={format} onValueChange={setFormat}>
-                  <SelectTrigger id="format">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="csv">
-                      <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="h-4 w-4" />
-                        CSV (Recomendado)
+            
+            <CardContent className="pt-6 space-y-8">
+              {/* Formato de Exportação - Destaque especial */}
+              <div className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 rounded-xl border-2 border-purple-200 dark:border-purple-800">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-purple-600 rounded-lg">
+                    <FileArchive className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <Label htmlFor="format" className="text-lg font-semibold">Formato de Exportação</Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Escolha o formato que melhor se adapta às suas necessidades
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  {[
+                    { value: 'csv', icon: FileSpreadsheet, label: 'CSV', desc: 'Excel/Planilhas' },
+                    { value: 'json', icon: FileJson, label: 'JSON', desc: 'APIs/Sistemas' },
+                    { value: 'excel', icon: FileSpreadsheet, label: 'Excel', desc: 'Microsoft' },
+                    { value: 'txt', icon: FileType, label: 'TXT', desc: 'Texto Simples' }
+                  ].map(({ value, icon: Icon, label, desc }) => (
+                    <div
+                      key={value}
+                      onClick={() => setFormat(value)}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        format === value
+                          ? 'border-purple-500 bg-purple-50 dark:bg-purple-950 shadow-md'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center text-center gap-2">
+                        <Icon className={`h-8 w-8 ${format === value ? 'text-purple-600' : 'text-gray-500'}`} />
+                        <div>
+                          <div className="font-semibold">{label}</div>
+                          <div className="text-xs text-gray-500">{desc}</div>
+                        </div>
+                        {format === value && (
+                          <CheckCircle className="h-5 w-5 text-purple-600" />
+                        )}
                       </div>
-                    </SelectItem>
-                    <SelectItem value="json">
-                      <div className="flex items-center gap-2">
-                        <FileJson className="h-4 w-4" />
-                        JSON
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="excel">
-                      <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="h-4 w-4" />
-                        Excel (.csv)
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="txt">
-                      <div className="flex items-center gap-2">
-                        <FileType className="h-4 w-4" />
-                        TXT
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              {/* Filtro de Status */}
-              <div className="space-y-2">
-                <Label>Status dos Atendimentos</Label>
+              {/* Filtros de Status */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-600 rounded-lg">
+                    <BarChart3 className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <Label className="text-lg font-semibold">Status dos Atendimentos</Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Selecione os status que deseja incluir no backup
+                    </p>
+                  </div>
+                </div>
+                
                 <div className="flex flex-wrap gap-2">
-                  {['PENDENTE', 'CONFIRMADO', 'AGENDADO', 'EM_ANDAMENTO', 'CONCLUIDO', 'CANCELADO', 'NAO_COMPARECEU'].map(status => (
+                  {[
+                    { key: 'SCHEDULED', label: 'Agendado' },
+                    { key: 'IN_PROGRESS', label: 'Em Andamento' },
+                    { key: 'COMPLETED', label: 'Concluído' },
+                    { key: 'CANCELLED', label: 'Cancelado' },
+                    { key: 'NO_SHOW', label: 'Não Compareceu' }
+                  ].map(({ key, label }) => (
                     <Badge
-                      key={status}
-                      variant={statusFilter.includes(status) ? 'default' : 'outline'}
-                      className="cursor-pointer"
-                      onClick={() => toggleStatusFilter(status)}
+                      key={key}
+                      variant={statusFilter.includes(key) ? 'default' : 'outline'}
+                      className="cursor-pointer py-2 px-4 text-sm transition-all hover:scale-105"
+                      onClick={() => toggleStatusFilter(key)}
                     >
-                      {status.replace(/_/g, ' ')}
+                      {statusFilter.includes(key) && <CheckCircle className="h-3 w-3 mr-1" />}
+                      {label}
                     </Badge>
                   ))}
                 </div>
-                <p className="text-sm text-gray-500">
-                  {statusFilter.length === 0 ? 'Todos os status selecionados' : `${statusFilter.length} status selecionado(s)`}
-                </p>
+                
+                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950">
+                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800 dark:text-blue-200">
+                    {statusFilter.length === 0 
+                      ? '✅ Todos os status estão incluídos' 
+                      : `📊 ${statusFilter.length} status selecionado${statusFilter.length > 1 ? 's' : ''}`
+                    }
+                  </AlertDescription>
+                </Alert>
               </div>
 
-              {/* Filtro de Data */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dateStart">Data Inicial</Label>
-                  <Input
-                    id="dateStart"
-                    type="date"
-                    value={dateStart}
-                    onChange={(e) => setDateStart(e.target.value)}
-                  />
+              {/* Filtro de Período */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-teal-600 rounded-lg">
+                    <Calendar className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <Label className="text-lg font-semibold">Período de Análise</Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Defina o intervalo de datas para filtrar os atendimentos
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dateEnd">Data Final</Label>
-                  <Input
-                    id="dateEnd"
-                    type="date"
-                    value={dateEnd}
-                    onChange={(e) => setDateEnd(e.target.value)}
-                  />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border">
+                    <Label htmlFor="dateStart" className="font-medium flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Data Inicial
+                    </Label>
+                    <Input
+                      id="dateStart"
+                      type="date"
+                      value={dateStart}
+                      onChange={(e) => setDateStart(e.target.value)}
+                      className="border-2"
+                    />
+                  </div>
+                  <div className="space-y-2 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border">
+                    <Label htmlFor="dateEnd" className="font-medium flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Data Final
+                    </Label>
+                    <Input
+                      id="dateEnd"
+                      type="date"
+                      value={dateEnd}
+                      onChange={(e) => setDateEnd(e.target.value)}
+                      className="border-2"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Opções Adicionais */}
-              <div className="space-y-2">
+              <div className="space-y-4 p-6 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 rounded-xl border-2 border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-600 rounded-lg">
+                    <Settings className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <Label className="text-lg font-semibold">Opções Avançadas</Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Personalize o conteúdo do seu backup
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-lg border">
+                  <div className="flex items-center gap-3">
+                    <Database className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <Label htmlFor="includeFeedback" className="cursor-pointer font-medium">
+                        Incluir Metadados Completos
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        Timestamps, IDs internos e informações detalhadas
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="includeFeedback"
+                    checked={includeFeedback}
+                    onCheckedChange={setIncludeFeedback}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
                 <Label>Opções de Conteúdo</Label>
                 <div className="flex items-center space-x-2">
                   <input

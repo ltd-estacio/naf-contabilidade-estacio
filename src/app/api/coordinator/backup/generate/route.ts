@@ -308,19 +308,20 @@ export async function POST(request: NextRequest) {
 // Funções auxiliares para gerar diferentes formatos
 
 function generateCSV(data: any[]): string {
-  if (data.length === 0) return ''
+  if (data.length === 0) return 'Nenhum registro encontrado'
 
   const headers = Object.keys(data[0])
   const csvRows = []
 
-  // Header
-  csvRows.push(headers.join(','))
+  // Header (já sanitizado)
+  csvRows.push(headers.map(h => `"${h}"`).join(','))
 
   // Rows
   for (const row of data) {
     const values = headers.map(header => {
       const value = row[header]
-      const escaped = ('' + value).replace(/"/g, '""')
+      // Valores já estão sanitizados, apenas escapar aspas
+      const escaped = String(value).replace(/"/g, '""')
       return `"${escaped}"`
     })
     csvRows.push(values.join(','))
@@ -332,20 +333,31 @@ function generateCSV(data: any[]): string {
 function generateTXT(data: any[]): string {
   if (data.length === 0) return 'Nenhum registro encontrado.'
 
-  let content = '========================================\n'
-  content += '   BACKUP DE ATENDIMENTOS FISCAIS\n'
+  let content = '='.'repeat(60) + '\n'
+  content += '   BACKUP DE ATENDIMENTOS FISCAIS NAF\n'
   content += `   Gerado em: ${new Date().toLocaleString('pt-BR')}\n`
   content += `   Total de registros: ${data.length}\n`
-  content += '========================================\n\n'
+  content += '='.repeat(60) + '\n\n'
 
   data.forEach((record, index) => {
-    content += `\n--- REGISTRO ${index + 1} ---\n`
+    content += `\n${'='.repeat(60)}\n`
+    content += `REGISTRO ${index + 1} de ${data.length}\n`
+    content += '='.repeat(60) + '\n\n'
+    
     Object.entries(record).forEach(([key, value]) => {
-      const label = key.replace(/_/g, ' ').toUpperCase()
-      content += `${label}: ${value}\n`
+      const label = key
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+      content += `${label}:\n  ${value}\n\n`
     })
-    content += '\n' + '-'.repeat(50) + '\n'
   })
+
+  content += '\n' + '='.repeat(60) + '\n'
+  content += 'FIM DO BACKUP\n'
+  content += '='.repeat(60) + '\n'
 
   return content
 }
+

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 export const dynamic = 'force-dynamic'
 
 /**
- * GET - Buscar logs de backup do coordenador
+ * GET - Buscar logs de backup do coordenador com estatísticas
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,45 +22,67 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Buscar logs
-    const { data: logs, error: logsError, count } = await supabase
-      .from('backup_logs')
-      .select('*', { count: 'exact' })
-      .eq('coordinator_id', coordinatorId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
+    // Buscar logs do banco de dados
+    const [logs, totalCount] = await Promise.all([
+      prisma.backupLog.findMany({
+        where: {
+          coordinatorId
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: limit,
+        skip: offset
+      }),
+      prisma.backupLog.count({
+        where: {
+          coordinatorId
+        }
+      })
+    ])
 
-    if (logsError) {
-      console.error('Erro ao buscar logs:', logsError)
-      return NextResponse.json(
-        { error: 'Erro ao buscar logs' },
-        { status: 500 }
-      )
+    // Calcular estatísticas
+    const allLogs = await prisma.backupLog.findMany({
+      where: {
+        coordinatorId
+      }
+    })
+
+    const statistics = {
+      total_backups: allLogs.length,
+      total_downloads: allLogs.filter(log => log.backupType === 'download').length,
+      total_emails: allLogs.filter(log => log.backupType === 'email').length,
+      total_previews: allLogs.filter(log => log.backupType === 'preview').length,
+      total_records_exported: allLogs.reduce((sum, log) => sum + log.totalRecords, 0),
+      total_size_kb: allLogs.reduce((sum, log) => sum + log.fileSizeKb, 0),
+      avg_execution_time_ms: allLogs.length > 0 
+        ? allLogs.reduce((sum, log) => sum + log.executionTimeMs, 0) / allLogs.length 
+        : 0,
+      last_backup_date: allLogs.length > 0 ? allLogs[0].createdAt.toISOString() : null,
+      failed_backups: allLogs.filter(log => !log.success).length
     }
 
-    // Buscar estatísticas
-    const { data: stats } = await supabase
-      .from('vw_backup_statistics')
-      .select('*')
-      .eq('coordinator_id', coordinatorId)
-      .single()
+    // Formatar logs para o frontend
+    const formattedLogs = logs.map(log => ({
+      id: log.id,
+      backup_type: log.backupType,
+      export_format: log.exportFormat,
+      file_size_kb: log.fileSizeKb,
+      total_records: log.totalRecords,
+      created_at: log.createdAt.toISOString(),
+      success: log.success,
+      email_sent_to: log.emailSentTo,
+      execution_time_ms: log.executionTimeMs,
+      ip_address: log.ipAddress,
+      error_message: log.errorMessage
+    }))
 
     return NextResponse.json({
       success: true,
       data: {
-        logs: logs || [],
-        total: count || 0,
-        statistics: stats || {
-          total_backups: 0,
-          total_downloads: 0,
-          total_emails: 0,
-          total_previews: 0,
-          total_records_exported: 0,
-          total_size_kb: 0,
-          avg_execution_time_ms: 0,
-          last_backup_date: null,
-          failed_backups: 0
-        }
+        logs: formattedLogs,
+        total: totalCount,
+        statistics
       }
     })
 
@@ -71,5 +95,8 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 }
+
