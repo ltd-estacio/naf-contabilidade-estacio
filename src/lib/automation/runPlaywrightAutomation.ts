@@ -1,7 +1,10 @@
-import type { Browser, BrowserContext, Page } from 'playwright-core'
 import { promises as fs } from 'fs'
-import { createRequire } from 'module'
+import chromium from '@sparticuz/chromium'
 import Papa from 'papaparse'
+
+type Browser = any
+type BrowserContext = any
+type Page = any
 
 export type AutomationSummary = {
   totalRows: number
@@ -210,28 +213,30 @@ export async function runPlaywrightAutomation(formId: string, filePath: string):
     if (runningOnServerless) {
       log('☁️ Ambiente serverless detectado; preparando Chromium otimizado para Lambda')
       ensureLambdaHints()
-      const require = createRequire(import.meta.url)
-      try {
-        const playwrightAwsModule = require('playwright-aws-lambda') as {
-          launchChromium?: (options?: Record<string, unknown>) => Promise<Browser>
-          default?: { launchChromium?: (options?: Record<string, unknown>) => Promise<Browser> }
-        }
 
-        const launchChromium =
-          playwrightAwsModule.launchChromium ?? playwrightAwsModule.default?.launchChromium
-
-        if (!launchChromium) {
-          raise('Pacote playwright-aws-lambda não expôs a função launchChromium esperada.')
-        }
-
-        browser = await launchChromium({ headless: true })
-      } catch (error) {
-        raise(`Falha ao iniciar Chromium otimizado: ${(error as Error).message}`)
+      if (typeof chromium.setHeadlessMode === 'function') {
+        chromium.setHeadlessMode(true)
       }
+      if (typeof chromium.setGraphicsMode === 'function') {
+        chromium.setGraphicsMode(false)
+      }
+
+      const executablePath = await chromium.executablePath()
+      const { chromium: playwrightChromium } = await import('playwright-core')
+
+      browser = await playwrightChromium.launch({
+        args: [...chromium.args, '--single-process'],
+        executablePath,
+        headless: chromium.headless !== false,
+        ignoreHTTPSErrors: true,
+      })
     } else {
-      const { chromium } = await import('playwright-core')
+      const { chromium: playwrightChromium } = await import('playwright-core')
       log('🖥️ Executando automação com Chromium local do Playwright')
-      browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+      browser = await playwrightChromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      })
     }
 
     context = await browser.newContext()

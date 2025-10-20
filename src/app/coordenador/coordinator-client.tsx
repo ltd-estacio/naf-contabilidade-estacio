@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import CoordinatorDashboard from '@/components/CoordinatorDashboard'
 import AdvancedScheduling from '@/components/AdvancedScheduling'
 import PowerBIAdvanced from '@/components/PowerBIAdvanced'
-import RelatorioCoordrenador from '@/components/RelatorioCoordrenador'
+import CoordinatorReportsCenter from '@/components/coordinator/CoordinatorReportsCenter'
 import NotificationSystem from '@/components/NotificationSystem'
 import PerformanceAnalytics from '@/components/PerformanceAnalytics'
 import SystemManagement from '@/components/SystemManagement'
@@ -74,7 +74,7 @@ export default function CoordinatorClient({ session }: CoordinatorClientProps) {
         </TabsContent>
 
         <TabsContent value="relatorio">
-          <RelatorioCoordrenador />
+          <CoordinatorReportsCenter />
         </TabsContent>
 
         <TabsContent value="usuarios">

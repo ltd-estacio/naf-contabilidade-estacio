@@ -8,10 +8,10 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ['bcryptjs', 'playwright-aws-lambda', 'lambdafs'],
+    serverComponentsExternalPackages: ['bcryptjs', '@sparticuz/chromium', 'playwright-core'],
     outputFileTracingIncludes: {
       'app/api/automation/run/route': [
-        './node_modules/playwright-aws-lambda/dist/src/bin/**'
+        './node_modules/@sparticuz/chromium/bin/**'
       ]
     }
   },

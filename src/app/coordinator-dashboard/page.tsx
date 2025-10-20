@@ -48,8 +48,8 @@ import {
 import Link from 'next/link'
 import DashboardInlineNav from '@/components/DashboardInlineNav'
 import CoordinatorInterface from '@/components/chat/CoordinatorInterface'
-import AdvancedReportsCenter from '@/components/reports/AdvancedReportsCenter'
 import BusinessIntelligence from '@/components/coordinator/BusinessIntelligence'
+import CoordinatorExecutiveReport from '@/components/reports/CoordinatorExecutiveReport'
 import NAFFooter from '@/components/layout/NAFFooter'
 import SimpleChart from '@/components/charts/SimpleChart'
 import AppointmentsPanel from '@/components/admin/AppointmentsPanel'
@@ -2532,90 +2532,7 @@ export default function CoordinatorDashboard() {
           </TabsContent>
 
           <TabsContent value="reports" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Relatório Completo do Coordenador</CardTitle>
-                <CardDescription>Gere um relatório profissional com gráficos, textos e tabelas do período selecionado.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 dark:bg-gray-900 dark:border-gray-800">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label htmlFor="coord-format" className="text-sm text-gray-600 dark:text-gray-400">Formato</label>
-                    <select id="coord-format" className="w-full border rounded px-3 py-2">
-                      <option value="pdf">PDF</option>
-                      <option value="xlsx">Excel (XLSX)</option>
-                      <option value="csv">CSV</option>
-                      <option value="docx">DOCX</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="coord-period" className="text-sm text-gray-600 dark:text-gray-400">Período</label>
-                    <select id="coord-period" className="w-full border rounded px-3 py-2" defaultValue="30d">
-                      <option value="7d">Últimos 7 dias</option>
-                      <option value="30d">Últimos 30 dias</option>
-                      <option value="90d">Últimos 3 meses</option>
-                      <option value="365d">Último ano</option>
-                      <option value="all">Todos</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="coord-status" className="text-sm text-gray-600 dark:text-gray-400">Status</label>
-                    <select id="coord-status" className="w-full border rounded px-3 py-2">
-                      <option value="all">Todos</option>
-                      <option value="PENDENTE">Pendente</option>
-                      <option value="CONFIRMADO">Confirmado</option>
-                      <option value="EM_ANDAMENTO">Em Andamento</option>
-                      <option value="CONCLUIDO">Concluído</option>
-                      <option value="CANCELADO">Cancelado</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="coord-category" className="text-sm text-gray-600 dark:text-gray-400">Categoria (Serviço)</label>
-                    <select id="coord-category" className="w-full border rounded px-3 py-2">
-                      <option value="all">Todas</option>
-                      {dashboardData?.services?.slice(0, 50).map((s: unknown, idx: number) => (
-                        <option key={idx} value={s.service_type}>{s.service_type}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Button
-                    onClick={async () => {
-                      const f = (document.getElementById('coord-format') as HTMLSelectElement)?.value || 'pdf'
-                      const p = (document.getElementById('coord-period') as HTMLSelectElement)?.value || '30d'
-                      const st = (document.getElementById('coord-status') as HTMLSelectElement)?.value || 'all'
-                      const cat = (document.getElementById('coord-category') as HTMLSelectElement)?.value || 'all'
-                      try {
-                        const res = await fetch(`/api/coordinator/report?format=${encodeURIComponent(f)}&period=${encodeURIComponent(p)}&status=${encodeURIComponent(st)}&category=${encodeURIComponent(cat)}`)
-                        if (!res.ok) {
-                          const txt = await res.text().catch(() => '')
-                          alert(`❌ Erro ao gerar relatório (${res.status}). Detalhe: ${txt?.slice(0,200)}`)
-                          return
-                        }
-                        const blob = await res.blob()
-                        const url = URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = `relatorio-coordenador-${new Date().toISOString().split('T')[0]}.${f === 'xlsx' ? 'xlsx' : (f === 'docx' ? 'docx' : (f === 'csv' ? 'csv' : 'pdf'))}`
-                        document.body.appendChild(a)
-                        a.click()
-                        a.remove()
-                        URL.revokeObjectURL(url)
-                      } catch (e) {
-                        console.error(e)
-                        alert('❌ Erro ao gerar relatório. Verifique sua conexão.')
-                      }
-                    }}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Baixar Relatório
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-            {/* Enhanced Report Dashboard */}
-            <AdvancedReportsCenter />
+            <CoordinatorExecutiveReport />
           </TabsContent>
 
           <TabsContent value="chat-links" className="space-y-6">

@@ -26,7 +26,7 @@ import {
 } from 'chart.js'
 import FiscalAppointmentsSection from './FiscalAppointmentsSection'
 import BusinessIntelligence from './BusinessIntelligence'
-import RelatorioCoordrenador from './RelatorioCoordrenador'
+import CoordinatorReportsCenter from './coordinator/CoordinatorReportsCenter'
 
 // Registrar componentes do Chart.js
 ChartJS.register(
@@ -324,7 +324,7 @@ export default function CoordinatorDashboard() {
       {activeTab === 'business-intelligence' ? (
         <BusinessIntelligence />
       ) : activeTab === 'relatorio-completo' ? (
-        <RelatorioCoordrenador />
+        <CoordinatorReportsCenter />
       ) : activeTab === 'fiscal-appointments' ? (
         <FiscalAppointmentsSection />
       ) : activeTab === 'dashboard' ? (
