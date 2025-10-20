@@ -194,29 +194,31 @@ export async function buildCoordinatorComprehensiveReport(
     endDateISO = now.toISOString()
   }
 
+  let attendancesQuery = client
+    .from('attendances')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (startDateISO) attendancesQuery = attendancesQuery.gte('created_at', startDateISO)
+  if (endDateISO) attendancesQuery = attendancesQuery.lte('created_at', endDateISO)
+  if (filters.status) attendancesQuery = attendancesQuery.eq('status', filters.status)
+  if (filters.serviceType) attendancesQuery = attendancesQuery.eq('service_type', filters.serviceType)
+  if (filters.studentId) attendancesQuery = attendancesQuery.eq('student_id', filters.studentId)
+
+  let fiscalQuery = client
+    .from('fiscal_appointments')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (startDateISO) fiscalQuery = fiscalQuery.gte('created_at', startDateISO)
+  if (endDateISO) fiscalQuery = fiscalQuery.lte('created_at', endDateISO)
+  if (filters.status) fiscalQuery = fiscalQuery.eq('status', filters.status)
+  if (filters.serviceType) fiscalQuery = fiscalQuery.eq('service_type', filters.serviceType)
+  if (filters.studentId) fiscalQuery = fiscalQuery.eq('assigned_student_id', filters.studentId)
+
   const [attendancesResult, fiscalAppointmentsResult, studentsResult, servicesResult] = await Promise.all([
-    client
-      .from('attendances')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .modify((query) => {
-        if (startDateISO) query.gte('created_at', startDateISO)
-        if (endDateISO) query.lte('created_at', endDateISO)
-        if (filters.status) query.eq('status', filters.status)
-        if (filters.serviceType) query.eq('service_type', filters.serviceType)
-        if (filters.studentId) query.eq('student_id', filters.studentId)
-      }),
-    client
-      .from('fiscal_appointments')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .modify((query) => {
-        if (startDateISO) query.gte('created_at', startDateISO)
-        if (endDateISO) query.lte('created_at', endDateISO)
-        if (filters.status) query.eq('status', filters.status)
-        if (filters.serviceType) query.eq('service_type', filters.serviceType)
-        if (filters.studentId) query.eq('assigned_student_id', filters.studentId)
-      }),
+    attendancesQuery,
+    fiscalQuery,
     client.from('students').select('*'),
     client.from('naf_services').select('*'),
   ])
