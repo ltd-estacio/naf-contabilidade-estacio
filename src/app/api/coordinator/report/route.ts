@@ -40,6 +40,31 @@ const round = (value: number, precision = 1) => {
 
 const formatPercentage = (value: number) => `${round(value, 1)}%`
 
+const stripDiacritics = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[•–—]/g, '-')
+    .replace(/[^\x20-\x7E]/g, '')
+
+const sanitizeSpreadsheetValue = (value: unknown): string | number => {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'number') return value
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Nao'
+  return stripDiacritics(String(value))
+}
+
+const sanitizeRecordForSheet = (record: Record<string, unknown>) => {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, val]) => [key, sanitizeSpreadsheetValue(val)])
+  )
+}
+
+const sanitizeForCsv = (value: unknown): string => {
+  if (value === null || value === undefined) return ''
+  return stripDiacritics(String(value))
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -195,69 +220,87 @@ export async function GET(request: NextRequest) {
     const insights: string[] = []
 
     if (monthGrowth !== 0) {
-      insights.push(`📈 Variação de volume: ${monthGrowth > 0 ? '+' : ''}${monthGrowth}% em relação ao mês anterior${monthGrowth > 20 ? ' — crescimento relevante' : monthGrowth < -20 ? ' — queda acentuada' : ''}.`)
+      const growthMessage = monthGrowth > 0
+        ? `Volume de atendimentos cresceu ${monthGrowth}% em relação ao mês anterior`
+        : `Volume de atendimentos reduziu ${Math.abs(monthGrowth)}% frente ao mês anterior`
+      const qualifier = monthGrowth > 20
+        ? ' — planeje capacidade extra para absorver a demanda.'
+        : monthGrowth < -20
+          ? ' — investigue causas e ajuste a comunicação com o público.'
+          : '.'
+      insights.push(`${growthMessage}${qualifier}`)
     }
 
-    insights.push(`✅ Taxa de conclusão geral: ${conclusionRate}% | Média mensal: ${averageMonthlyCompletion}%.`)
+    insights.push(`Taxa de conclusão consolidada está em ${conclusionRate}% (média móvel de ${averageMonthlyCompletion}%).`)
 
     if (agendadosCount > 0) {
-      insights.push(`📅 ${agendadosCount} atendimentos aguardam realização (agendados/confirmados).`)
+      insights.push(`Há ${agendadosCount} atendimentos agendados ou confirmados aguardando execução — valide disponibilidade de equipe.`)
     }
 
     if (emAndamentoCount > 0) {
-      insights.push(`⏳ ${emAndamentoCount} atendimentos estão em andamento.`)
+      insights.push(`Monitoramos ${emAndamentoCount} atendimentos em andamento; mantenha atualizações no Registro do Atendimento.`)
     }
 
     if (naoCompareceuCount > 0) {
       const naoCompareceuRate = totalAttendances > 0 ? Math.round((naoCompareceuCount / totalAttendances) * 100) : 0
-      insights.push(`⚠️ ${naoCompareceuCount} casos de não comparecimento (${naoCompareceuRate}% do total).`)
+      insights.push(`Foram registrados ${naoCompareceuCount} casos de ausência (${naoCompareceuRate}% do total); reforçar confirmações pode reduzir o índice.`)
     }
 
     if (averageSatisfaction) {
-      insights.push(`⭐ Satisfação média registrada: ${averageSatisfaction}/5.`)
+      insights.push(`Satisfação média registrada pelos usuários está em ${averageSatisfaction}/5; mantenha o padrão com feedback contínuo.`)
     }
 
     if (highUrgencyCount > 0) {
-      insights.push(`🔴 ${highUrgencyCount} demandas com alta urgência identificadas (incluindo ${urgentCount} urgentes).`)
+      insights.push(`Identificadas ${highUrgencyCount} demandas de alta urgência, sendo ${urgentCount} classificadas como URGENTE — priorize a alocação imediata.`)
     }
 
     if (backlogCount > 0) {
       const backlogRate = totalAttendances > 0 ? Math.round((backlogCount / totalAttendances) * 100) : 0
-      insights.push(`📊 Backlog atual: ${backlogCount} atendimentos em aberto (${backlogRate}% do total).`)
+      insights.push(`Backlog atual soma ${backlogCount} atendimentos pendentes (${backlogRate}% do total); avalie redistribuir atendentes ou abrir novos horários.`)
     }
 
     if (criticalAppointments.length > 0) {
-      insights.push(`⚡ ${criticalAppointments.length} atendimentos críticos (≥7 dias ou urgência alta) requerem prioridade imediata.`)
+      insights.push(`Há ${criticalAppointments.length} atendimentos críticos (mais de 7 dias em aberto ou urgência ALTA/URGENTE) que exigem ação imediata.`)
     }
 
     if (topServices.length > 0) {
-      insights.push(`🏆 Serviço mais demandado: "${topServices[0].name}" (${topServices[0].total} registros).`)
+      const topService = topServices[0]
+      const completedApprox = Math.round((topService.total * (topService.completionRate || 0)) / 100)
+      insights.push(`Serviço mais demandado: "${topService.name}" com ${topService.total} solicitações e cerca de ${completedApprox} concluídas (${round(topService.completionRate || 0, 1)}%).`)
+      if (topServices.length >= 3) {
+        insights.push(`Top 3 serviços em volume: ${topServices.slice(0, 3).map(s => s.name).join(', ')}.`)
+      }
     }
 
     if (report.clientCategories.length > 0) {
       const topSegment = report.clientCategories[0]
-      insights.push(`👥 Público principal: ${topSegment.category} (${round(topSegment.percent, 1)}% dos atendimentos).`)
+      insights.push(`Principal público atendido: ${topSegment.category} (representa ${round(topSegment.percent, 1)}% dos atendimentos).`)
     }
 
     if (report.studentInsights.length > 0) {
+      insights.push(`Equipe contou com ${report.studentInsights.length} estudantes ativos no período.`)
       const destaque = report.studentInsights[0]
-      insights.push(`🌟 Estudante destaque: ${destaque.name || 'Sem nome'} — ${destaque.totalAttendances} atendimentos, conclusão ${round(destaque.completionRate, 1)}%.`)
+      insights.push(`Estudante destaque: ${destaque.name || 'Sem cadastro'} realizou ${destaque.totalAttendances} atendimentos com ${round(destaque.completionRate, 1)}% de conclusão e satisfação média de ${round(destaque.averageSatisfaction || 0, 1)}/5.`)
     }
 
     if (averageAttendancesPerStudent) {
-      insights.push(`📌 Média de ${averageAttendancesPerStudent} atendimentos por estudante ativo.`)
+      insights.push(`Cada estudante realizou, em média, ${averageAttendancesPerStudent} atendimentos no período.`)
     }
 
     if (averageDuration) {
-      insights.push(`⏱️ Tempo médio por atendimento: ${averageDuration} minutos.`)
+      insights.push(`Tempo médio por atendimento está em ${averageDuration} minutos; monitore para otimizar a produtividade sem perder qualidade.`)
     }
 
     if (attendanceFeedbacks.length > 0) {
-      insights.push(`💬 ${attendanceFeedbacks.length} feedbacks qualificados coletados no período.`)
+      insights.push(`Foram coletados ${attendanceFeedbacks.length} feedbacks qualificados — matéria-prima para planos de melhoria.`)
     }
 
     if (cancellationRate > 0) {
-      insights.push(`❌ Taxa de cancelamento: ${cancellationRate}%${cancellationRate > 15 ? ' — atenção: índice elevado' : ''}.`)
+      insights.push(`Taxa de cancelamento está em ${cancellationRate}%.${cancellationRate > 15 ? ' Sugere-se revisar comunicações ou reagendamentos para conter o índice.' : ''}`)
+    }
+
+    if (report.summary.totalNotes > 0) {
+      insights.push(`Registro do Atendimento contém ${report.summary.totalNotes} anotações feitas pelos estudantes, reforçando a rastreabilidade dos casos.`)
     }
 
     const summaryRows = [
@@ -282,7 +325,7 @@ export async function GET(request: NextRequest) {
       const header = [
         'Protocolo',
         'Tipo',
-        'Serviço',
+        'Servico',
         'Status',
         'StatusCategoria',
         'Aluno',
@@ -301,24 +344,24 @@ export async function GET(request: NextRequest) {
       ]
 
       const rows = report.detailedAttendances.map(att => ([
-        csvEscape(att.protocol || att.id),
-        csvEscape(att.type),
-        csvEscape(att.service.name),
-        csvEscape(att.status),
-        csvEscape(att.statusCategory),
-        csvEscape(att.student.name || ''),
-        csvEscape(att.student.course || ''),
-        csvEscape(att.client.name || att.client.email || ''),
-        csvEscape(att.clientCategory || ''),
-        csvEscape(toDateTimeBR(att.timing.scheduledDate)),
-        csvEscape(toDateTimeBR(att.timing.startedAt)),
-        csvEscape(toDateTimeBR(att.timing.completedAt)),
-        csvEscape(att.urgency || ''),
-        csvEscape(att.isOnline ? 'Sim' : 'Não'),
-        csvEscape(att.rescheduled ? 'Sim' : 'Não'),
-        csvEscape(att.satisfaction ? att.satisfaction.toString() : ''),
-        csvEscape(att.durationMinutes ? att.durationMinutes.toString() : ''),
-        csvEscape(String(att.notesCount)),
+        csvEscape(sanitizeForCsv(att.protocol || att.id)),
+        csvEscape(sanitizeForCsv(att.type)),
+        csvEscape(sanitizeForCsv(att.service.name)),
+        csvEscape(sanitizeForCsv(att.status)),
+        csvEscape(sanitizeForCsv(att.statusCategory)),
+        csvEscape(sanitizeForCsv(att.student.name || '')),
+        csvEscape(sanitizeForCsv(att.student.course || '')),
+        csvEscape(sanitizeForCsv(att.client.name || att.client.email || '')),
+        csvEscape(sanitizeForCsv(att.clientCategory || '')),
+        csvEscape(sanitizeForCsv(toDateTimeBR(att.timing.scheduledDate))),
+        csvEscape(sanitizeForCsv(toDateTimeBR(att.timing.startedAt))),
+        csvEscape(sanitizeForCsv(toDateTimeBR(att.timing.completedAt))),
+        csvEscape(sanitizeForCsv(att.urgency || '')),
+        csvEscape(att.isOnline ? 'Sim' : 'Nao'),
+        csvEscape(att.rescheduled ? 'Sim' : 'Nao'),
+        csvEscape(att.satisfaction !== null && att.satisfaction !== undefined ? sanitizeForCsv(att.satisfaction) : ''),
+        csvEscape(att.durationMinutes !== null && att.durationMinutes !== undefined ? sanitizeForCsv(att.durationMinutes) : ''),
+        csvEscape(sanitizeForCsv(att.notesCount)),
       ]).join(','))
 
       const csvContent = [header.join(','), ...rows].join('\n')
@@ -334,10 +377,13 @@ export async function GET(request: NextRequest) {
     if (format === 'xlsx' || format === 'excel') {
       const wb = XLSX.utils.book_new()
 
-      const resumoSheet = summaryRows.map(row => ({ Indicador: row.label, Valor: row.value }))
+      const resumoSheet = summaryRows.map(row => ({
+        Indicador: stripDiacritics(row.label),
+        Valor: typeof row.value === 'string' ? stripDiacritics(row.value) : row.value,
+      }))
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumoSheet), 'Resumo')
 
-      const attendancesSheet = report.detailedAttendances.map(att => ({
+      const attendancesSheet = report.detailedAttendances.map(att => sanitizeRecordForSheet({
         Protocolo: att.protocol || att.id,
         Tipo: att.type === 'regular' ? 'Regular' : 'Fiscal',
         Servico: att.service.name,
@@ -353,95 +399,155 @@ export async function GET(request: NextRequest) {
         IniciadoEm: toDateTimeBR(att.timing.startedAt),
         ConcluidoEm: toDateTimeBR(att.timing.completedAt),
         Urgencia: att.urgency || '',
-        Online: att.isOnline ? 'Sim' : 'Não',
-        Reagendado: att.rescheduled ? 'Sim' : 'Não',
+        Online: att.isOnline ? 'Sim' : 'Nao',
+        Reagendado: att.rescheduled ? 'Sim' : 'Nao',
         NotasRegistradas: att.notesCount,
-        Satisfacao: att.satisfaction || '',
-        DuracaoMin: att.durationMinutes || '',
+        Satisfacao: att.satisfaction ?? '',
+        DuracaoMin: att.durationMinutes ?? '',
       }))
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attendancesSheet), 'Atendimentos')
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(notesFlattened.map(note => ({
-        Protocolo: note.protocol,
-        Servico: note.service,
-        Estudante: note.student,
-        Registro: note.note,
-        RegistradoEm: toDateTimeBR(note.createdAt)
-      }))), 'RegistroAtendimento')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          notesFlattened.map(note => sanitizeRecordForSheet({
+            Protocolo: note.protocol,
+            Servico: note.service,
+            Estudante: note.student,
+            Registro: note.note,
+            RegistradoEm: toDateTimeBR(note.createdAt)
+          }))
+        ),
+        'RegistroAtendimento'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(report.statusDistribution.map(item => ({
-        Status: item.label,
-        Quantidade: item.count,
-        Categoria: item.category,
-      }))), 'DistribuicaoStatus')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          report.statusDistribution.map(item => sanitizeRecordForSheet({
+            Status: item.label,
+            Quantidade: item.count,
+            Categoria: item.category,
+          }))
+        ),
+        'DistribuicaoStatus'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(report.servicePerformance.map(item => ({
-        Servico: item.name,
-        Categoria: item.category,
-        Total: item.total,
-        Conclusao: round(item.completionRate, 1),
-        Pendentes: item.pending,
-        Cancelados: item.cancelled,
-        SatisfacaoMedia: round(item.averageSatisfaction || 0, 2),
-        DuracaoMedia: item.averageDuration ? round(item.averageDuration || 0, 2) : '',
-      }))), 'Servicos')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          report.servicePerformance.map(item => sanitizeRecordForSheet({
+            Servico: item.name,
+            Categoria: item.category || '',
+            Total: item.total,
+            Conclusao: round(item.completionRate, 1),
+            Pendentes: item.pending,
+            Cancelados: item.cancelled,
+            SatisfacaoMedia: round(item.averageSatisfaction || 0, 2),
+            DuracaoMedia: item.averageDuration ? round(item.averageDuration || 0, 2) : '',
+          }))
+        ),
+        'Servicos'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(report.studentInsights.map(item => ({
-        Estudante: item.name || '',
-        Email: item.email || '',
-        Curso: item.course || '',
-        Semestre: item.semester || '',
-        TotalAtendimentos: item.totalAttendances,
-        TaxaConclusao: round(item.completionRate, 1),
-        SatisfacaoMedia: round(item.averageSatisfaction || 0, 2),
-        NotasRegistradas: item.notesCount,
-      }))), 'Estudantes')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          report.studentInsights.map(item => sanitizeRecordForSheet({
+            Estudante: item.name || '',
+            Email: item.email || '',
+            Curso: item.course || '',
+            Semestre: item.semester || '',
+            TotalAtendimentos: item.totalAttendances,
+            TaxaConclusao: round(item.completionRate, 1),
+            SatisfacaoMedia: round(item.averageSatisfaction || 0, 2),
+            NotasRegistradas: item.notesCount,
+          }))
+        ),
+        'Estudantes'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(report.courseDistribution.map(item => ({
-        Curso: item.course,
-        Total: item.total,
-      }))), 'Cursos')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          report.courseDistribution.map(item => sanitizeRecordForSheet({
+            Curso: item.course,
+            Total: item.total,
+          }))
+        ),
+        'Cursos'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(report.clientCategories.map(item => ({
-        Categoria: item.category,
-        Total: item.total,
-        Percentual: round(item.percent, 1),
-      }))), 'Publico')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          report.clientCategories.map(item => sanitizeRecordForSheet({
+            Categoria: item.category,
+            Total: item.total,
+            Percentual: round(item.percent, 1),
+          }))
+        ),
+        'Publico'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthlyTrend.map(item => ({
-        Mes: item.label,
-        Total: item.total,
-        Concluidos: item.completed,
-        EmAndamento: item.inProgress,
-        TaxaConclusao: item.completionRate,
-      }))), 'Timeline')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          monthlyTrend.map(item => sanitizeRecordForSheet({
+            Mes: item.label,
+            Total: item.total,
+            Concluidos: item.completed,
+            EmAndamento: item.inProgress,
+            TaxaConclusao: item.completionRate,
+          }))
+        ),
+        'Timeline'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(criticalAppointments.map(item => ({
-        Protocolo: item.protocolo,
-        Cliente: item.cliente,
-        Servico: item.servico,
-        Status: item.status,
-        Urgencia: item.urgencia,
-        CriadoEm: toDateTimeBR(item.criadoEm),
-        DiasAberto: item.diasAberto,
-      }))), 'PendenciasCriticas')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          criticalAppointments.map(item => sanitizeRecordForSheet({
+            Protocolo: item.protocolo,
+            Cliente: item.cliente,
+            Servico: item.servico,
+            Status: item.status,
+            Urgencia: item.urgencia,
+            CriadoEm: toDateTimeBR(item.criadoEm),
+            DiasAberto: item.diasAberto,
+          }))
+        ),
+        'PendenciasCriticas'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attendanceFeedbacks.map(item => ({
-        Protocolo: item.protocol,
-        Cliente: item.clientName,
-        Estudante: item.studentName,
-        Servico: item.serviceType,
-        Avaliacao: item.rating,
-        Feedback: item.feedback,
-        Status: item.status,
-        AgendadoEm: toDateTimeBR(item.scheduledDate),
-        ConcluidoEm: toDateTimeBR(item.completedAt),
-      }))), 'Feedbacks')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          attendanceFeedbacks.map(item => sanitizeRecordForSheet({
+            Protocolo: item.protocol,
+            Cliente: item.clientName,
+            Estudante: item.studentName,
+            Servico: item.serviceType,
+            Avaliacao: item.rating,
+            Feedback: item.feedback,
+            Status: item.status,
+            AgendadoEm: toDateTimeBR(item.scheduledDate),
+            ConcluidoEm: toDateTimeBR(item.completedAt),
+          }))
+        ),
+        'Feedbacks'
+      )
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(insights.map((text, index) => ({
-        Ordem: index + 1,
-        Insight: text,
-      }))), 'Insights')
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(
+          insights.map((text, index) => sanitizeRecordForSheet({
+            Ordem: index + 1,
+            Insight: stripDiacritics(text),
+          }))
+        ),
+        'Insights'
+      )
 
       const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
 
@@ -721,10 +827,10 @@ export async function GET(request: NextRequest) {
     autoTable(pdf, {
       startY: cursorY,
       head: [['Insights e Recomendações']],
-      body: insights.map(text => [text]),
+      body: insights.map(text => [`• ${text}`]),
       theme: 'plain',
-      styles: { fontSize: 9, cellPadding: 5, textColor: [55, 65, 81] },
-      headStyles: { fontSize: 10, fontStyle: 'bold' },
+      styles: { fontSize: 10, cellPadding: { top: 6, bottom: 6, left: 12, right: 8 }, textColor: [45, 55, 72], lineWidth: 0.2, lineColor: [226, 232, 240] },
+      headStyles: { fontSize: 11, fontStyle: 'bold', fillColor: [24, 45, 120], textColor: [255, 255, 255], halign: 'left', cellPadding: { top: 8, bottom: 6, left: 10, right: 10 } },
       margin: { left: pad, right: pad },
     })
 
