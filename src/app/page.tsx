@@ -2,11 +2,12 @@ import React from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { FileText, ArrowRight, Phone, Shield, TrendingUp, Clock, MapPin, Mail, Calendar, BookOpen, BarChart3, UserCheck, Zap } from 'lucide-react'
+import { FileText, ArrowRight, Phone, Shield, TrendingUp, Clock, MapPin, Mail, Calendar, BookOpen, BarChart3, UserCheck, Zap, CheckCircle } from 'lucide-react'
 import NAFServicesShowcase from "@/components/NAFServicesShowcase"
 import MainNavigation from '@/components/MainNavigation'
 import NAFFooter from '@/components/layout/NAFFooter'
 import { getHomeStats } from '@/lib/homeStats'
+import Image from 'next/image'
 
 export const dynamic = 'force-dynamic'
 
@@ -328,6 +329,98 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {/* App Download Section */}
+      <section className="relative overflow-hidden py-24 bg-slate-900 text-white">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -top-20 -right-24 h-64 w-64 rounded-full bg-blue-500/30 blur-3xl" />
+          <div className="absolute -bottom-32 -left-16 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
+        </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/10 rounded-full px-4 py-1 text-sm font-medium tracking-wide">
+                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                Aplicativo Oficial do NAF
+              </div>
+              <h3 className="text-3xl md:text-4xl font-bold leading-tight">
+                O NAF na palma da mão: acompanhe atendimentos, receba alertas e organize sua agenda onde estiver.
+              </h3>
+              <p className="text-lg text-slate-200/80">
+                Baixe o aplicativo gratuito do NAF e tenha acesso rápido aos seus atendimentos, notificações em tempo real e materiais de apoio para cada orientação fiscal ou contábil.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+                  <div className="mt-1">
+                    <CheckCircle className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Agenda inteligente</p>
+                    <p className="text-sm text-slate-200/70">Confirme, reagende e receba lembretes de cada atendimento.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+                  <div className="mt-1">
+                    <CheckCircle className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Documentos e orientações</p>
+                    <p className="text-sm text-slate-200/70">Acesse registros e materiais compartilhados com poucos toques.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 pt-2">
+                <Link
+                  href="https://play.google.com/store/apps/details?id=br.com.estacio.naf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group inline-flex items-center gap-3 rounded-xl bg-white text-slate-900 px-6 py-3 font-semibold shadow-lg shadow-slate-900/30 transition-transform duration-200 hover:-translate-y-1"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white group-hover:scale-105 transition">
+                    <svg width="18" height="18" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M30 71.5C30 53.55 44.55 39 62.5 39c6.87 0 13.62 1.7 19.64 4.94l260.9 135.86-63.85 63.85L30 108.23V71.5Z" fill="#34A853"/>
+                      <path d="M30 143.77 278.19 256 30 368.23v-224.46Z" fill="#FBBC05"/>
+                      <path d="M30 403.77v-36.73l314.04-136.28 63.85 63.85-260.9 135.86A62.5 62.5 0 0 1 30 403.77Z" fill="#4285F4"/>
+                      <path d="M408.04 294.61 470.6 357.17c16.57 16.57 16.57 43.46 0 60.03-8.29 8.29-19.15 12.44-30.02 12.44-10.86 0-21.73-4.15-30.02-12.44l-47.48-47.48 44.96-75.11Z" fill="#EA4335"/>
+                    </svg>
+                  </span>
+                  <div className="flex flex-col leading-tight">
+                    <span className="text-xs text-slate-500">Disponível na</span>
+                    <span>Google Play</span>
+                  </div>
+                </Link>
+                <p className="text-sm text-slate-300/70">
+                  Compatível com Android 8 ou superior • Oferece login seguro para estudantes e coordenadores.
+                </p>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="relative mx-auto max-w-xs">
+                <div className="absolute inset-0 rounded-[36px] bg-gradient-to-tr from-blue-500/60 via-blue-400/40 to-emerald-400/30 blur-3xl" />
+                <div className="relative rounded-[36px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl p-8 flex flex-col items-center gap-6">
+                  <div className="rounded-3xl overflow-hidden shadow-lg shadow-slate-900/20">
+                    <Image
+                      src="/images/naf-app-icon.svg"
+                      alt="Ícone do aplicativo NAF"
+                      width={240}
+                      height={240}
+                      priority
+                    />
+                  </div>
+                  <div className="text-center space-y-2">
+                    <p className="text-2xl font-semibold">App NAF Estácio</p>
+                    <p className="text-sm text-slate-200/70">
+                      Gerencie solicitações, receba alertas instantâneos e acompanhe o progresso dos atendimentos em um aplicativo intuitivo.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       </main>
       <NAFFooter />
     </>

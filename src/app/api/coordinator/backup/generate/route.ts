@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 type StudentInfo = {
   id: string
@@ -10,6 +12,22 @@ type StudentInfo = {
 }
 
 export const dynamic = 'force-dynamic'
+
+// Função para remover acentos e caracteres especiais
+function removeAccents(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos
+    .replace(/[^a-zA-Z0-9\s,.:;!?@#$%&*()[\]{}<>+=\-_/\\|'"]/g, '') // Remove outros caracteres especiais
+    .trim()
+}
+
+// Função para sanitizar valores para CSV/TXT
+function sanitizeValue(value: any): string {
+  if (value === null || value === undefined) return 'N/A'
+  const stringValue = String(value)
+  return removeAccents(stringValue)
+}
 
 /**
  * POST - Gerar backup de atendimentos fiscais em múltiplos formatos
@@ -24,7 +42,9 @@ export async function POST(request: NextRequest) {
       format = 'csv',
       filters = {},
       dateRange = {},
-      includeFeeback = true
+      includeFeeback = true,
+      includeMetadata = true,
+      compressed = false
     } = body
 
     if (!coordinatorId || !coordinatorName || !coordinatorEmail) {
@@ -36,157 +56,133 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now()
 
-    // Construir query com filtros
-    let query = supabase
-      .from('fiscal_appointments')
-      .select('*')
-      .order('created_at', { ascending: false })
+    // Construir query com filtros usando Prisma
+    const whereClause: any = {}
 
     // Aplicar filtros de status
     if (filters.status && filters.status.length > 0) {
-      query = query.in('status', filters.status)
+      whereClause.status = {
+        in: filters.status
+      }
     }
 
     // Aplicar filtros de data
-    if (dateRange.start) {
-      query = query.gte('created_at', dateRange.start)
-    }
-    if (dateRange.end) {
-      query = query.lte('created_at', dateRange.end)
-    }
-
-    // Aplicar filtro de estudante
-    if (filters.studentId) {
-      query = query.eq('assigned_student_id', filters.studentId)
-    }
-
-    // Aplicar filtro de categoria
-    if (filters.category) {
-      query = query.eq('service_category', filters.category)
-    }
-
-    const { data: appointments, error: appointmentsError } = await query
-
-    if (appointmentsError) {
-      console.error('Erro ao buscar atendimentos:', appointmentsError)
-      return NextResponse.json(
-        { error: 'Erro ao buscar atendimentos' },
-        { status: 500 }
-      )
-    }
-
-    // Buscar dados dos estudantes associados aos atendimentos
-    let studentsMap: Record<string, StudentInfo> = {}
-    const studentIds = Array.from(
-      new Set(
-        (appointments || [])
-          .map(apt => apt.assigned_student_id)
-          .filter((id): id is string => Boolean(id))
-      )
-    )
-
-    if (studentIds.length > 0) {
-      const { data: students, error: studentsError } = await supabase
-        .from('students')
-        .select('id, name, email, course, semester')
-        .in('id', studentIds)
-
-      if (studentsError) {
-        console.error('Erro ao buscar estudantes para o backup:', studentsError)
-      } else if (students) {
-        studentsMap = students.reduce((acc: Record<string, StudentInfo>, student) => {
-          acc[student.id] = student
-          return acc
-        }, {})
+    if (dateRange.start || dateRange.end) {
+      whereClause.createdAt = {}
+      if (dateRange.start) {
+        whereClause.createdAt.gte = new Date(dateRange.start)
+      }
+      if (dateRange.end) {
+        whereClause.createdAt.lte = new Date(dateRange.end)
       }
     }
 
-    // Buscar feedbacks se solicitado
-    let feedbacksMap: Record<string, any> = {}
-    if (includeFeeback && appointments && appointments.length > 0) {
-      const appointmentIds = appointments.map(apt => apt.id)
-      const { data: feedbacks } = await supabase
-        .from('fiscal_appointment_feedbacks')
-        .select('*')
-        .in('appointment_id', appointmentIds)
-
-      if (feedbacks) {
-        feedbacks.forEach(feedback => {
-          feedbacksMap[feedback.appointment_id] = feedback
-        })
+    // Buscar atendimentos
+    const attendances = await prisma.attendance.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            cpf: true,
+            phone: true
+          }
+        },
+        demand: {
+          select: {
+            protocolNumber: true,
+            title: true,
+            description: true,
+            category: true,
+            theme: true,
+            status: true,
+            priority: true,
+            clientName: true,
+            clientEmail: true,
+            clientPhone: true,
+            clientCpf: true,
+            clientAddress: true,
+            createdAt: true,
+            completedAt: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
-    }
+    })
 
-    // Preparar dados para exportação
-    const exportData = appointments?.map(apt => {
-      const feedback = feedbacksMap[apt.id]
-      const assignedStudent = apt.assigned_student_id ? studentsMap[apt.assigned_student_id] : undefined
-      return {
+    // Preparar dados para exportação com sanitização
+    const exportData = attendances.map(att => {
+      const baseData = {
         // Dados básicos do atendimento
-        protocolo: apt.protocol || 'N/A',
-        status: apt.status,
-        servico: apt.service_title,
-        categoria: apt.service_category,
-        tipo_servico: apt.service_type,
-
-        // Dados do cliente
-        cliente_nome: apt.client_name,
-        cliente_email: apt.client_email,
-        cliente_telefone: apt.client_phone,
-        cliente_cpf: apt.client_cpf || 'N/A',
-        cliente_nascimento: apt.client_birth_date || 'N/A',
-
-        // Endereço
-        endereco_completo: `${apt.address_street}, ${apt.address_number}${apt.address_complement ? ' - ' + apt.address_complement : ''} - ${apt.address_neighborhood}, ${apt.address_city}/${apt.address_state}`,
-        cep: apt.address_zipcode || 'N/A',
-
-        // Dados de agendamento
-        urgencia: apt.urgency_level,
-        data_preferencia: apt.preferred_date || 'N/A',
-        horario_preferencia: apt.preferred_time || 'N/A',
-        periodo_preferencia: apt.preferred_period || 'N/A',
-
-        // Estudante responsável
-        estudante_nome: assignedStudent?.name || 'Não atribuído',
-        estudante_email: assignedStudent?.email || 'N/A',
-        estudante_curso: assignedStudent?.course || 'N/A',
-        estudante_semestre: assignedStudent?.semester || 'N/A',
-
+        protocolo: sanitizeValue(att.protocol),
+        status: sanitizeValue(att.status),
+        categoria: sanitizeValue(att.category),
+        tema: sanitizeValue(att.theme),
+        subtema: sanitizeValue(att.subtheme),
+        tipo: sanitizeValue(att.type),
+        
+        // Horas e validação
+        horas_prestadas: sanitizeValue(att.hours),
+        validado: att.isValidated ? 'Sim' : 'Nao',
+        validado_por: sanitizeValue(att.validatedBy),
+        
+        // Descrição e observações
+        descricao: sanitizeValue(att.description),
+        observacoes: sanitizeValue(att.observations),
+        notas_validacao: sanitizeValue(att.validationNotes),
+        
+        // Certificado
+        requer_certificado: att.requiresCert ? 'Sim' : 'Nao',
+        certificado_emitido: att.certIssued ? 'Sim' : 'Nao',
+        
+        // Usuário responsável
+        usuario_id: sanitizeValue(att.user.id),
+        usuario_nome: sanitizeValue(att.user.name),
+        usuario_email: sanitizeValue(att.user.email),
+        usuario_cpf: sanitizeValue(att.user.cpf),
+        usuario_telefone: sanitizeValue(att.user.phone),
+        
+        // Dados da demanda (se existir)
+        demanda_protocolo: sanitizeValue(att.demand?.protocolNumber),
+        demanda_titulo: sanitizeValue(att.demand?.title),
+        demanda_categoria: sanitizeValue(att.demand?.category),
+        demanda_tema: sanitizeValue(att.demand?.theme),
+        demanda_status: sanitizeValue(att.demand?.status),
+        demanda_prioridade: sanitizeValue(att.demand?.priority),
+        
+        // Dados do cliente (da demanda)
+        cliente_nome: sanitizeValue(att.demand?.clientName),
+        cliente_email: sanitizeValue(att.demand?.clientEmail),
+        cliente_telefone: sanitizeValue(att.demand?.clientPhone),
+        cliente_cpf: sanitizeValue(att.demand?.clientCpf),
+        cliente_endereco: sanitizeValue(att.demand?.clientAddress),
+        
         // Datas importantes
-        data_criacao: new Date(apt.created_at).toLocaleString('pt-BR'),
-        data_atualizacao: apt.updated_at ? new Date(apt.updated_at).toLocaleString('pt-BR') : 'N/A',
-        data_confirmacao: apt.confirmed_at ? new Date(apt.confirmed_at).toLocaleString('pt-BR') : 'N/A',
-        data_agendamento: apt.scheduled_at ? new Date(apt.scheduled_at).toLocaleString('pt-BR') : 'N/A',
-        data_conclusao: apt.completed_at ? new Date(apt.completed_at).toLocaleString('pt-BR') : 'N/A',
-
-        // Observações
-        observacoes_cliente: apt.client_notes || 'Nenhuma',
-        observacoes_internas: apt.internal_notes || 'Nenhuma',
-
-        // Feedback (se disponível)
-        ...(feedback ? {
-          avaliacao_geral: feedback.rating || 'N/A',
-          qualidade_atendimento: feedback.attendance_quality || 'N/A',
-          pontualidade: feedback.punctuality || 'N/A',
-          profissionalismo: feedback.professionalism || 'N/A',
-          resolucao_problema: feedback.problem_resolution || 'N/A',
-          recomendaria: feedback.would_recommend ? 'Sim' : 'Não',
-          comentarios_feedback: feedback.feedback_text || 'Nenhum',
-          comentarios_adicionais: feedback.additional_comments || 'Nenhum',
-          data_feedback: new Date(feedback.created_at).toLocaleString('pt-BR')
-        } : {
-          avaliacao_geral: 'Sem feedback',
-          qualidade_atendimento: 'N/A',
-          pontualidade: 'N/A',
-          profissionalismo: 'N/A',
-          resolucao_problema: 'N/A',
-          recomendaria: 'N/A',
-          comentarios_feedback: 'Sem feedback',
-          comentarios_adicionais: 'N/A',
-          data_feedback: 'N/A'
-        })
+        data_criacao: sanitizeValue(att.createdAt?.toLocaleString('pt-BR')),
+        data_atualizacao: sanitizeValue(att.updatedAt?.toLocaleString('pt-BR')),
+        data_agendamento: sanitizeValue(att.scheduledAt?.toLocaleString('pt-BR')),
+        data_conclusao: sanitizeValue(att.completedAt?.toLocaleString('pt-BR')),
+        data_validacao: sanitizeValue(att.validatedAt?.toLocaleString('pt-BR'))
       }
-    }) || []
+
+      // Adicionar metadados se solicitado
+      if (includeMetadata) {
+        return {
+          ...baseData,
+          atendimento_id: att.id,
+          demanda_id: att.demandId || 'N/A',
+          demanda_descricao: sanitizeValue(att.demand?.description),
+          demanda_data_criacao: sanitizeValue(att.demand?.createdAt?.toLocaleString('pt-BR')),
+          demanda_data_conclusao: sanitizeValue(att.demand?.completedAt?.toLocaleString('pt-BR'))
+        }
+      }
+
+      return baseData
+    })
 
     // Gerar arquivo no formato solicitado
     let fileContent: string
@@ -196,26 +192,26 @@ export async function POST(request: NextRequest) {
     switch (format) {
       case 'csv':
         fileContent = generateCSV(exportData)
-        mimeType = 'text/csv'
+        mimeType = 'text/csv;charset=utf-8'
         fileExtension = 'csv'
         break
 
       case 'json':
         fileContent = JSON.stringify(exportData, null, 2)
-        mimeType = 'application/json'
+        mimeType = 'application/json;charset=utf-8'
         fileExtension = 'json'
         break
 
       case 'txt':
         fileContent = generateTXT(exportData)
-        mimeType = 'text/plain'
+        mimeType = 'text/plain;charset=utf-8'
         fileExtension = 'txt'
         break
 
       case 'excel':
         // Para Excel, vamos gerar um CSV que pode ser aberto no Excel
         fileContent = generateCSV(exportData)
-        mimeType = 'application/vnd.ms-excel'
+        mimeType = 'application/vnd.ms-excel;charset=utf-8'
         fileExtension = 'csv'
         break
 
@@ -229,28 +225,31 @@ export async function POST(request: NextRequest) {
     const executionTime = Date.now() - startTime
     const fileSizeKB = Buffer.byteLength(fileContent, 'utf8') / 1024
 
-    // Registrar log de backup
-    const { error: logError } = await supabase
-      .from('backup_logs')
-      .insert({
-        coordinator_id: coordinatorId,
-        coordinator_name: coordinatorName,
-        coordinator_email: coordinatorEmail,
-        backup_type: 'download',
-        export_format: format,
-        file_size_kb: fileSizeKB,
-        total_records: exportData.length,
-        filter_applied: filters,
-        date_range: dateRange,
-        status_filter: filters.status || [],
-        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        user_agent: request.headers.get('user-agent') || 'unknown',
-        success: true,
-        execution_time_ms: executionTime
+    // Registrar log de backup no banco de dados
+    try {
+      await prisma.backupLog.create({
+        data: {
+          coordinatorId,
+          coordinatorName,
+          coordinatorEmail,
+          backupType: 'download',
+          exportFormat: format,
+          totalRecords: exportData.length,
+          fileSizeKb: fileSizeKB,
+          executionTimeMs: executionTime,
+          filters: filters,
+          includeMetadata,
+          compressed,
+          success: true,
+          ipAddress: request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown',
+          userAgent: request.headers.get('user-agent') || 'unknown'
+        }
       })
-
-    if (logError) {
-      console.error('Erro ao registrar log:', logError)
+    } catch (logError) {
+      console.error('Erro ao registrar log de backup:', logError)
+      // Não falha a requisição se o log não puder ser salvo
     }
 
     // Retornar arquivo como base64 para download no frontend
@@ -260,7 +259,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         content: base64Content,
-        fileName: `backup_atendimentos_${new Date().toISOString().split('T')[0]}.${fileExtension}`,
+        fileName: `backup_atendimentos_NAF_${new Date().toISOString().split('T')[0]}.${fileExtension}`,
         mimeType,
         fileSize: fileSizeKB,
         totalRecords: exportData.length,
@@ -270,6 +269,30 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Erro ao gerar backup:', error)
+    
+    // Tentar registrar erro no log
+    try {
+      const body = await request.json()
+      await prisma.backupLog.create({
+        data: {
+          coordinatorId: body.coordinatorId || 'unknown',
+          coordinatorName: body.coordinatorName || 'unknown',
+          coordinatorEmail: body.coordinatorEmail || 'unknown',
+          backupType: 'download',
+          exportFormat: body.format || 'csv',
+          totalRecords: 0,
+          fileSizeKb: 0,
+          executionTimeMs: Date.now() - Date.now(),
+          success: false,
+          errorMessage: error instanceof Error ? error.message : 'Erro desconhecido',
+          ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+          userAgent: request.headers.get('user-agent') || 'unknown'
+        }
+      })
+    } catch (logError) {
+      console.error('Erro ao registrar log de erro:', logError)
+    }
+
     return NextResponse.json(
       {
         error: 'Erro interno do servidor',
@@ -277,6 +300,8 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 }
 

@@ -458,3 +458,46 @@ model ReportHistory {
 
   @@map("report_history")
 }
+
+// Modelo de histórico de backups
+model BackupLog {
+  id              String   @id @default(cuid())
+  
+  // Informações do coordenador
+  coordinatorId   String
+  coordinatorName String
+  coordinatorEmail String
+  
+  // Tipo de operação
+  backupType      String   // 'download', 'email', 'preview', 'scheduled'
+  exportFormat    String   // 'csv', 'json', 'excel', 'txt', 'pdf'
+  
+  // Estatísticas do backup
+  totalRecords    Int      @default(0)
+  fileSizeKb      Float    @default(0)
+  executionTimeMs Int      @default(0)
+  
+  // Configurações aplicadas
+  filters         Json?    // Filtros de status, data, etc.
+  includeMetadata Boolean  @default(true)
+  compressed      Boolean  @default(false)
+  
+  // Status e resultado
+  success         Boolean  @default(true)
+  errorMessage    String?
+  
+  // Informações de envio (quando aplicável)
+  emailSentTo     String?
+  emailSentAt     DateTime?
+  
+  // Metadados de rastreamento
+  ipAddress       String?
+  userAgent       String?
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  
+  @@index([coordinatorId, createdAt])
+  @@index([backupType, createdAt])
+  @@map("backup_logs")
+}
