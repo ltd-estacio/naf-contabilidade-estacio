@@ -285,26 +285,26 @@ export default async function Home() {
       </section>
 
       {/* Contact Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-800 dark:to-indigo-900">
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
               Entre em Contato
             </h2>
-            <p className="text-xl text-blue-100">
+            <p className="text-xl text-slate-600">
               Estamos aqui para ajudar com seus problemas contábeis e fiscais
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {contactInfo.map((contact, index) => (
-              <Card key={index} className="bg-white/10 backdrop-blur border-white/25 hover:bg-white/20 transition-all duration-300 text-center">
+              <Card key={index} className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 text-center">
                 <CardHeader>
-                  <div className="w-12 h-12 bg-white/20 text-white rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                     <contact.icon className="h-6 w-6" />
                   </div>
-                  <CardTitle className="text-lg mb-2 text-white">{contact.label}</CardTitle>
-                  <CardDescription className="text-blue-100">
+                  <CardTitle className="text-lg mb-2 text-slate-900">{contact.label}</CardTitle>
+                  <CardDescription className="text-slate-600">
                     {contact.value}
                   </CardDescription>
                 </CardHeader>
@@ -314,7 +314,7 @@ export default async function Home() {
 
           <div className="text-center mt-12">
             <Link href="/naf-scheduling">
-              <Button size="lg" className="bg-white/15 text-white border-white/30 hover:bg-white/25 backdrop-blur">
+              <Button size="lg" className="bg-black text-white hover:bg-gray-900 border border-transparent">
                 <Calendar className="mr-2 h-5 w-5" />
                 Agendar Atendimento
               </Button>
