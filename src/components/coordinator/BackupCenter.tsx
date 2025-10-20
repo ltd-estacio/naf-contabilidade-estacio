@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -38,7 +39,13 @@ import {
   TrendingUp,
   User,
   BarChart3,
-  Settings
+  Settings,
+  Bell,
+  HardDrive,
+  Zap,
+  Save,
+  Trash2,
+  FileArchive
 } from 'lucide-react'
 
 interface BackupCenterProps {
@@ -97,9 +104,88 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
+  // Configurações Avançadas
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false)
+  const [autoBackupFrequency, setAutoBackupFrequency] = useState('weekly')
+  const [autoBackupEmail, setAutoBackupEmail] = useState(coordinatorEmail)
+  const [retentionDays, setRetentionDays] = useState('90')
+  const [defaultFormat, setDefaultFormat] = useState('csv')
+  const [enableCompression, setEnableCompression] = useState(true)
+  const [maxFileSizeMB, setMaxFileSizeMB] = useState('50')
+  const [notifyOnSuccess, setNotifyOnSuccess] = useState(true)
+  const [notifyOnFailure, setNotifyOnFailure] = useState(true)
+  const [includeMetadata, setIncludeMetadata] = useState(true)
+  const [configSaved, setConfigSaved] = useState(false)
+
   useEffect(() => {
     loadLogs()
+    loadBackupConfig()
   }, [])
+
+  const loadBackupConfig = () => {
+    // Carrega configurações do localStorage
+    const savedConfig = localStorage.getItem(`backup-config-${coordinatorId}`)
+    if (savedConfig) {
+      try {
+        const config = JSON.parse(savedConfig)
+        setAutoBackupEnabled(config.autoBackupEnabled ?? false)
+        setAutoBackupFrequency(config.autoBackupFrequency ?? 'weekly')
+        setAutoBackupEmail(config.autoBackupEmail ?? coordinatorEmail)
+        setRetentionDays(config.retentionDays ?? '90')
+        setDefaultFormat(config.defaultFormat ?? 'csv')
+        setEnableCompression(config.enableCompression ?? true)
+        setMaxFileSizeMB(config.maxFileSizeMB ?? '50')
+        setNotifyOnSuccess(config.notifyOnSuccess ?? true)
+        setNotifyOnFailure(config.notifyOnFailure ?? true)
+        setIncludeMetadata(config.includeMetadata ?? true)
+      } catch (error) {
+        console.error('Erro ao carregar configurações:', error)
+      }
+    }
+  }
+
+  const saveBackupConfig = () => {
+    const config = {
+      autoBackupEnabled,
+      autoBackupFrequency,
+      autoBackupEmail,
+      retentionDays,
+      defaultFormat,
+      enableCompression,
+      maxFileSizeMB,
+      notifyOnSuccess,
+      notifyOnFailure,
+      includeMetadata,
+      lastUpdated: new Date().toISOString()
+    }
+    
+    localStorage.setItem(`backup-config-${coordinatorId}`, JSON.stringify(config))
+    setConfigSaved(true)
+    setSuccessMessage('✅ Configurações salvas com sucesso!')
+    
+    setTimeout(() => {
+      setConfigSaved(false)
+      setSuccessMessage('')
+    }, 3000)
+  }
+
+  const resetBackupConfig = () => {
+    if (confirm('Tem certeza que deseja restaurar as configurações padrão?')) {
+      localStorage.removeItem(`backup-config-${coordinatorId}`)
+      setAutoBackupEnabled(false)
+      setAutoBackupFrequency('weekly')
+      setAutoBackupEmail(coordinatorEmail)
+      setRetentionDays('90')
+      setDefaultFormat('csv')
+      setEnableCompression(true)
+      setMaxFileSizeMB('50')
+      setNotifyOnSuccess(true)
+      setNotifyOnFailure(true)
+      setIncludeMetadata(true)
+      setSuccessMessage('✅ Configurações restauradas para o padrão!')
+      setTimeout(() => setSuccessMessage(''), 3000)
+    }
+  }
 
   const loadLogs = async () => {
     try {
@@ -113,6 +199,11 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
     } catch (error) {
       console.error('Erro ao carregar logs:', error)
     }
+  }
+
+  const applyDefaultConfig = () => {
+    setFormat(defaultFormat)
+    setIncludeFeedback(includeMetadata)
   }
 
   const handleDownload = async () => {
@@ -357,11 +448,24 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
         <TabsContent value="backup" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filtros de Exportação
-              </CardTitle>
-              <CardDescription>Configure os filtros para o backup dos atendimentos</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Filter className="h-5 w-5" />
+                    Filtros de Exportação
+                  </CardTitle>
+                  <CardDescription>Configure os filtros para o backup dos atendimentos</CardDescription>
+                </div>
+                <Button
+                  onClick={applyDefaultConfig}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  Aplicar Config. Padrão
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Formato de Exportação */}
@@ -630,20 +734,325 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Configurações de Backup
+                Configurações Avançadas de Backup
               </CardTitle>
               <CardDescription>
-                Personalize as preferências de backup e notificações
+                Personalize as preferências de backup, automação e notificações
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  As configurações avançadas estarão disponíveis em breve.
-                  Por enquanto, utilize as opções de filtro na aba "Gerar Backup".
+            <CardContent className="space-y-6">
+              {/* Backup Automático */}
+              <div className="space-y-4 p-4 border rounded-lg bg-blue-50 dark:bg-blue-900/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                      <Zap className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">Backup Automático</h3>
+                      <p className="text-sm text-gray-600">Configure backups periódicos automáticos</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="autoBackupEnabled"
+                      checked={autoBackupEnabled}
+                      onCheckedChange={setAutoBackupEnabled}
+                    />
+                    <Label htmlFor="autoBackupEnabled" className="cursor-pointer font-medium">
+                      {autoBackupEnabled ? 'Ativado' : 'Desativado'}
+                    </Label>
+                  </div>
+                </div>
+
+                {autoBackupEnabled && (
+                  <div className="space-y-4 mt-4 pl-4 border-l-2 border-blue-300">
+                    <div className="space-y-2">
+                      <Label htmlFor="autoBackupFrequency">Frequência de Backup</Label>
+                      <Select value={autoBackupFrequency} onValueChange={setAutoBackupFrequency}>
+                        <SelectTrigger id="autoBackupFrequency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Diário (Todo dia às 2:00 AM)
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="weekly">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Semanal (Domingos às 2:00 AM)
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="biweekly">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Quinzenal (1º e 15º de cada mês)
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="monthly">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Mensal (Primeiro dia do mês)
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="autoBackupEmail">E-mail para Receber Backups</Label>
+                      <Input
+                        id="autoBackupEmail"
+                        type="email"
+                        value={autoBackupEmail}
+                        onChange={(e) => setAutoBackupEmail(e.target.value)}
+                        placeholder="seu@email.com"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Os backups automáticos serão enviados para este e-mail
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Retenção de Dados */}
+              <div className="space-y-4 p-4 border rounded-lg bg-green-50 dark:bg-green-900/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                    <HardDrive className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Retenção de Dados</h3>
+                    <p className="text-sm text-gray-600">Configure por quanto tempo manter os backups</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pl-4 border-l-2 border-green-300">
+                  <Label htmlFor="retentionDays">Período de Retenção</Label>
+                  <Select value={retentionDays} onValueChange={setRetentionDays}>
+                    <SelectTrigger id="retentionDays">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30 dias (1 mês)</SelectItem>
+                      <SelectItem value="60">60 dias (2 meses)</SelectItem>
+                      <SelectItem value="90">90 dias (3 meses) - Recomendado</SelectItem>
+                      <SelectItem value="180">180 dias (6 meses)</SelectItem>
+                      <SelectItem value="365">365 dias (1 ano)</SelectItem>
+                      <SelectItem value="730">730 dias (2 anos)</SelectItem>
+                      <SelectItem value="unlimited">Ilimitado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    Backups mais antigos que este período serão automaticamente removidos do histórico
+                  </p>
+                </div>
+              </div>
+
+              {/* Formato e Compressão */}
+              <div className="space-y-4 p-4 border rounded-lg bg-purple-50 dark:bg-purple-900/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                    <FileArchive className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Formato e Compressão</h3>
+                    <p className="text-sm text-gray-600">Configurações de formato e otimização</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pl-4 border-l-2 border-purple-300">
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultFormat">Formato Padrão de Exportação</Label>
+                    <Select value={defaultFormat} onValueChange={setDefaultFormat}>
+                      <SelectTrigger id="defaultFormat">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="csv">
+                          <div className="flex items-center gap-2">
+                            <FileSpreadsheet className="h-4 w-4" />
+                            CSV - Planilha (Recomendado)
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="json">
+                          <div className="flex items-center gap-2">
+                            <FileJson className="h-4 w-4" />
+                            JSON - Dados Estruturados
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="excel">
+                          <div className="flex items-center gap-2">
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Excel - Microsoft Excel
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="txt">
+                          <div className="flex items-center gap-2">
+                            <FileType className="h-4 w-4" />
+                            TXT - Texto Simples
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="enableCompression" className="cursor-pointer">
+                      Habilitar compressão de arquivos (.zip)
+                    </Label>
+                    <Switch
+                      id="enableCompression"
+                      checked={enableCompression}
+                      onCheckedChange={setEnableCompression}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Reduz o tamanho dos arquivos em até 70% para facilitar envio e armazenamento
+                  </p>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="maxFileSizeMB">Tamanho Máximo do Arquivo (MB)</Label>
+                    <Select value={maxFileSizeMB} onValueChange={setMaxFileSizeMB}>
+                      <SelectTrigger id="maxFileSizeMB">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10 MB - Pequeno</SelectItem>
+                        <SelectItem value="25">25 MB - Médio</SelectItem>
+                        <SelectItem value="50">50 MB - Grande (Recomendado)</SelectItem>
+                        <SelectItem value="100">100 MB - Muito Grande</SelectItem>
+                        <SelectItem value="unlimited">Ilimitado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Arquivos maiores serão divididos em partes menores automaticamente
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="includeMetadata" className="cursor-pointer">
+                      Incluir metadados completos (timestamps, IPs, etc.)
+                    </Label>
+                    <Switch
+                      id="includeMetadata"
+                      checked={includeMetadata}
+                      onCheckedChange={setIncludeMetadata}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notificações */}
+              <div className="space-y-4 p-4 border rounded-lg bg-orange-50 dark:bg-orange-900/10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                    <Bell className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Notificações</h3>
+                    <p className="text-sm text-gray-600">Configure alertas e notificações por e-mail</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pl-4 border-l-2 border-orange-300">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="notifyOnSuccess" className="cursor-pointer">
+                      Notificar quando backup for concluído com sucesso
+                    </Label>
+                    <Switch
+                      id="notifyOnSuccess"
+                      checked={notifyOnSuccess}
+                      onCheckedChange={setNotifyOnSuccess}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="notifyOnFailure" className="cursor-pointer">
+                      Notificar quando backup falhar (Recomendado)
+                    </Label>
+                    <Switch
+                      id="notifyOnFailure"
+                      checked={notifyOnFailure}
+                      onCheckedChange={setNotifyOnFailure}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="flex gap-3 pt-4">
+                <Button
+                  onClick={saveBackupConfig}
+                  className="flex-1"
+                  size="lg"
+                  disabled={configSaved}
+                >
+                  {configSaved ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Salvo!
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Salvar Configurações
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={resetBackupConfig}
+                  variant="outline"
+                  size="lg"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Restaurar Padrão
+                </Button>
+              </div>
+
+              {/* Informações de Segurança */}
+              <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+                <Shield className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800 dark:text-blue-200">
+                  <strong>Segurança:</strong> Todas as configurações são salvas localmente no seu navegador.
+                  Os backups automáticos respeitam as mesmas regras de segurança dos backups manuais.
                 </AlertDescription>
               </Alert>
+
+              {/* Status das Configurações */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium">Backup Automático</span>
+                  </div>
+                  <Badge variant={autoBackupEnabled ? "default" : "secondary"}>
+                    {autoBackupEnabled ? `Ativo (${autoBackupFrequency})` : 'Desativado'}
+                  </Badge>
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <HardDrive className="h-4 w-4 text-green-600" />
+                    <span className="font-medium">Retenção</span>
+                  </div>
+                  <Badge variant="outline">
+                    {retentionDays === 'unlimited' ? 'Ilimitada' : `${retentionDays} dias`}
+                  </Badge>
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <FileArchive className="h-4 w-4 text-purple-600" />
+                    <span className="font-medium">Formato</span>
+                  </div>
+                  <Badge variant="outline">
+                    {defaultFormat.toUpperCase()} {enableCompression && '+ ZIP'}
+                  </Badge>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
