@@ -643,22 +643,6 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
               </div>
             </CardContent>
           </Card>
-                <Label>Opções de Conteúdo</Label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="includeFeedback"
-                    checked={includeFeedback}
-                    onChange={(e) => setIncludeFeedback(e.target.checked)}
-                    className="rounded"
-                  />
-                  <Label htmlFor="includeFeedback" className="cursor-pointer">
-                    Incluir feedbacks dos atendimentos
-                  </Label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Ações */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

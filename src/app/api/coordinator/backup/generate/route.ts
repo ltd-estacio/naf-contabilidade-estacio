@@ -333,7 +333,7 @@ function generateCSV(data: any[]): string {
 function generateTXT(data: any[]): string {
   if (data.length === 0) return 'Nenhum registro encontrado.'
 
-  let content = '='.'repeat(60) + '\n'
+  let content = '='.repeat(60) + '\n'
   content += '   BACKUP DE ATENDIMENTOS FISCAIS NAF\n'
   content += `   Gerado em: ${new Date().toLocaleString('pt-BR')}\n`
   content += `   Total de registros: ${data.length}\n`
@@ -360,4 +360,3 @@ function generateTXT(data: any[]): string {
 
   return content
 }
-
