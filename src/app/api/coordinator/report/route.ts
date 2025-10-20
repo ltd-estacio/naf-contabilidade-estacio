@@ -49,11 +49,15 @@ export async function GET(request: NextRequest) {
     const categoryFilterParam = searchParams.get('category') || 'all'
     const studentFilterParam = searchParams.get('studentId') || searchParams.get('student') || ''
 
+    const statusFilter = statusFilterParam === 'ALL' ? undefined : statusFilterParam
+    const serviceFilter = categoryFilterParam.toLowerCase() === 'all' ? undefined : categoryFilterParam
+    const studentFilter = studentFilterParam.toLowerCase() === 'all' ? undefined : studentFilterParam
+
     const report = await buildCoordinatorComprehensiveReport({
       period,
-      status: statusFilterParam !== 'ALL' ? statusFilterParam : undefined,
-      serviceType: categoryFilterParam !== 'all' ? categoryFilterParam : undefined,
-      studentId: studentFilterParam || undefined,
+      status: statusFilter,
+      serviceType: serviceFilter,
+      studentId: studentFilter,
     })
 
     const totalAttendances = report.summary.totals.overall

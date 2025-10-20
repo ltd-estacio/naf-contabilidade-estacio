@@ -7,16 +7,20 @@ export const runtime = 'nodejs'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const period = searchParams.get('period') ?? 'all'
-  const statusFilter = searchParams.get('status') ?? ''
-  const serviceFilter = searchParams.get('serviceType') ?? ''
-  const studentFilter = searchParams.get('studentId') ?? ''
+  const rawStatus = searchParams.get('status') ?? ''
+  const rawService = searchParams.get('serviceType') ?? ''
+  const rawStudent = searchParams.get('studentId') ?? ''
+
+  const statusFilter = rawStatus && rawStatus.toUpperCase() !== 'ALL' ? rawStatus : undefined
+  const serviceFilter = rawService && rawService.toLowerCase() !== 'all' ? rawService : undefined
+  const studentFilter = rawStudent && rawStudent.toLowerCase() !== 'all' ? rawStudent : undefined
 
   try {
     const report = await buildCoordinatorComprehensiveReport({
       period,
-      status: statusFilter || undefined,
-      serviceType: serviceFilter || undefined,
-      studentId: studentFilter || undefined,
+      status: statusFilter,
+      serviceType: serviceFilter,
+      studentId: studentFilter,
     })
 
     return NextResponse.json({

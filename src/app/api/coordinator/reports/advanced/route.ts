@@ -629,14 +629,19 @@ export async function GET(request: NextRequest) {
     const format = searchParams.get('format') || 'json'
     const period = searchParams.get('period') || '30d'
 
+    const rawService = searchParams.get('serviceType') || undefined
+    const rawStatus = searchParams.get('status') || undefined
+    const rawStudent = searchParams.get('studentId') || undefined
+    const rawCategory = searchParams.get('category') || undefined
+
     const filters: ReportFilters = {
       period,
       startDate: searchParams.get('startDate') || undefined,
       endDate: searchParams.get('endDate') || undefined,
-      serviceType: searchParams.get('serviceType') || undefined,
-      status: searchParams.get('status') || undefined,
-      studentId: searchParams.get('studentId') || undefined,
-      category: searchParams.get('category') || undefined
+      serviceType: rawService && rawService.toLowerCase() !== 'all' ? rawService : undefined,
+      status: rawStatus && rawStatus.toUpperCase() !== 'ALL' ? rawStatus : undefined,
+      studentId: rawStudent && rawStudent.toLowerCase() !== 'all' ? rawStudent : undefined,
+      category: rawCategory && rawCategory.toLowerCase() !== 'all' ? rawCategory : undefined
     }
 
     console.log(`📊 Report type: ${type}, Format: ${format}, Period: ${period}`)
