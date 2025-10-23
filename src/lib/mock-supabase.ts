@@ -1,4 +1,13 @@
 // Mock do Supabase para desenvolvimento local
+
+// Interfaces para tipagem
+interface MockFilter {
+  type: 'eq' | 'is' | 'in'
+  column: string
+  value?: unknown
+  values?: unknown[]
+}
+
 interface MockData {
   chat_conversations: Map<string, unknown>
   chat_messages: Map<string, unknown[]>
@@ -74,9 +83,9 @@ class MockTable {
 }
 
 class MockQuery {
-  private filters: unknown[] = []
-  private updateData: unknown = null
-  private insertData: unknown = null
+  private filters: MockFilter[] = []
+  private updateData: Record<string, unknown> | null = null
+  private insertData: Record<string, unknown> | null = null
   private isSingle: boolean = false
   private orderBy: { column: string, ascending: boolean } | null = null
   private limitValue: number | null = null
@@ -89,9 +98,9 @@ class MockQuery {
     private operationData?: unknown
   ) {
     if (operation === 'insert') {
-      this.insertData = operationData
+      this.insertData = operationData as Record<string, unknown> | null
     } else if (operation === 'update') {
-      this.updateData = operationData
+      this.updateData = operationData as Record<string, unknown> | null
     }
   }
 
@@ -133,6 +142,13 @@ class MockQuery {
     return this
   }
 
+  range(from: number, to: number) {
+    // Para o mock, vamos simular que sempre retorna dados vazios
+    // mas com a estrutura correta para funcionar com o sistema de backup
+    this.limitValue = to - from + 1
+    return this
+  }
+
   then(onfulfilled?: (value: unknown) => unknown, onrejected?: (reason: unknown) => unknown) {
     return this.execute().then(onfulfilled, onrejected)
   }
@@ -158,11 +174,11 @@ class MockQuery {
   }
 
   private async handleChatConversations() {
-    if (this.operation === 'insert') {
+    if (this.operation === 'insert' && this.insertData) {
       // Criar nova conversa
       const conversationId = `conversation-${Date.now()}`
       const conversation = {
-        ...this.insertData,
+        ...(this.insertData as Record<string, unknown>),
         id: conversationId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -177,15 +193,15 @@ class MockQuery {
     if (this.operation === 'update') {
       // Simular update de conversa
       const idFilter = this.filters.find(f => f.column === 'id')
-      if (idFilter) {
-        const conversation = this.data.chat_conversations.get(idFilter.value)
-        if (conversation) {
+      if (idFilter && idFilter.value) {
+        const conversation = this.data.chat_conversations.get(idFilter.value as string) as Record<string, unknown>
+        if (conversation && this.updateData) {
           const updated = {
-            ...conversation,
-            ...this.updateData,
+            ...(conversation as Record<string, unknown>),
+            ...(this.updateData as Record<string, unknown>),
             updated_at: new Date().toISOString()
           }
-          this.data.chat_conversations.set(idFilter.value, updated)
+          this.data.chat_conversations.set(idFilter.value as string, updated)
           return { data: updated, error: null }
         }
       }
@@ -199,21 +215,23 @@ class MockQuery {
       const statusFilter = this.filters.find(f => f.column === 'status')
       const humanRequestedFilter = this.filters.find(f => f.column === 'human_requested')
 
-      let conversations = Array.from(this.data.chat_conversations.values())
+      let conversations = Array.from(this.data.chat_conversations.values()) as Array<Record<string, unknown>>
 
       // Aplicar filtros
       if (userIdFilter) {
-        conversations = conversations.filter(c => c.user_id === userIdFilter.value)
+        conversations = conversations.filter((c: Record<string, unknown>) => c.user_id === userIdFilter.value)
 
         // Para buscar conversa por user_id (retornar sempre a mais recente)
         if (conversations.length > 0) {
           // Ordenar por data de criação (mais recente primeiro)
-          conversations.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime())
+          conversations.sort((a: Record<string, unknown>, b: Record<string, unknown>) => 
+            new Date((b.created_at as string) || '').getTime() - new Date((a.created_at as string) || '').getTime()
+          )
 
           if (this.isSingle) {
             // Se tem select específico com mensagens, incluir mensagens
             if (this.columns && this.columns.includes('messages')) {
-              conversations[0].messages = this.data.chat_messages.get(conversations[0].id) || []
+              (conversations[0] as Record<string, unknown>).messages = this.data.chat_messages.get(conversations[0].id as string) || []
             }
             return { data: conversations[0], error: null }
           }
@@ -223,34 +241,34 @@ class MockQuery {
         }
       }
       if (coordinatorIdFilter) {
-        conversations = conversations.filter(c => c.coordinator_id === coordinatorIdFilter.value)
+        conversations = conversations.filter((c: Record<string, unknown>) => c.coordinator_id === coordinatorIdFilter.value)
       }
       if (statusFilter) {
-        conversations = conversations.filter(c => c.status === statusFilter.value)
+        conversations = conversations.filter((c: Record<string, unknown>) => c.status === statusFilter.value)
       }
       if (humanRequestedFilter) {
-        conversations = conversations.filter(c => c.human_requested === humanRequestedFilter.value)
+        conversations = conversations.filter((c: Record<string, unknown>) => c.human_requested === humanRequestedFilter.value)
       }
 
       // Filtros especiais para buscar solicitações pendentes de chat humano
       const chatAcceptedByFilter = this.filters.find(f => f.column === 'chat_accepted_by')
       if (chatAcceptedByFilter && chatAcceptedByFilter.type === 'is' && chatAcceptedByFilter.value === null) {
-        conversations = conversations.filter(c => !c.chat_accepted_by)
+        conversations = conversations.filter((c: Record<string, unknown>) => !c.chat_accepted_by)
       }
 
       // Se tem select específico com mensagens, incluir mensagens
       if (this.columns && this.columns.includes('messages')) {
-        conversations = conversations.map(conv => ({
-          ...conv,
-          messages: this.data.chat_messages.get(conv.id) || []
+        conversations = conversations.map((conv: Record<string, unknown>) => ({
+          ...(conv as Record<string, unknown>),
+          messages: this.data.chat_messages.get(conv.id as string) || []
         }))
       }
 
       // Aplicar ordenação
       if (this.orderBy) {
-        conversations.sort((a, b) => {
-          const aVal = a[this.orderBy!.column]
-          const bVal = b[this.orderBy!.column]
+        conversations.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+          const aVal = a[this.orderBy!.column] as string | number
+          const bVal = b[this.orderBy!.column] as string | number
 
           if (aVal < bVal) return this.orderBy!.ascending ? -1 : 1
           if (aVal > bVal) return this.orderBy!.ascending ? 1 : -1
@@ -270,24 +288,24 @@ class MockQuery {
   }
 
   private async handleChatMessages() {
-    if (this.operation === 'insert') {
+    if (this.operation === 'insert' && this.insertData) {
       // Simular insert de mensagem
-      const conversationId = this.insertData.conversation_id
+      const conversationId = (this.insertData as Record<string, unknown>).conversation_id as string
       if (!this.data.chat_messages.has(conversationId)) {
         this.data.chat_messages.set(conversationId, [])
       }
 
       const message = {
-        ...this.insertData,
+        ...(this.insertData as Record<string, unknown>),
         id: `message-${Date.now()}`,
         created_at: new Date().toISOString(),
-        is_read: this.insertData.is_read !== undefined ? this.insertData.is_read : false
+        is_read: (this.insertData as Record<string, unknown>).is_read !== undefined ? (this.insertData as Record<string, unknown>).is_read : false
       }
 
       this.data.chat_messages.get(conversationId)?.push(message)
 
       // Atualizar timestamp da conversa
-      const conversation = this.data.chat_conversations.get(conversationId)
+      const conversation = this.data.chat_conversations.get(conversationId) as Record<string, unknown>
       if (conversation) {
         conversation.updated_at = new Date().toISOString()
       }
@@ -299,8 +317,8 @@ class MockQuery {
       // Buscar mensagens
       const conversationIdFilter = this.filters.find(f => f.column === 'conversation_id')
 
-      if (conversationIdFilter) {
-        const messages = this.data.chat_messages.get(conversationIdFilter.value) || []
+      if (conversationIdFilter && conversationIdFilter.value) {
+        const messages = this.data.chat_messages.get(conversationIdFilter.value as string) || []
         return { data: messages, error: null }
       }
 
@@ -323,26 +341,26 @@ class MockQuery {
 
       let updatedCount = 0
 
-      if (idFilter) {
+      if (idFilter && idFilter.value) {
         // Atualizar mensagem específica por ID
         const messagesCollections = Array.from(this.data.chat_messages.values())
         for (const messages of messagesCollections) {
-          const messageIndex = messages.findIndex((m: unknown) => m.id === idFilter.value)
-          if (messageIndex !== -1) {
-            messages[messageIndex] = { ...messages[messageIndex], ...this.updateData }
+          const messageIndex = messages.findIndex((m) => (m as Record<string, unknown>).id === idFilter.value)
+          if (messageIndex !== -1 && this.updateData) {
+            messages[messageIndex] = { ...(messages[messageIndex] as Record<string, unknown>), ...(this.updateData as Record<string, unknown>) }
             updatedCount++
             return { data: messages[messageIndex], error: null }
           }
         }
       }
 
-      if (inFilter) {
+      if (inFilter && inFilter.values) {
         // Atualizar múltiplas mensagens por IDs
         const messagesCollections = Array.from(this.data.chat_messages.values())
         for (const messages of messagesCollections) {
           for (let i = 0; i < messages.length; i++) {
-            if (inFilter.values.includes(messages[i].id)) {
-              messages[i] = { ...messages[i], ...this.updateData }
+            if (inFilter.values.includes((messages[i] as Record<string, unknown>).id) && this.updateData) {
+              messages[i] = { ...(messages[i] as Record<string, unknown>), ...(this.updateData as Record<string, unknown>) }
               updatedCount++
             }
           }
@@ -350,23 +368,24 @@ class MockQuery {
         return { data: null, error: null, count: updatedCount }
       }
 
-      if (conversationIdFilter) {
+      if (conversationIdFilter && conversationIdFilter.value) {
         // Atualizar mensagens de uma conversa específica
-        const messages = this.data.chat_messages.get(conversationIdFilter.value)
-        if (messages) {
+        const messages = this.data.chat_messages.get(conversationIdFilter.value as string)
+        if (messages && this.updateData) {
           for (let i = 0; i < messages.length; i++) {
             let shouldUpdate = true
+            const message = messages[i] as Record<string, unknown>
 
             // Verificar filtros adicionais
-            if (senderTypeFilter && messages[i].sender_type !== senderTypeFilter.value) {
+            if (senderTypeFilter && senderTypeFilter.value && message.sender_type !== senderTypeFilter.value) {
               shouldUpdate = false
             }
-            if (isReadFilter && messages[i].is_read !== isReadFilter.value) {
+            if (isReadFilter && isReadFilter.value !== undefined && message.is_read !== isReadFilter.value) {
               shouldUpdate = false
             }
 
             if (shouldUpdate) {
-              messages[i] = { ...messages[i], ...this.updateData }
+              messages[i] = { ...(message as Record<string, unknown>), ...(this.updateData as Record<string, unknown>) }
               updatedCount++
             }
           }
@@ -381,33 +400,33 @@ class MockQuery {
   }
 
   private async handleStudents() {
-    if (this.operation === 'insert') {
+    if (this.operation === 'insert' && this.insertData) {
       // Simular insert de estudante
       const studentId = `student-${Date.now()}`
       const student = {
-        ...this.insertData,
+        ...(this.insertData as Record<string, unknown>),
         id: studentId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      }
+      } as Record<string, unknown>
 
       // Verificar se email já existe
-      const studentsArray = Array.from(this.data.students.values())
-      if (studentsArray.find(s => s.email === student.email)) {
+      const studentsArray = Array.from(this.data.students.values()) as Array<Record<string, unknown>>
+      if (studentsArray.find((s: Record<string, unknown>) => s.email === student.email)) {
         return { data: null, error: { message: 'Email já cadastrado' } }
       }
 
       // Verificar se CPF já existe (se fornecido)
       if (student.document) {
-        const cleanDocument = student.document.replace(/\D/g, '')
-        if (studentsArray.find(s => s.document === cleanDocument)) {
+        const cleanDocument = (student.document as string).replace(/\D/g, '')
+        if (studentsArray.find((s: Record<string, unknown>) => s.document === cleanDocument)) {
           return { data: null, error: { message: 'CPF já cadastrado' } }
         }
       }
 
       // Verificar se matrícula já existe (se fornecida)
       if (student.registration_number) {
-        if (studentsArray.find(s => s.registration_number === student.registration_number)) {
+        if (studentsArray.find((s: Record<string, unknown>) => s.registration_number === student.registration_number)) {
           return { data: null, error: { message: 'Número de matrícula já cadastrado' } }
         }
       }
@@ -422,25 +441,25 @@ class MockQuery {
       const documentFilter = this.filters.find(f => f.column === 'document')
       const registrationFilter = this.filters.find(f => f.column === 'registration_number')
 
-      if (emailFilter) {
-        const studentsArray = Array.from(this.data.students.values())
-        const student = studentsArray.find(s => s.email === emailFilter.value)
+      if (emailFilter && emailFilter.value) {
+        const studentsArray = Array.from(this.data.students.values()) as Array<Record<string, unknown>>
+        const student = studentsArray.find((s: Record<string, unknown>) => s.email === emailFilter.value)
         if (student) {
           return { data: student, error: null }
         }
       }
 
-      if (documentFilter) {
-        const studentsArray = Array.from(this.data.students.values())
-        const student = studentsArray.find(s => s.document === documentFilter.value)
+      if (documentFilter && documentFilter.value) {
+        const studentsArray = Array.from(this.data.students.values()) as Array<Record<string, unknown>>
+        const student = studentsArray.find((s: Record<string, unknown>) => s.document === documentFilter.value)
         if (student) {
           return { data: student, error: null }
         }
       }
 
-      if (registrationFilter) {
-        const studentsArray = Array.from(this.data.students.values())
-        const student = studentsArray.find(s => s.registration_number === registrationFilter.value)
+      if (registrationFilter && registrationFilter.value) {
+        const studentsArray = Array.from(this.data.students.values()) as Array<Record<string, unknown>>
+        const student = studentsArray.find((s: Record<string, unknown>) => s.registration_number === registrationFilter.value)
         if (student) {
           return { data: student, error: null }
         }

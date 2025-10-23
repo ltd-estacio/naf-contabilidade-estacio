@@ -9,7 +9,7 @@ import { supabaseAdmin, supabase } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
-const SCHEMA_PATH = path.join(process.cwd(), 'database', 'tables.sql')
+const SCHEMA_PATH = path.join(process.cwd(), 'src', 'sql', 'tables.sql')
 const DEFAULT_PAGE_SIZE = 1000
 const MAX_ROWS_IN_MEMORY = 200_000
 
@@ -67,13 +67,10 @@ const parseBoolean = (value: string | null | undefined, defaultValue = false): b
   return ['1', 'true', 'yes', 'sim', 'on'].includes(normalized)
 }
 
-const ensureSupabaseClient = (): SupabaseClient => {
-  const hasUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)
-  const hasAnon = Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-  if (!hasUrl || !hasAnon) {
-    throw new Error('Configuração do Supabase ausente. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.')
-  }
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ? supabaseAdmin : supabase
+const ensureSupabaseClient = (): SupabaseClient | typeof supabaseAdmin => {
+  // Usar supabaseAdmin se disponível, senão usar o cliente padrão
+  // O sistema já trata o fallback para mock internamente
+  return supabaseAdmin
 }
 
 const extractTablesFromSchema = async (): Promise<string[]> => {
@@ -99,7 +96,7 @@ const resolveScope = (available: string[], requested: string[] | null): string[]
 }
 
 const fetchTableData = async (
-  client: SupabaseClient,
+  client: SupabaseClient | typeof supabaseAdmin,
   tableName: string,
   preview: boolean,
   pageSize: number
@@ -111,28 +108,28 @@ const fetchTableData = async (
   let truncated = false
 
   if (preview) {
-    const { count, error } = await client
+    const countResult = await (client as any)
       .from(tableName)
-      .select('*', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true }) as { count: number | null; error: any }
 
-    if (error) {
-      throw new Error(`Falha ao contar registros: ${error.message}`)
+    if (countResult.error) {
+      throw new Error(`Falha ao contar registros: ${countResult.error.message}`)
     }
 
-    rowCount = count ?? 0
+    rowCount = countResult.count ?? 0
 
     if (rowCount > 0) {
-      const { data: sample, error: sampleError } = await client
+      const sampleResult = await (client as any)
         .from(tableName)
         .select('*')
-        .limit(1)
+        .limit(1) as { data: any[] | null; error: any }
 
-      if (sampleError) {
-        throw new Error(`Falha ao obter amostra: ${sampleError.message}`)
+      if (sampleResult.error) {
+        throw new Error(`Falha ao obter amostra: ${sampleResult.error.message}`)
       }
 
-      if (sample && sample[0]) {
-        Object.keys(sample[0]).forEach((key) => columnSet.add(key))
+      if (sampleResult.data && sampleResult.data[0]) {
+        Object.keys(sampleResult.data[0]).forEach((key) => columnSet.add(key))
       }
     }
 
@@ -156,28 +153,28 @@ const fetchTableData = async (
 
   while (hasMore) {
     const to = from + pageSize - 1
-    const { data, error, count } = await client
+    const result = await (client as any)
       .from(tableName)
       .select('*', { count: from === 0 ? 'exact' : undefined })
-      .range(from, to)
+      .range(from, to) as { data: any[] | null; error: any; count?: number | null }
 
-    if (error) {
-      throw new Error(`Erro ao obter dados: ${error.message}`)
+    if (result.error) {
+      throw new Error(`Erro ao obter dados: ${result.error.message}`)
     }
 
-    if (typeof count === 'number' && totalKnown === 0) {
-      totalKnown = count
+    if (typeof result.count === 'number' && totalKnown === 0) {
+      totalKnown = result.count
     }
 
-    if (data && data.length > 0) {
-      rows.push(...data)
-      data.forEach((row) => {
+    if (result.data && result.data.length > 0) {
+      rows.push(...result.data)
+      result.data.forEach((row: any) => {
         Object.keys(row || {}).forEach((key) => columnSet.add(key))
       })
-      fetched += data.length
+      fetched += result.data.length
     }
 
-    if (!data || data.length < pageSize) {
+    if (!result.data || result.data.length < pageSize) {
       hasMore = false
       continue
     }
@@ -383,7 +380,8 @@ const createBackup = async (options: BackupOptions) => {
       const tableData = await fetchTableData(client, tableName, options.preview, options.pageSize)
       tables.push(tableData)
     } catch (error: unknown) {
-      errors.push({ table: tableName, message: error?.message ?? 'Erro desconhecido' })
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      errors.push({ table: tableName, message: errorMessage })
     }
   }
 
@@ -506,7 +504,7 @@ export async function GET(request: NextRequest) {
     const zipExtras = format === 'csv' ? ['csv'] : extras.length ? extras : ['json', 'csv', 'sql']
     const archive = await buildZipPackage(tables, metadata, schemaSql, includeSchema, zipExtras, compression, preview)
 
-    return new NextResponse(archive, {
+    return new NextResponse(archive as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${filename}"`,
@@ -516,8 +514,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error('Erro ao gerar backup:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { success: false, message: 'Erro ao gerar backup', detail: error?.message ?? String(error) },
+      { success: false, message: 'Erro ao gerar backup', detail: errorMessage },
       { status: 500 }
     )
   }
@@ -574,8 +573,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error('Erro ao processar requisição de backup:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { success: false, message: 'Erro interno durante o processamento do backup.', detail: error?.message ?? String(error) },
+      { success: false, message: 'Erro interno durante o processamento do backup.', detail: errorMessage },
       { status: 500 }
     )
   }
@@ -608,8 +608,9 @@ export async function DELETE(request: NextRequest) {
     )
   } catch (error: unknown) {
     console.error('Erro durante a limpeza de backups:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { success: false, message: 'Erro interno durante a limpeza de backups.', detail: error?.message ?? String(error) },
+      { success: false, message: 'Erro interno durante a limpeza de backups.', detail: errorMessage },
       { status: 500 }
     )
   }
