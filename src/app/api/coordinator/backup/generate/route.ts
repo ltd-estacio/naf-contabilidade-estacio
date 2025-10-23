@@ -77,42 +77,93 @@ export async function POST(request: NextRequest) {
     console.log('Filtros:', JSON.stringify(filters))
     console.log('Range de datas:', JSON.stringify(dateRange))
 
-    // Construir query simplificada usando Supabase
-    let query = (supabaseAdmin as any).from('attendances').select('*')
+    // Buscar dados da tabela ATTENDANCES
+    console.log('📊 Buscando dados da tabela ATTENDANCES...')
+    let queryAttendances = (supabaseAdmin as any).from('attendances').select('*')
 
-    // Aplicar filtros de status
+    // Aplicar filtros de status para attendances
     if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
-      console.log('Aplicando filtro de status:', filters.status)
-      query = query.in('status', filters.status)
+      console.log('Aplicando filtro de status em attendances:', filters.status)
+      queryAttendances = queryAttendances.in('status', filters.status)
     }
 
-    // Aplicar filtros de data
+    // Aplicar filtros de data para attendances
     if (dateRange.start) {
       const startDate = new Date(dateRange.start).toISOString()
-      console.log('Aplicando filtro de data inicial:', startDate)
-      query = query.gte('created_at', startDate)
+      console.log('Aplicando filtro de data inicial em attendances:', startDate)
+      queryAttendances = queryAttendances.gte('created_at', startDate)
     }
     if (dateRange.end) {
       const endDate = new Date(dateRange.end).toISOString()
-      console.log('Aplicando filtro de data final:', endDate)
-      query = query.lte('created_at', endDate)
+      console.log('Aplicando filtro de data final em attendances:', endDate)
+      queryAttendances = queryAttendances.lte('created_at', endDate)
     }
 
-    // Ordenar por data de criação
-    query = query.order('created_at', { ascending: false })
+    queryAttendances = queryAttendances.order('created_at', { ascending: false })
 
-    console.log('🔄 Executando query...')
+    console.log('🔄 Executando query em ATTENDANCES...')
+    const { data: attendancesData, error: attendancesError } = await queryAttendances
 
-    // Executar query
-    const { data: attendances, error: queryError } = await query
-
-    if (queryError) {
-      console.error('❌ Erro ao buscar atendimentos:', queryError)
-      console.error('Detalhes do erro:', JSON.stringify(queryError, null, 2))
-      throw new Error(`Erro ao buscar atendimentos: ${queryError.message || JSON.stringify(queryError)}`)
+    if (attendancesError) {
+      console.error('❌ Erro ao buscar attendances:', attendancesError)
+      throw new Error(`Erro ao buscar attendances: ${attendancesError.message}`)
     }
 
-    console.log(`✅ Query executada com sucesso. ${attendances?.length || 0} atendimentos encontrados`)
+    console.log(`✅ ${attendancesData?.length || 0} registros encontrados em ATTENDANCES`)
+
+    // Buscar dados da tabela FISCAL_APPOINTMENTS
+    console.log('📊 Buscando dados da tabela FISCAL_APPOINTMENTS...')
+    let queryFiscal = (supabaseAdmin as any).from('fiscal_appointments').select('*')
+
+    // Aplicar filtros de status para fiscal_appointments
+    // Status possíveis: PENDENTE, CONFIRMADO, EM_ANDAMENTO, CONCLUIDO, CANCELADO
+    const fiscalStatusMap: Record<string, string> = {
+      'AGENDADO': 'PENDENTE',
+      'EM_ANDAMENTO': 'EM_ANDAMENTO',
+      'CONCLUIDO': 'CONCLUIDO',
+      'CANCELADO': 'CANCELADO',
+      'NAO_COMPARECEU': 'CANCELADO'
+    }
+
+    if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+      const fiscalStatuses = filters.status.map((s: string) => fiscalStatusMap[s] || s)
+      console.log('Aplicando filtro de status em fiscal_appointments:', fiscalStatuses)
+      queryFiscal = queryFiscal.in('status', fiscalStatuses)
+    }
+
+    // Aplicar filtros de data para fiscal_appointments
+    if (dateRange.start) {
+      const startDate = new Date(dateRange.start).toISOString()
+      console.log('Aplicando filtro de data inicial em fiscal_appointments:', startDate)
+      queryFiscal = queryFiscal.gte('created_at', startDate)
+    }
+    if (dateRange.end) {
+      const endDate = new Date(dateRange.end).toISOString()
+      console.log('Aplicando filtro de data final em fiscal_appointments:', endDate)
+      queryFiscal = queryFiscal.lte('created_at', endDate)
+    }
+
+    queryFiscal = queryFiscal.order('created_at', { ascending: false })
+
+    console.log('🔄 Executando query em FISCAL_APPOINTMENTS...')
+    const { data: fiscalData, error: fiscalError } = await queryFiscal
+
+    if (fiscalError) {
+      console.error('❌ Erro ao buscar fiscal_appointments:', fiscalError)
+      throw new Error(`Erro ao buscar fiscal_appointments: ${fiscalError.message}`)
+    }
+
+    console.log(`✅ ${fiscalData?.length || 0} registros encontrados em FISCAL_APPOINTMENTS`)
+
+    // Combinar os dados das duas tabelas
+    const allAttendances = [
+      ...(attendancesData || []).map((att: any) => ({ ...att, _source: 'attendances' })),
+      ...(fiscalData || []).map((fiscal: any) => ({ ...fiscal, _source: 'fiscal_appointments' }))
+    ]
+
+    console.log(`📊 Total combinado: ${allAttendances.length} registros (${attendancesData?.length || 0} attendances + ${fiscalData?.length || 0} fiscal)`)
+
+    const attendances = allAttendances
 
     // Se não houver atendimentos, retornar arquivo vazio mas válido
     if (!attendances || attendances.length === 0) {
@@ -137,6 +188,34 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Buscar informações dos estudantes relacionados
+    console.log('👨‍🎓 Buscando informações dos estudantes...')
+    const studentIds = [...new Set(
+      attendances
+        .map((att: any) => att.student_id || att.assigned_student_id)
+        .filter((id: any) => id)
+    )]
+
+    console.log(`Encontrados ${studentIds.length} estudantes únicos`)
+
+    let studentsMap: Record<string, any> = {}
+    if (studentIds.length > 0) {
+      const { data: studentsData, error: studentsError } = await (supabaseAdmin as any)
+        .from('students')
+        .select('id, name, email, course, semester, registration_number')
+        .in('id', studentIds)
+
+      if (!studentsError && studentsData) {
+        studentsMap = studentsData.reduce((acc: any, student: any) => {
+          acc[student.id] = student
+          return acc
+        }, {})
+        console.log(`✅ Informações de ${Object.keys(studentsMap).length} estudantes carregadas`)
+      } else {
+        console.warn('⚠️ Não foi possível carregar informações dos estudantes:', studentsError)
+      }
+    }
+
     // Preparar dados para exportação com sanitização
     const exportData = attendances.map((att: any) => {
       // Função helper para converter data
@@ -149,40 +228,117 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const baseData = {
+      const source = att._source
+      const studentId = att.student_id || att.assigned_student_id
+      const student = studentId ? studentsMap[studentId] : null
+
+      // Dados base comuns
+      const baseData: Record<string, any> = {
+        // Origem do registro
+        origem_tabela: sanitizeValue(source),
+        
         // Dados básicos do atendimento
         id: sanitizeValue(att.id),
         protocolo: sanitizeValue(att.protocol),
         status: sanitizeValue(att.status),
-        categoria: sanitizeValue(att.category),
-        tema: sanitizeValue(att.theme),
-        subtema: sanitizeValue(att.subtheme),
-        tipo: sanitizeValue(att.type),
         
-        // Horas e validação
-        horas_prestadas: sanitizeValue(att.hours),
-        validado: att.is_validated || att.isValidated ? 'Sim' : 'Nao',
-        validado_por: sanitizeValue(att.validated_by || att.validatedBy),
+        // Informações do Cliente
+        cliente_nome: sanitizeValue(att.client_name),
+        cliente_email: sanitizeValue(att.client_email),
+        cliente_telefone: sanitizeValue(att.client_phone),
+        cliente_documento: sanitizeValue(att.client_cpf || att.client_document),
+        cliente_categoria: sanitizeValue(att.client_category),
         
-        // Descrição e observações
-        descricao: sanitizeValue(att.description),
-        observacoes: sanitizeValue(att.observations),
-        notas_validacao: sanitizeValue(att.validation_notes || att.validationNotes),
-        
-        // Certificado
-        requer_certificado: att.requires_cert || att.requiresCert ? 'Sim' : 'Nao',
-        certificado_emitido: att.cert_issued || att.certIssued ? 'Sim' : 'Nao',
-        
-        // IDs de relacionamento
-        usuario_id: sanitizeValue(att.user_id || att.userId),
-        demanda_id: sanitizeValue(att.demand_id || att.demandId),
-        
-        // Datas importantes (suporta snake_case e camelCase)
-        data_criacao: formatDate(att.created_at || att.createdAt),
-        data_atualizacao: formatDate(att.updated_at || att.updatedAt),
-        data_agendamento: formatDate(att.scheduled_at || att.scheduledAt),
-        data_conclusao: formatDate(att.completed_at || att.completedAt),
-        data_validacao: formatDate(att.validated_at || att.validatedAt)
+        // Informações do Estudante
+        estudante_id: sanitizeValue(studentId),
+        estudante_nome: student ? sanitizeValue(student.name) : sanitizeValue(att.student_name),
+        estudante_email: student ? sanitizeValue(student.email) : sanitizeValue(att.assigned_student_email),
+        estudante_curso: student ? sanitizeValue(student.course) : 'N/A',
+        estudante_semestre: student ? sanitizeValue(student.semester) : 'N/A',
+        estudante_matricula: student ? sanitizeValue(student.registration_number) : 'N/A'
+      }
+
+      // Adicionar campos específicos baseado na origem
+      if (source === 'fiscal_appointments') {
+        Object.assign(baseData, {
+          // Serviço Fiscal
+          tipo_servico: sanitizeValue(att.service_type),
+          titulo_servico: sanitizeValue(att.service_title),
+          categoria_servico: sanitizeValue(att.service_category),
+          detalhes_servico: sanitizeValue(JSON.stringify(att.service_details)),
+          
+          // Urgência e Prioridade
+          nivel_urgencia: sanitizeValue(att.urgency_level),
+          
+          // Endereço do Cliente
+          endereco_rua: sanitizeValue(att.address_street),
+          endereco_numero: sanitizeValue(att.address_number),
+          endereco_complemento: sanitizeValue(att.address_complement),
+          endereco_bairro: sanitizeValue(att.address_neighborhood),
+          endereco_cidade: sanitizeValue(att.address_city),
+          endereco_estado: sanitizeValue(att.address_state),
+          endereco_cep: sanitizeValue(att.address_zipcode),
+          
+          // Preferências de Agendamento
+          data_preferida: formatDate(att.preferred_date),
+          hora_preferida: sanitizeValue(att.preferred_time),
+          periodo_preferido: sanitizeValue(att.preferred_period),
+          
+          // Avaliação
+          avaliacao_satisfacao: sanitizeValue(att.client_satisfaction_rating),
+          
+          // Observações
+          observacoes_cliente: sanitizeValue(att.client_notes),
+          observacoes_internas: sanitizeValue(att.internal_notes),
+          
+          // Datas
+          data_criacao: formatDate(att.created_at),
+          data_atualizacao: formatDate(att.updated_at),
+          data_confirmacao: formatDate(att.confirmed_at),
+          data_agendamento: formatDate(att.scheduled_at),
+          data_conclusao: formatDate(att.completed_at)
+        })
+      } else {
+        // Tabela attendances
+        Object.assign(baseData, {
+          // Tipo de Serviço
+          tipo_servico: sanitizeValue(att.service_type),
+          descricao_servico: sanitizeValue(att.service_description),
+          
+          // Agendamento
+          data_agendada: sanitizeValue(att.scheduled_date),
+          hora_agendada: sanitizeValue(att.scheduled_time),
+          duracao_minutos: sanitizeValue(att.duration_minutes),
+          
+          // Modalidade
+          online: att.is_online ? 'Sim' : 'Nao',
+          link_reuniao: sanitizeValue(att.meeting_link),
+          local: sanitizeValue(att.location),
+          
+          // Urgência
+          urgencia: sanitizeValue(att.urgency),
+          
+          // Avaliação e Feedback
+          avaliacao_satisfacao: sanitizeValue(att.client_satisfaction_rating),
+          feedback_cliente: sanitizeValue(att.client_feedback),
+          notas_estudante: sanitizeValue(att.student_notes),
+          
+          // Validação
+          validado_supervisor: att.supervisor_validation ? 'Sim' : 'Nao',
+          supervisor_id: sanitizeValue(att.supervisor_id),
+          
+          // Documentos
+          documentos: sanitizeValue(JSON.stringify(att.documents)),
+          
+          // Cancelamento
+          motivo_cancelamento: sanitizeValue(att.cancellation_reason),
+          
+          // Datas
+          data_criacao: formatDate(att.created_at),
+          data_conclusao: formatDate(att.completed_at),
+          data_cancelamento: formatDate(att.cancelled_at),
+          data_validacao: formatDate(att.validated_at)
+        })
       }
 
       return baseData
