@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { supabaseAdmin } from '@/lib/supabase'
 
 type StudentInfo = {
   id: string
@@ -56,66 +54,77 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now()
 
-    // Construir query com filtros usando Prisma
-    const whereClause: any = {}
+    // Construir query com filtros usando Supabase
+    let query = (supabaseAdmin as any).from('attendances').select(`
+      *,
+      user:users!userId(id, name, email, cpf, phone),
+      demand:demands!demandId(
+        protocolNumber,
+        title,
+        description,
+        category,
+        theme,
+        status,
+        priority,
+        clientName,
+        clientEmail,
+        clientPhone,
+        clientCpf,
+        clientAddress,
+        createdAt,
+        completedAt
+      )
+    `)
 
     // Aplicar filtros de status
     if (filters.status && filters.status.length > 0) {
-      whereClause.status = {
-        in: filters.status
-      }
+      query = query.in('status', filters.status)
     }
 
     // Aplicar filtros de data
-    if (dateRange.start || dateRange.end) {
-      whereClause.createdAt = {}
-      if (dateRange.start) {
-        whereClause.createdAt.gte = new Date(dateRange.start)
-      }
-      if (dateRange.end) {
-        whereClause.createdAt.lte = new Date(dateRange.end)
-      }
+    if (dateRange.start) {
+      query = query.gte('createdAt', new Date(dateRange.start).toISOString())
+    }
+    if (dateRange.end) {
+      query = query.lte('createdAt', new Date(dateRange.end).toISOString())
     }
 
-    // Buscar atendimentos
-    const attendances = await prisma.attendance.findMany({
-      where: whereClause,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            cpf: true,
-            phone: true
-          }
-        },
-        demand: {
-          select: {
-            protocolNumber: true,
-            title: true,
-            description: true,
-            category: true,
-            theme: true,
-            status: true,
-            priority: true,
-            clientName: true,
-            clientEmail: true,
-            clientPhone: true,
-            clientCpf: true,
-            clientAddress: true,
-            createdAt: true,
-            completedAt: true
-          }
+    // Ordenar por data de criação
+    query = query.order('createdAt', { ascending: false })
+
+    // Executar query
+    const { data: attendances, error: queryError } = await query
+
+    if (queryError) {
+      console.error('Erro ao buscar atendimentos:', queryError)
+      throw new Error(`Erro ao buscar atendimentos: ${queryError.message}`)
+    }
+
+    // Se não houver atendimentos, retornar arquivo vazio mas válido
+    if (!attendances || attendances.length === 0) {
+      const emptyContent = format === 'json' 
+        ? '[]' 
+        : format === 'txt'
+        ? 'Nenhum atendimento encontrado para os filtros especificados.'
+        : 'Nenhum atendimento encontrado para os filtros especificados.'
+
+      const base64Content = Buffer.from(emptyContent, 'utf8').toString('base64')
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          content: base64Content,
+          fileName: `backup_atendimentos_NAF_${new Date().toISOString().split('T')[0]}.${format === 'json' ? 'json' : format === 'txt' ? 'txt' : 'csv'}`,
+          mimeType: format === 'json' ? 'application/json' : format === 'txt' ? 'text/plain' : 'text/csv',
+          fileSize: Buffer.byteLength(emptyContent, 'utf8') / 1024,
+          totalRecords: 0,
+          executionTime: Date.now() - startTime
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+      })
+    }
 
     // Preparar dados para exportação com sanitização
-    const exportData = attendances.map(att => {
+    const exportData = attendances.map((att: any) => {
       const baseData = {
         // Dados básicos do atendimento
         protocolo: sanitizeValue(att.protocol),
@@ -227,25 +236,24 @@ export async function POST(request: NextRequest) {
 
     // Registrar log de backup no banco de dados
     try {
-      await prisma.backupLog.create({
-        data: {
-          coordinatorId,
-          coordinatorName,
-          coordinatorEmail,
-          backupType: 'download',
-          exportFormat: format,
-          totalRecords: exportData.length,
-          fileSizeKb: fileSizeKB,
-          executionTimeMs: executionTime,
-          filters: filters,
-          includeMetadata,
-          compressed,
-          success: true,
-          ipAddress: request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown',
-          userAgent: request.headers.get('user-agent') || 'unknown'
-        }
+      await (supabaseAdmin as any).from('backup_logs').insert({
+        coordinator_id: coordinatorId,
+        coordinator_name: coordinatorName,
+        coordinator_email: coordinatorEmail,
+        backup_type: 'download',
+        export_format: format,
+        total_records: exportData.length,
+        file_size_kb: fileSizeKB,
+        execution_time_ms: executionTime,
+        filters: filters,
+        include_metadata: includeMetadata,
+        compressed,
+        success: true,
+        ip_address: request.headers.get('x-forwarded-for') || 
+                    request.headers.get('x-real-ip') || 
+                    'unknown',
+        user_agent: request.headers.get('user-agent') || 'unknown',
+        created_at: new Date().toISOString()
       })
     } catch (logError) {
       console.error('Erro ao registrar log de backup:', logError)
@@ -272,22 +280,20 @@ export async function POST(request: NextRequest) {
     
     // Tentar registrar erro no log
     try {
-      const body = await request.json()
-      await prisma.backupLog.create({
-        data: {
-          coordinatorId: body.coordinatorId || 'unknown',
-          coordinatorName: body.coordinatorName || 'unknown',
-          coordinatorEmail: body.coordinatorEmail || 'unknown',
-          backupType: 'download',
-          exportFormat: body.format || 'csv',
-          totalRecords: 0,
-          fileSizeKb: 0,
-          executionTimeMs: Date.now() - Date.now(),
-          success: false,
-          errorMessage: error instanceof Error ? error.message : 'Erro desconhecido',
-          ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
-          userAgent: request.headers.get('user-agent') || 'unknown'
-        }
+      await (supabaseAdmin as any).from('backup_logs').insert({
+        coordinator_id: 'unknown',
+        coordinator_name: 'unknown',
+        coordinator_email: 'unknown',
+        backup_type: 'download',
+        export_format: 'csv',
+        total_records: 0,
+        file_size_kb: 0,
+        execution_time_ms: 0,
+        success: false,
+        error_message: error instanceof Error ? error.message : 'Erro desconhecido',
+        ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+        user_agent: request.headers.get('user-agent') || 'unknown',
+        created_at: new Date().toISOString()
       })
     } catch (logError) {
       console.error('Erro ao registrar log de erro:', logError)
@@ -300,8 +306,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
-  } finally {
-    await prisma.$disconnect()
   }
 }
 
