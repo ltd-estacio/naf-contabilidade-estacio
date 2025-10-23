@@ -31,8 +31,15 @@ function sanitizeValue(value: any): string {
  * POST - Gerar backup de atendimentos fiscais em múltiplos formatos
  */
 export async function POST(request: NextRequest) {
+  console.log('🚀 API de backup chamada')
+  console.log('Método:', request.method)
+  console.log('URL:', request.url)
+  
   try {
+    console.log('📝 Lendo body da requisição...')
     const body = await request.json()
+    console.log('Body recebido:', JSON.stringify(body, null, 2))
+    
     const {
       coordinatorId,
       coordinatorName,
@@ -45,60 +52,67 @@ export async function POST(request: NextRequest) {
       compressed = false
     } = body
 
+    console.log('Parâmetros extraídos:', {
+      coordinatorId,
+      coordinatorName,
+      coordinatorEmail,
+      format,
+      hasFilters: Object.keys(filters).length > 0,
+      hasDateRange: Object.keys(dateRange).length > 0
+    })
+
     if (!coordinatorId || !coordinatorName || !coordinatorEmail) {
+      console.log('❌ Validação falhou: dados do coordenador ausentes')
       return NextResponse.json(
         { error: 'Dados do coordenador são obrigatórios' },
         { status: 400 }
       )
     }
 
+    console.log('✅ Validação passou')
+
     const startTime = Date.now()
 
-    // Construir query com filtros usando Supabase
-    let query = (supabaseAdmin as any).from('attendances').select(`
-      *,
-      user:users!userId(id, name, email, cpf, phone),
-      demand:demands!demandId(
-        protocolNumber,
-        title,
-        description,
-        category,
-        theme,
-        status,
-        priority,
-        clientName,
-        clientEmail,
-        clientPhone,
-        clientCpf,
-        clientAddress,
-        createdAt,
-        completedAt
-      )
-    `)
+    console.log('🔍 Iniciando backup de atendimentos...')
+    console.log('Filtros:', JSON.stringify(filters))
+    console.log('Range de datas:', JSON.stringify(dateRange))
+
+    // Construir query simplificada usando Supabase
+    let query = (supabaseAdmin as any).from('attendances').select('*')
 
     // Aplicar filtros de status
-    if (filters.status && filters.status.length > 0) {
+    if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
+      console.log('Aplicando filtro de status:', filters.status)
       query = query.in('status', filters.status)
     }
 
     // Aplicar filtros de data
     if (dateRange.start) {
-      query = query.gte('createdAt', new Date(dateRange.start).toISOString())
+      const startDate = new Date(dateRange.start).toISOString()
+      console.log('Aplicando filtro de data inicial:', startDate)
+      query = query.gte('created_at', startDate)
     }
     if (dateRange.end) {
-      query = query.lte('createdAt', new Date(dateRange.end).toISOString())
+      const endDate = new Date(dateRange.end).toISOString()
+      console.log('Aplicando filtro de data final:', endDate)
+      query = query.lte('created_at', endDate)
     }
 
     // Ordenar por data de criação
-    query = query.order('createdAt', { ascending: false })
+    query = query.order('created_at', { ascending: false })
+
+    console.log('🔄 Executando query...')
 
     // Executar query
     const { data: attendances, error: queryError } = await query
 
     if (queryError) {
-      console.error('Erro ao buscar atendimentos:', queryError)
-      throw new Error(`Erro ao buscar atendimentos: ${queryError.message}`)
+      console.error('❌ Erro ao buscar atendimentos:', queryError)
+      console.error('Detalhes do erro:', JSON.stringify(queryError, null, 2))
+      throw new Error(`Erro ao buscar atendimentos: ${queryError.message || JSON.stringify(queryError)}`)
     }
+
+    console.log(`✅ Query executada com sucesso. ${attendances?.length || 0} atendimentos encontrados`)
 
     // Se não houver atendimentos, retornar arquivo vazio mas válido
     if (!attendances || attendances.length === 0) {
@@ -125,8 +139,19 @@ export async function POST(request: NextRequest) {
 
     // Preparar dados para exportação com sanitização
     const exportData = attendances.map((att: any) => {
+      // Função helper para converter data
+      const formatDate = (dateStr: string | null | undefined) => {
+        if (!dateStr) return 'N/A'
+        try {
+          return new Date(dateStr).toLocaleString('pt-BR')
+        } catch {
+          return 'N/A'
+        }
+      }
+
       const baseData = {
         // Dados básicos do atendimento
+        id: sanitizeValue(att.id),
         protocolo: sanitizeValue(att.protocol),
         status: sanitizeValue(att.status),
         categoria: sanitizeValue(att.category),
@@ -136,62 +161,34 @@ export async function POST(request: NextRequest) {
         
         // Horas e validação
         horas_prestadas: sanitizeValue(att.hours),
-        validado: att.isValidated ? 'Sim' : 'Nao',
-        validado_por: sanitizeValue(att.validatedBy),
+        validado: att.is_validated || att.isValidated ? 'Sim' : 'Nao',
+        validado_por: sanitizeValue(att.validated_by || att.validatedBy),
         
         // Descrição e observações
         descricao: sanitizeValue(att.description),
         observacoes: sanitizeValue(att.observations),
-        notas_validacao: sanitizeValue(att.validationNotes),
+        notas_validacao: sanitizeValue(att.validation_notes || att.validationNotes),
         
         // Certificado
-        requer_certificado: att.requiresCert ? 'Sim' : 'Nao',
-        certificado_emitido: att.certIssued ? 'Sim' : 'Nao',
+        requer_certificado: att.requires_cert || att.requiresCert ? 'Sim' : 'Nao',
+        certificado_emitido: att.cert_issued || att.certIssued ? 'Sim' : 'Nao',
         
-        // Usuário responsável
-        usuario_id: sanitizeValue(att.user.id),
-        usuario_nome: sanitizeValue(att.user.name),
-        usuario_email: sanitizeValue(att.user.email),
-        usuario_cpf: sanitizeValue(att.user.cpf),
-        usuario_telefone: sanitizeValue(att.user.phone),
+        // IDs de relacionamento
+        usuario_id: sanitizeValue(att.user_id || att.userId),
+        demanda_id: sanitizeValue(att.demand_id || att.demandId),
         
-        // Dados da demanda (se existir)
-        demanda_protocolo: sanitizeValue(att.demand?.protocolNumber),
-        demanda_titulo: sanitizeValue(att.demand?.title),
-        demanda_categoria: sanitizeValue(att.demand?.category),
-        demanda_tema: sanitizeValue(att.demand?.theme),
-        demanda_status: sanitizeValue(att.demand?.status),
-        demanda_prioridade: sanitizeValue(att.demand?.priority),
-        
-        // Dados do cliente (da demanda)
-        cliente_nome: sanitizeValue(att.demand?.clientName),
-        cliente_email: sanitizeValue(att.demand?.clientEmail),
-        cliente_telefone: sanitizeValue(att.demand?.clientPhone),
-        cliente_cpf: sanitizeValue(att.demand?.clientCpf),
-        cliente_endereco: sanitizeValue(att.demand?.clientAddress),
-        
-        // Datas importantes
-        data_criacao: sanitizeValue(att.createdAt?.toLocaleString('pt-BR')),
-        data_atualizacao: sanitizeValue(att.updatedAt?.toLocaleString('pt-BR')),
-        data_agendamento: sanitizeValue(att.scheduledAt?.toLocaleString('pt-BR')),
-        data_conclusao: sanitizeValue(att.completedAt?.toLocaleString('pt-BR')),
-        data_validacao: sanitizeValue(att.validatedAt?.toLocaleString('pt-BR'))
-      }
-
-      // Adicionar metadados se solicitado
-      if (includeMetadata) {
-        return {
-          ...baseData,
-          atendimento_id: att.id,
-          demanda_id: att.demandId || 'N/A',
-          demanda_descricao: sanitizeValue(att.demand?.description),
-          demanda_data_criacao: sanitizeValue(att.demand?.createdAt?.toLocaleString('pt-BR')),
-          demanda_data_conclusao: sanitizeValue(att.demand?.completedAt?.toLocaleString('pt-BR'))
-        }
+        // Datas importantes (suporta snake_case e camelCase)
+        data_criacao: formatDate(att.created_at || att.createdAt),
+        data_atualizacao: formatDate(att.updated_at || att.updatedAt),
+        data_agendamento: formatDate(att.scheduled_at || att.scheduledAt),
+        data_conclusao: formatDate(att.completed_at || att.completedAt),
+        data_validacao: formatDate(att.validated_at || att.validatedAt)
       }
 
       return baseData
     })
+
+    console.log(`📊 ${exportData.length} registros preparados para exportação`)
 
     // Gerar arquivo no formato solicitado
     let fileContent: string
@@ -276,7 +273,18 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Erro ao gerar backup:', error)
+    console.error('❌ Erro ao gerar backup:', error)
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'N/A')
+    
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorDetails = {
+      message: errorMessage,
+      name: error instanceof Error ? error.name : 'UnknownError',
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    }
+
+    console.error('Detalhes completos do erro:', JSON.stringify(errorDetails, null, 2))
     
     // Tentar registrar erro no log
     try {
@@ -290,7 +298,7 @@ export async function POST(request: NextRequest) {
         file_size_kb: 0,
         execution_time_ms: 0,
         success: false,
-        error_message: error instanceof Error ? error.message : 'Erro desconhecido',
+        error_message: errorMessage,
         ip_address: request.headers.get('x-forwarded-for') || 'unknown',
         user_agent: request.headers.get('user-agent') || 'unknown',
         created_at: new Date().toISOString()
@@ -301,8 +309,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
+        success: false,
         error: 'Erro interno do servidor',
-        message: error instanceof Error ? error.message : 'Erro desconhecido'
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
       },
       { status: 500 }
     )
