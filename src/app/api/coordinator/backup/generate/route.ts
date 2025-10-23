@@ -31,9 +31,10 @@ function sanitizeValue(value: any): string {
  * POST - Gerar backup de atendimentos fiscais em múltiplos formatos
  */
 export async function POST(request: NextRequest) {
+  console.log('🚀 ========================================')
   console.log('🚀 API de backup chamada')
-  console.log('Método:', request.method)
-  console.log('URL:', request.url)
+  console.log('🚀 Timestamp:', new Date().toISOString())
+  console.log('🚀 ========================================')
   
   try {
     console.log('📝 Lendo body da requisição...')
@@ -52,14 +53,13 @@ export async function POST(request: NextRequest) {
       compressed = false
     } = body
 
-    console.log('Parâmetros extraídos:', {
-      coordinatorId,
-      coordinatorName,
-      coordinatorEmail,
-      format,
-      hasFilters: Object.keys(filters).length > 0,
-      hasDateRange: Object.keys(dateRange).length > 0
-    })
+    console.log('📋 Parâmetros extraídos:')
+    console.log('  - coordinatorId:', coordinatorId)
+    console.log('  - coordinatorName:', coordinatorName)
+    console.log('  - coordinatorEmail:', coordinatorEmail)
+    console.log('  - format:', format)
+    console.log('  - filters:', JSON.stringify(filters))
+    console.log('  - dateRange:', JSON.stringify(dateRange))
 
     if (!coordinatorId || !coordinatorName || !coordinatorEmail) {
       console.log('❌ Validação falhou: dados do coordenador ausentes')
@@ -73,29 +73,36 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now()
 
+    console.log('🔍 ========================================')
     console.log('🔍 Iniciando backup de atendimentos...')
-    console.log('Filtros:', JSON.stringify(filters))
+    console.log('🔍 ========================================')
+    console.log('Filtros recebidos:', JSON.stringify(filters))
     console.log('Range de datas:', JSON.stringify(dateRange))
 
     // Buscar dados da tabela ATTENDANCES
-    console.log('📊 Buscando dados da tabela ATTENDANCES...')
+    console.log('\n📊 ========================================')
+    console.log('📊 Buscando dados da tabela ATTENDANCES')
+    console.log('📊 ========================================')
+    
     let queryAttendances = (supabaseAdmin as any).from('attendances').select('*')
 
-    // Aplicar filtros de status para attendances
+    // Aplicar filtros de status para attendances SOMENTE SE FORNECIDOS
     if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
-      console.log('Aplicando filtro de status em attendances:', filters.status)
+      console.log('🔍 Aplicando filtro de status em attendances:', filters.status)
       queryAttendances = queryAttendances.in('status', filters.status)
+    } else {
+      console.log('🔍 SEM filtro de status - buscando TODOS os registros')
     }
 
-    // Aplicar filtros de data para attendances
+    // Aplicar filtros de data para attendances SOMENTE SE FORNECIDOS
     if (dateRange.start) {
       const startDate = new Date(dateRange.start).toISOString()
-      console.log('Aplicando filtro de data inicial em attendances:', startDate)
+      console.log('🔍 Aplicando filtro de data inicial em attendances:', startDate)
       queryAttendances = queryAttendances.gte('created_at', startDate)
     }
     if (dateRange.end) {
       const endDate = new Date(dateRange.end).toISOString()
-      console.log('Aplicando filtro de data final em attendances:', endDate)
+      console.log('🔍 Aplicando filtro de data final em attendances:', endDate)
       queryAttendances = queryAttendances.lte('created_at', endDate)
     }
 
@@ -106,13 +113,27 @@ export async function POST(request: NextRequest) {
 
     if (attendancesError) {
       console.error('❌ Erro ao buscar attendances:', attendancesError)
+      console.error('❌ Código:', attendancesError.code)
+      console.error('❌ Detalhes:', attendancesError.details)
+      console.error('❌ Hint:', attendancesError.hint)
       throw new Error(`Erro ao buscar attendances: ${attendancesError.message}`)
     }
 
     console.log(`✅ ${attendancesData?.length || 0} registros encontrados em ATTENDANCES`)
+    if (attendancesData && attendancesData.length > 0) {
+      console.log('📝 Exemplo do primeiro registro:', {
+        id: attendancesData[0].id,
+        protocol: attendancesData[0].protocol,
+        status: attendancesData[0].status,
+        client_name: attendancesData[0].client_name
+      })
+    }
 
     // Buscar dados da tabela FISCAL_APPOINTMENTS
-    console.log('📊 Buscando dados da tabela FISCAL_APPOINTMENTS...')
+    console.log('\n📊 ========================================')
+    console.log('📊 Buscando dados da tabela FISCAL_APPOINTMENTS')
+    console.log('📊 ========================================')
+    
     let queryFiscal = (supabaseAdmin as any).from('fiscal_appointments').select('*')
 
     // Aplicar filtros de status para fiscal_appointments
@@ -127,19 +148,21 @@ export async function POST(request: NextRequest) {
 
     if (filters.status && Array.isArray(filters.status) && filters.status.length > 0) {
       const fiscalStatuses = filters.status.map((s: string) => fiscalStatusMap[s] || s)
-      console.log('Aplicando filtro de status em fiscal_appointments:', fiscalStatuses)
+      console.log('🔍 Aplicando filtro de status em fiscal_appointments:', fiscalStatuses)
       queryFiscal = queryFiscal.in('status', fiscalStatuses)
+    } else {
+      console.log('🔍 SEM filtro de status - buscando TODOS os registros fiscais')
     }
 
-    // Aplicar filtros de data para fiscal_appointments
+    // Aplicar filtros de data para fiscal_appointments SOMENTE SE FORNECIDOS
     if (dateRange.start) {
       const startDate = new Date(dateRange.start).toISOString()
-      console.log('Aplicando filtro de data inicial em fiscal_appointments:', startDate)
+      console.log('🔍 Aplicando filtro de data inicial em fiscal_appointments:', startDate)
       queryFiscal = queryFiscal.gte('created_at', startDate)
     }
     if (dateRange.end) {
       const endDate = new Date(dateRange.end).toISOString()
-      console.log('Aplicando filtro de data final em fiscal_appointments:', endDate)
+      console.log('🔍 Aplicando filtro de data final em fiscal_appointments:', endDate)
       queryFiscal = queryFiscal.lte('created_at', endDate)
     }
 
@@ -150,10 +173,21 @@ export async function POST(request: NextRequest) {
 
     if (fiscalError) {
       console.error('❌ Erro ao buscar fiscal_appointments:', fiscalError)
+      console.error('❌ Código:', fiscalError.code)
+      console.error('❌ Detalhes:', fiscalError.details)
+      console.error('❌ Hint:', fiscalError.hint)
       throw new Error(`Erro ao buscar fiscal_appointments: ${fiscalError.message}`)
     }
 
     console.log(`✅ ${fiscalData?.length || 0} registros encontrados em FISCAL_APPOINTMENTS`)
+    if (fiscalData && fiscalData.length > 0) {
+      console.log('📝 Exemplo do primeiro registro fiscal:', {
+        id: fiscalData[0].id,
+        protocol: fiscalData[0].protocol,
+        status: fiscalData[0].status,
+        client_name: fiscalData[0].client_name
+      })
+    }
 
     // Combinar os dados das duas tabelas
     const allAttendances = [
@@ -161,7 +195,11 @@ export async function POST(request: NextRequest) {
       ...(fiscalData || []).map((fiscal: any) => ({ ...fiscal, _source: 'fiscal_appointments' }))
     ]
 
-    console.log(`📊 Total combinado: ${allAttendances.length} registros (${attendancesData?.length || 0} attendances + ${fiscalData?.length || 0} fiscal)`)
+    console.log('\n📊 ========================================')
+    console.log(`📊 TOTAL COMBINADO: ${allAttendances.length} registros`)
+    console.log(`📊 - Attendances: ${attendancesData?.length || 0}`)
+    console.log(`📊 - Fiscal: ${fiscalData?.length || 0}`)
+    console.log('📊 ========================================')
 
     const attendances = allAttendances
 
