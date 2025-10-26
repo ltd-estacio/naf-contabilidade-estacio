@@ -10,8 +10,14 @@ import { Badge } from '@/components/ui/badge'
 interface TimeSlot {
   time: string
   is_available: boolean
-  reason?: string
+  reason?: string | null
   slots_remaining: number
+}
+
+interface BlockedInfo {
+  isBlocked: boolean
+  reason?: string
+  type?: 'day' | 'date'
 }
 
 interface ImprovedCalendarPickerProps {
@@ -34,6 +40,7 @@ export default function ImprovedCalendarPicker({
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
   const [loading, setLoading] = useState(false)
   const [manualDate, setManualDate] = useState('')
+  const [blockedInfo, setBlockedInfo] = useState<BlockedInfo>({ isBlocked: false })
 
   const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
   const MONTHS = [
@@ -60,11 +67,58 @@ export default function ImprovedCalendarPicker({
   const loadTimeSlots = async (selectedDate: string) => {
     console.log('📡 Buscando slots para:', selectedDate)
     setLoading(true)
+    setBlockedInfo({ isBlocked: false }) // Reset blocked info
+    
     try {
       const response = await fetch(`/api/scheduling/availability?date=${selectedDate}`)
       const data = await response.json()
       
       console.log('📥 Resposta da API:', data)
+      
+      // Verificar se há bloqueios para esta data
+      if (data.availability && Array.isArray(data.availability)) {
+        const selectedDateObj = new Date(selectedDate + 'T00:00:00')
+        const dayOfWeek = selectedDateObj.getDay() // 0=Domingo, 6=Sábado
+        
+        // Verificar bloqueio por data específica
+        const dateBlock = data.availability.find((avail: any) => 
+          avail.type === 'blocked' && 
+          avail.specific_date === selectedDate &&
+          avail.is_active
+        )
+        
+        // Verificar bloqueio por dia da semana
+        const dayBlock = data.availability.find((avail: any) => 
+          avail.type === 'blocked' && 
+          avail.day_of_week === dayOfWeek &&
+          !avail.specific_date &&
+          avail.is_active
+        )
+        
+        if (dateBlock) {
+          console.log('🚫 Data bloqueada:', dateBlock.reason)
+          setBlockedInfo({
+            isBlocked: true,
+            reason: dateBlock.reason || 'Data indisponível para agendamentos',
+            type: 'date'
+          })
+          setTimeSlots([])
+          setLoading(false)
+          return
+        }
+        
+        if (dayBlock) {
+          console.log('🚫 Dia da semana bloqueado:', dayBlock.reason)
+          setBlockedInfo({
+            isBlocked: true,
+            reason: dayBlock.reason || 'Este dia da semana está bloqueado para agendamentos',
+            type: 'day'
+          })
+          setTimeSlots([])
+          setLoading(false)
+          return
+        }
+      }
       
       if (data.timeSlots && data.timeSlots.length > 0) {
         console.log(`✅ ${data.timeSlots.length} horários recebidos da API`)
@@ -309,6 +363,27 @@ export default function ImprovedCalendarPicker({
             {loading ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">Carregando horários...</p>
+              </div>
+            ) : blockedInfo.isBlocked ? (
+              <div className="text-center py-8 space-y-4">
+                <div className="flex items-center justify-center gap-2 text-red-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-red-600 mb-2">
+                    {blockedInfo.type === 'date' ? 'Data Bloqueada' : 'Dia da Semana Bloqueado'}
+                  </p>
+                  <p className="text-gray-600">
+                    {blockedInfo.reason}
+                  </p>
+                </div>
+                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800">
+                    💡 <strong>Dica:</strong> Selecione outra data disponível no calendário para continuar com o agendamento.
+                  </p>
+                </div>
               </div>
             ) : timeSlots.length === 0 ? (
               <div className="text-center py-8">
