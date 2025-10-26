@@ -123,7 +123,7 @@ export default function SchedulingAvailabilityManager() {
         start_time: formData.start_time,
         end_time: formData.end_time,
         reason: formData.reason || null,
-        created_by: 'coordinator', // TODO: Pegar do usuário logado
+        // created_by deve ser UUID ou null - remover por enquanto
       }
 
       if (formData.type === 'available') {
@@ -240,7 +240,7 @@ export default function SchedulingAvailabilityManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...updatedSettings,
-          updated_by: 'coordinator', // TODO: Pegar do usuário logado
+          // updated_by deve ser UUID ou null - remover por enquanto
         }),
       })
 
