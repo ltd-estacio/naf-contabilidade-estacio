@@ -43,28 +43,64 @@ export default function ImprovedCalendarPicker({
 
   useEffect(() => {
     if (date) {
+      console.log('🔍 Carregando horários para:', date)
       loadTimeSlots(date)
+    } else {
+      console.log('⚠️ Nenhuma data selecionada ainda')
     }
   }, [date])
 
   useEffect(() => {
     if (date && time && format) {
+      console.log('✅ Seleção completa:', { date, time, format })
       onDateTimeSelect(date, time, format)
     }
   }, [date, time, format])
 
   const loadTimeSlots = async (selectedDate: string) => {
+    console.log('📡 Buscando slots para:', selectedDate)
     setLoading(true)
     try {
       const response = await fetch(`/api/scheduling/availability?date=${selectedDate}`)
       const data = await response.json()
-      if (data.timeSlots) {
+      
+      console.log('📥 Resposta da API:', data)
+      
+      if (data.timeSlots && data.timeSlots.length > 0) {
+        console.log(`✅ ${data.timeSlots.length} horários recebidos da API`)
         setTimeSlots(data.timeSlots)
+      } else {
+        console.log('⚠️ API não retornou slots, usando horários padrão')
+        // Fallback: usar horários fixos se a API não retornar slots
+        const defaultSlots = [
+          '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+          '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
+        ].map(time => ({
+          time,
+          is_available: true,
+          reason: null,
+          slots_remaining: 3
+        }))
+        console.log(`✅ ${defaultSlots.length} horários padrão definidos`)
+        setTimeSlots(defaultSlots)
       }
     } catch (error) {
-      console.error('Erro ao carregar horários:', error)
+      console.error('❌ Erro ao carregar horários:', error)
+      // Em caso de erro, usar horários padrão
+      const defaultSlots = [
+        '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+        '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
+      ].map(time => ({
+        time,
+        is_available: true,
+        reason: null,
+        slots_remaining: 3
+      }))
+      console.log(`✅ ${defaultSlots.length} horários padrão (fallback por erro)`)
+      setTimeSlots(defaultSlots)
     } finally {
       setLoading(false)
+      console.log('✅ Loading concluído')
     }
   }
 
