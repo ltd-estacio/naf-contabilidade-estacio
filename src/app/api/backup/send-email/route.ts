@@ -22,6 +22,14 @@ const transporter = nodemailer.createTransport({
  * POST - Enviar backup por e-mail
  */
 export async function POST(request: NextRequest) {
+  console.log('🚀 API /api/backup/send-email CHAMADA!')
+  console.log('🚀 Environment vars:', {
+    hasEmailUser: !!process.env.EMAIL_USER,
+    hasEmailPass: !!process.env.EMAIL_PASS,
+    hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    hasSupabaseKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  })
+  
   try {
     console.log('📧 ========================================')
     console.log('📧 Iniciando envio de backup por e-mail...')

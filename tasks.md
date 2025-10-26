@@ -28,3 +28,4 @@ Tarefas finais concluidas:
 [ X ] Verificacao de pessoas que fazem atendimento no mesmo dia e horario fica bloqueado
 [ X ] Envio de backup de atendimento por e-mail
 [ X ] Filtro de relatório dos atendimentos por datas (relatório semanal, mensal)
+[ X ] 
