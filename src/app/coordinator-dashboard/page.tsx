@@ -59,6 +59,7 @@ import ChatLinkGenerator from '@/components/coordinator/ChatLinkGenerator'
 import BackupCenter from '@/components/coordinator/BackupCenter'
 import ExternalCoursesManager from '@/components/ExternalCoursesManager'
 import PasswordChangeForm from '@/components/PasswordChangeForm'
+import SchedulingAvailabilityManager from '@/components/admin/SchedulingAvailabilityManager'
 // import { HistoryDashboard } from '@/components/coordinator/HistoryDashboard'
 
 interface ServiceMetrics {
@@ -1167,6 +1168,13 @@ export default function CoordinatorDashboard() {
       category: 'management'
     },
     {
+      value: 'scheduling',
+      label: 'Disponibilidade',
+      description: 'Gerenciar horários de agendamento',
+      icon: CalendarClock,
+      category: 'operations'
+    },
+    {
       value: 'automation',
       label: 'Automação Fiscal',
       description: 'Upload inteligente e preenchimento automático',
@@ -1427,6 +1435,10 @@ export default function CoordinatorDashboard() {
             <TabsTrigger className="w-full justify-center gap-2" value="courses">
               <BookOpen className="h-4 w-4" />
               Cursos Externos
+            </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="scheduling">
+              <CalendarClock className="h-4 w-4" />
+              Disponibilidade
             </TabsTrigger>
             <TabsTrigger className="w-full justify-center gap-2" value="danger">
               <AlertTriangle className="h-4 w-4" />
@@ -2299,6 +2311,11 @@ export default function CoordinatorDashboard() {
           {/* NOVA ABA: CURSOS EXTERNOS */}
           <TabsContent value="courses" className="space-y-6">
             <ExternalCoursesManager />
+          </TabsContent>
+
+          {/* NOVA ABA: DISPONIBILIDADE DE AGENDAMENTOS */}
+          <TabsContent value="scheduling" className="space-y-6">
+            <SchedulingAvailabilityManager />
           </TabsContent>
 
           {/* PAINEL DE PERIGO - Operações Críticas com 2FA */}
