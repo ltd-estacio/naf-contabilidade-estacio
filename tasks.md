@@ -26,3 +26,4 @@ Tarefas finais concluidas:
 [ X ] Trocar de estudante na hora do atendimento (coordenador redirecionar)
 [ X ] Calendário (formato e bloqueio/datas horários pelo coordenador)
 [ X ] Designe do Calendário melhorada
+[ X ] Verificacao de pessoas que fazem atendimento no mesmo dia e horario fica bloqueado
