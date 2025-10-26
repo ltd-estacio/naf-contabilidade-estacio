@@ -24,6 +24,7 @@ import {
   MessageSquare
 } from 'lucide-react'
 import FeedbackModal from './FeedbackModal'
+import AttendanceRegistrationModal, { RegistrationData } from './AttendanceRegistrationModal'
 
 interface FiscalAppointment {
   id: string
@@ -70,6 +71,8 @@ export default function FiscalAppointmentsManager() {
   const [showDetails, setShowDetails] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [completedAppointment, setCompletedAppointment] = useState<FiscalAppointment | null>(null)
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
+  const [appointmentToStart, setAppointmentToStart] = useState<FiscalAppointment | null>(null)
   const [error, setError] = useState('')
 
   const loadAppointments = async () => {
@@ -120,29 +123,43 @@ export default function FiscalAppointmentsManager() {
   }
 
   const handleStartAppointment = async (appointment: FiscalAppointment) => {
+    // Abrir modal de registro antes de iniciar o atendimento
+    setAppointmentToStart(appointment)
+    setShowRegistrationModal(true)
+  }
+
+  const handleRegistrationSubmit = async (data: RegistrationData) => {
+    if (!appointmentToStart) return
+
     try {
       const token = localStorage.getItem('student_token')
-      const response = await fetch('/api/students/fiscal-appointments', {
-        method: 'PUT',
+      
+      // Salvar o registro de anotações
+      const response = await fetch('/api/students/attendance-notes', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          appointmentId: appointment.id,
-          status: 'EM_ANDAMENTO'
+          appointmentId: appointmentToStart.id,
+          stepByStep: data.stepByStep,
+          stages: data.stages,
+          summary: data.summary
         })
       })
 
       if (response.ok) {
         await loadAppointments()
-        alert('Atendimento iniciado com sucesso!')
+        alert('Registro salvo e atendimento iniciado com sucesso!')
+        setAppointmentToStart(null)
       } else {
-        alert('Erro ao iniciar atendimento')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao salvar registro')
       }
     } catch (error) {
-      console.error('Erro ao iniciar atendimento:', error)
-      alert('Erro ao iniciar atendimento')
+      console.error('Erro ao salvar registro:', error)
+      throw error // Deixa o modal tratar o erro
     }
   }
 
@@ -468,6 +485,21 @@ export default function FiscalAppointmentsManager() {
             setShowFeedbackModal(false)
             setCompletedAppointment(null)
           }}
+        />
+      )}
+
+      {/* Modal de Registro do Atendimento */}
+      {showRegistrationModal && appointmentToStart && (
+        <AttendanceRegistrationModal
+          isOpen={showRegistrationModal}
+          onClose={() => {
+            setShowRegistrationModal(false)
+            setAppointmentToStart(null)
+          }}
+          onSubmit={handleRegistrationSubmit}
+          appointmentId={appointmentToStart.id}
+          clientName={appointmentToStart.client_name}
+          serviceTitle={appointmentToStart.service_title}
         />
       )}
     </div>
