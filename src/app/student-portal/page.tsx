@@ -56,6 +56,8 @@ import ReportGenerator from '@/components/reports/ReportGenerator'
 import { StudentChat } from '@/components/chat/StudentChat'
 import StudentFiscalAppointments from '@/components/student/StudentFiscalAppointments'
 import ChatLinkGenerator from '@/components/coordinator/ChatLinkGenerator'
+import ExternalCoursesViewer from '@/components/ExternalCoursesViewer'
+import PasswordChangeForm from '@/components/PasswordChangeForm'
 import studentSession from '@/lib/studentSession'
 
 interface StudentProfile {
@@ -966,6 +968,7 @@ export default function StudentPortal() {
             <TabsTrigger className="w-full justify-center" value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger className="w-full justify-center" value="attendances">Atendimentos Fiscais</TabsTrigger>
             <TabsTrigger className="w-full justify-center" value="trainings">Treinamentos</TabsTrigger>
+            <TabsTrigger className="w-full justify-center" value="courses">Cursos</TabsTrigger>
             <TabsTrigger className="w-full justify-center" value="analytics">Analytics</TabsTrigger>
             <TabsTrigger className="w-full justify-center" value="reports">Relatórios</TabsTrigger>
             <TabsTrigger className="w-full justify-center" value="profile">Perfil</TabsTrigger>
@@ -1907,6 +1910,21 @@ export default function StudentPortal() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Componente de Mudança de Senha */}
+            {profileData && (
+              <div className="mt-6">
+                <PasswordChangeForm 
+                  userEmail={profileData.profile.email || user?.email || ''}
+                  userType="student"
+                />
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Nova Tab: Cursos Externos */}
+          <TabsContent value="courses" className="mt-6 space-y-6">
+            <ExternalCoursesViewer />
           </TabsContent>
 
           {/* Chat Tab */}

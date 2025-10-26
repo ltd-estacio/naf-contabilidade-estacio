@@ -57,6 +57,8 @@ import UsersPanel from '@/components/admin/UsersPanel'
 import StudentsPerformancePanel from '@/components/coordinator/StudentsPerformancePanel'
 import ChatLinkGenerator from '@/components/coordinator/ChatLinkGenerator'
 import BackupCenter from '@/components/coordinator/BackupCenter'
+import ExternalCoursesManager from '@/components/ExternalCoursesManager'
+import PasswordChangeForm from '@/components/PasswordChangeForm'
 // import { HistoryDashboard } from '@/components/coordinator/HistoryDashboard'
 
 interface ServiceMetrics {
@@ -1415,6 +1417,10 @@ export default function CoordinatorDashboard() {
               <ShieldCheck className="h-4 w-4" />
               Segurança Digital
             </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="courses">
+              <BookOpen className="h-4 w-4" />
+              Cursos Externos
+            </TabsTrigger>
             <TabsTrigger className="w-full justify-center gap-2" value="danger">
               <AlertTriangle className="h-4 w-4" />
               Perigo
@@ -2263,11 +2269,29 @@ export default function CoordinatorDashboard() {
           </TabsContent>
 
           <TabsContent value="security" className="space-y-6">
-            <BackupCenter
-              coordinatorId={user?.id || 'unknown'}
-              coordinatorName={user?.name || 'Coordenador'}
-              coordinatorEmail={user?.email || 'coordenador@naf.com'}
-            />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* Componente de Mudança de Senha */}
+              <div>
+                <PasswordChangeForm 
+                  userEmail={user?.email || ''}
+                  userType="coordinator"
+                />
+              </div>
+
+              {/* Backup Center */}
+              <div>
+                <BackupCenter
+                  coordinatorId={user?.id || 'unknown'}
+                  coordinatorName={user?.name || 'Coordenador'}
+                  coordinatorEmail={user?.email || 'coordenador@naf.com'}
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* NOVA ABA: CURSOS EXTERNOS */}
+          <TabsContent value="courses" className="space-y-6">
+            <ExternalCoursesManager />
           </TabsContent>
 
           {/* PAINEL DE PERIGO - Operações Críticas com 2FA */}
