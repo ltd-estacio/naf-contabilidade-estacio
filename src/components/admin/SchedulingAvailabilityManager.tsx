@@ -132,8 +132,10 @@ export default function SchedulingAvailabilityManager() {
 
       if (formData.dateType === 'specific') {
         payload.specific_date = formData.specific_date
+        payload.day_of_week = null // Garantir que day_of_week seja null
       } else {
         payload.day_of_week = parseInt(formData.day_of_week)
+        payload.specific_date = null // Garantir que specific_date seja null
       }
 
       const url = editingId
@@ -146,6 +148,9 @@ export default function SchedulingAvailabilityManager() {
         payload.id = editingId
       }
 
+      console.log('📤 Enviando para API:', method, url)
+      console.log('📦 Payload:', JSON.stringify(payload, null, 2))
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -153,6 +158,12 @@ export default function SchedulingAvailabilityManager() {
       })
 
       const data = await response.json()
+      
+      console.log('📥 Resposta da API:', {
+        status: response.status,
+        ok: response.ok,
+        data
+      })
 
       if (response.ok) {
         alert(editingId ? 'Configuração atualizada!' : 'Configuração criada!')
@@ -160,10 +171,13 @@ export default function SchedulingAvailabilityManager() {
         resetForm()
         loadAvailabilities()
       } else {
-        alert(`Erro: ${data.error || 'Erro desconhecido'}`)
+        const errorMsg = data.error || 'Erro desconhecido'
+        const details = data.details ? `\n\nDetalhes: ${data.details}` : ''
+        alert(`Erro: ${errorMsg}${details}`)
+        console.error('❌ Erro da API:', data)
       }
     } catch (error) {
-      console.error('Erro ao salvar:', error)
+      console.error('❌ Erro ao salvar:', error)
       alert('Erro ao salvar configuração')
     } finally {
       setLoading(false)

@@ -67,7 +67,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('🔍 POST /api/scheduling/availability - Iniciando...')
+    
     const body = await request.json()
+    console.log('📦 Body recebido:', JSON.stringify(body, null, 2))
+    
     const {
       type,
       specific_date,
@@ -81,6 +85,7 @@ export async function POST(request: NextRequest) {
 
     // Validações
     if (!type || !['available', 'blocked'].includes(type)) {
+      console.log('❌ Tipo inválido:', type)
       return NextResponse.json(
         { error: 'Tipo inválido. Use "available" ou "blocked"' },
         { status: 400 }
@@ -88,6 +93,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!start_time || !end_time) {
+      console.log('❌ Horários faltando:', { start_time, end_time })
       return NextResponse.json(
         { error: 'Horários de início e fim são obrigatórios' },
         { status: 400 }
@@ -95,44 +101,66 @@ export async function POST(request: NextRequest) {
     }
 
     if (!specific_date && day_of_week === undefined) {
+      console.log('❌ Data/dia da semana faltando:', { specific_date, day_of_week })
       return NextResponse.json(
         { error: 'Forneça uma data específica ou dia da semana' },
         { status: 400 }
       )
     }
 
+    // Preparar dados para inserção
+    const insertData = {
+      type,
+      specific_date: specific_date || null,
+      day_of_week: day_of_week !== undefined ? parseInt(day_of_week) : null,
+      start_time,
+      end_time,
+      reason: reason || null,
+      max_appointments: max_appointments || 1,
+      created_by: created_by || null,
+      is_active: true
+    }
+    
+    console.log('💾 Dados a inserir:', JSON.stringify(insertData, null, 2))
+    console.log('🔑 Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'OK' : 'FALTANDO')
+    console.log('🔑 Supabase Key:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'OK' : 'FALTANDO')
+
     // Inserir novo registro
     const { data, error } = await supabase
       .from('scheduling_availability')
-      .insert({
-        type,
-        specific_date,
-        day_of_week,
-        start_time,
-        end_time,
-        reason,
-        max_appointments: max_appointments || 1,
-        created_by,
-        is_active: true
-      })
+      .insert(insertData)
       .select()
       .single()
 
     if (error) {
-      console.error('Erro ao criar disponibilidade:', error)
+      console.error('❌ Erro do Supabase:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
       return NextResponse.json(
-        { error: 'Erro ao criar disponibilidade', details: error.message },
+        { 
+          error: 'Erro ao criar disponibilidade', 
+          details: error.message,
+          hint: error.hint,
+          code: error.code
+        },
         { status: 500 }
       )
     }
 
+    console.log('✅ Disponibilidade criada com sucesso:', data)
     return NextResponse.json({
       success: true,
       message: 'Disponibilidade criada com sucesso',
       availability: data
     })
   } catch (error: any) {
-    console.error('Erro ao processar requisição:', error)
+    console.error('❌ Erro ao processar requisição:', {
+      message: error.message,
+      stack: error.stack
+    })
     return NextResponse.json(
       { error: 'Erro interno do servidor', details: error.message },
       { status: 500 }
