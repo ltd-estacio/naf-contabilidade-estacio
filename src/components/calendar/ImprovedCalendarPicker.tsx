@@ -70,59 +70,44 @@ export default function ImprovedCalendarPicker({
     setBlockedInfo({ isBlocked: false }) // Reset blocked info
     
     try {
-      const response = await fetch(`/api/scheduling/availability?date=${selectedDate}`)
+      // Usar nova API que verifica vagas disponíveis
+      const response = await fetch(`/api/scheduling/check-slots?date=${selectedDate}`)
       const data = await response.json()
       
       console.log('📥 Resposta da API:', data)
       
-      // Verificar se há bloqueios para esta data
-      if (data.availability && Array.isArray(data.availability)) {
-        const selectedDateObj = new Date(selectedDate + 'T00:00:00')
-        const dayOfWeek = selectedDateObj.getDay() // 0=Domingo, 6=Sábado
+      // Verificar se o dia está bloqueado
+      if (data.isBlocked) {
+        console.log('🚫 Dia bloqueado:', data.reason)
+        setBlockedInfo({
+          isBlocked: true,
+          reason: data.reason || 'Data indisponível para agendamentos',
+          type: 'date'
+        })
+        setTimeSlots([])
+        setLoading(false)
+        return
+      }
+      
+      // Usar os slots retornados pela API
+      if (data.timeSlots && data.timeSlots.length > 0) {
+        console.log(`✅ ${data.timeSlots.length} horários recebidos da API`)
         
-        // Verificar bloqueio por data específica
-        const dateBlock = data.availability.find((avail: any) => 
-          avail.type === 'blocked' && 
-          avail.specific_date === selectedDate &&
-          avail.is_active
-        )
+        // Filtrar apenas os slots que têm vagas disponíveis
+        const availableSlots = data.timeSlots.filter((slot: any) => slot.is_available)
         
-        // Verificar bloqueio por dia da semana
-        const dayBlock = data.availability.find((avail: any) => 
-          avail.type === 'blocked' && 
-          avail.day_of_week === dayOfWeek &&
-          !avail.specific_date &&
-          avail.is_active
-        )
+        console.log(`✅ ${availableSlots.length} horários com vagas disponíveis`)
         
-        if (dateBlock) {
-          console.log('🚫 Data bloqueada:', dateBlock.reason)
+        if (availableSlots.length === 0) {
           setBlockedInfo({
             isBlocked: true,
-            reason: dateBlock.reason || 'Data indisponível para agendamentos',
+            reason: 'Todos os horários deste dia já estão ocupados. Por favor, selecione outra data.',
             type: 'date'
           })
           setTimeSlots([])
-          setLoading(false)
-          return
+        } else {
+          setTimeSlots(availableSlots)
         }
-        
-        if (dayBlock) {
-          console.log('🚫 Dia da semana bloqueado:', dayBlock.reason)
-          setBlockedInfo({
-            isBlocked: true,
-            reason: dayBlock.reason || 'Este dia da semana está bloqueado para agendamentos',
-            type: 'day'
-          })
-          setTimeSlots([])
-          setLoading(false)
-          return
-        }
-      }
-      
-      if (data.timeSlots && data.timeSlots.length > 0) {
-        console.log(`✅ ${data.timeSlots.length} horários recebidos da API`)
-        setTimeSlots(data.timeSlots)
       } else {
         console.log('⚠️ API não retornou slots, usando horários padrão')
         // Fallback: usar horários fixos se a API não retornar slots
@@ -399,11 +384,13 @@ export default function ImprovedCalendarPicker({
                     onClick={() => slot.is_available && handleTimeSelect(slot.time)}
                     disabled={!slot.is_available}
                     className={`
-                      p-3 rounded-lg text-sm font-medium transition-all
+                      p-3 rounded-lg text-sm font-medium transition-all relative
                       ${!slot.is_available
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
                         : time === slot.time
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-blue-500 text-white shadow-lg'
+                        : slot.slots_remaining <= 1
+                        ? 'bg-amber-50 border-2 border-amber-300 text-amber-700 hover:bg-amber-100'
                         : 'bg-white border-2 border-blue-200 text-blue-600 hover:bg-blue-50'
                       }
                     `}
@@ -411,8 +398,17 @@ export default function ImprovedCalendarPicker({
                   >
                     {slot.time}
                     {slot.is_available && slot.slots_remaining > 0 && (
-                      <div className="text-xs mt-1 opacity-75">
-                        {slot.slots_remaining} vaga{slot.slots_remaining !== 1 ? 's' : ''}
+                      <div className={`text-xs mt-1 ${time === slot.time ? 'opacity-90' : 'opacity-75'}`}>
+                        {slot.slots_remaining === 1 ? (
+                          <span className="font-semibold">⚠️ Última vaga!</span>
+                        ) : (
+                          <span>{slot.slots_remaining} vaga{slot.slots_remaining !== 1 ? 's' : ''}</span>
+                        )}
+                      </div>
+                    )}
+                    {!slot.is_available && (
+                      <div className="text-xs mt-1">
+                        🚫 Ocupado
                       </div>
                     )}
                   </button>
