@@ -39,13 +39,19 @@ async function logAuditAction(action: string, coordinatorId: string, success: bo
 // Criar backup automático antes de operações destrutivas
 async function createAutomaticBackup() {
   try {
+    console.log('🔄 Iniciando criação de backup automático...')
+    
     const tables = ['fiscal_appointments', 'attendances', 'appointments', 'attendance_feedback']
     const backupData: Record<string, unknown[]> = {}
 
     for (const table of tables) {
+      console.log(`📊 Buscando dados da tabela: ${table}`)
       const { data, error } = await supabase.from(table).select('*')
       if (!error && data) {
         backupData[table] = data
+        console.log(`✅ ${table}: ${data.length} registros`)
+      } else if (error) {
+        console.error(`❌ Erro ao buscar ${table}:`, error)
       }
     }
 
@@ -58,6 +64,15 @@ async function createAutomaticBackup() {
       records_count: Object.values(backupData).reduce((sum, records) => sum + records.length, 0)
     }
 
+    console.log('💾 Salvando backup no banco de dados...')
+    console.log('📦 Backup a ser salvo:', {
+      backup_date: backupRecord.backup_date,
+      backup_type: backupRecord.backup_type,
+      tables_count: backupRecord.tables_count,
+      records_count: backupRecord.records_count,
+      data_size: backupRecord.data.length
+    })
+
     const { data: insertedBackup, error: insertError } = await supabase
       .from('system_backups')
       .insert(backupRecord)
@@ -65,9 +80,12 @@ async function createAutomaticBackup() {
       .single()
 
     if (insertError) {
-      console.error('Erro ao inserir backup:', insertError)
-      return { success: false, message: 'Falha ao salvar backup' }
+      console.error('❌ Erro ao inserir backup:', insertError)
+      console.error('❌ Detalhes do erro:', JSON.stringify(insertError, null, 2))
+      return { success: false, message: `Falha ao salvar backup: ${insertError.message}` }
     }
+
+    console.log('✅ Backup salvo com sucesso! ID:', insertedBackup?.id)
 
     return { 
       success: true, 
@@ -76,8 +94,9 @@ async function createAutomaticBackup() {
       backupRecord: insertedBackup
     }
   } catch (error) {
-    console.error('Erro ao criar backup automático:', error)
-    return { success: false, message: 'Falha ao criar backup automático' }
+    console.error('❌ Erro CRÍTICO ao criar backup automático:', error)
+    console.error('❌ Stack:', (error as Error).stack)
+    return { success: false, message: `Falha ao criar backup automático: ${(error as Error).message}` }
   }
 }
 
@@ -145,8 +164,8 @@ async function sendBackupEmail(backupData: any, backupRecord: any, coordinatorNa
     console.log('🔑 Backup Record ID:', backupIdFromRecord)
     console.log('📦 Backup Record completo:', JSON.stringify(backupRecord, null, 2))
 
-    // Criar ID legível do backup
-    const backupId = `BKP-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${backupIdFromRecord.toString().substring(0, 8)}`
+    // Criar ID legível do backup (ID é numérico, não UUID)
+    const backupId = `BKP-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(backupIdFromRecord).padStart(8, '0')}`
 
     console.log('🎫 Backup ID legível:', backupId)
 
@@ -226,7 +245,15 @@ async function sendBackupEmail(backupData: any, backupRecord: any, coordinatorNa
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, twoFactorCode, coordinatorId } = body
+    const { action, twoFactorCode, coordinatorId, coordinatorEmail, coordinatorName } = body
+
+    console.log('🔐 Request recebido:', {
+      action,
+      twoFactorCode: twoFactorCode ? '***' : undefined,
+      coordinatorId,
+      coordinatorEmail,
+      coordinatorName
+    })
 
     // Validar código 2FA (em produção, isso seria feito com um serviço real de 2FA)
     if (!twoFactorCode || twoFactorCode.length !== 6) {
@@ -263,22 +290,22 @@ export async function POST(request: NextRequest) {
         console.log('📦 Dados do backup prontos:', {
           tables: Object.keys(backupResult.backupData || {}),
           records: backupResult.backupRecord?.records_count,
-          coordinatorEmail: body.coordinatorEmail || 'coordenador@naf.com',
-          coordinatorName: body.coordinatorName || 'Coordenador NAF'
+          coordinatorEmail: coordinatorEmail || 'coordenador@naf.com',
+          coordinatorName: coordinatorName || 'Coordenador NAF'
         })
         
         const emailResult = await sendBackupEmail(
           backupResult.backupData!,
           backupResult.backupRecord!,
-          body.coordinatorEmail || 'coordenador@naf.com',
-          body.coordinatorName || 'Coordenador NAF'
+          coordinatorName || 'Coordenador NAF',
+          coordinatorEmail || 'coordenador@naf.com'
         )
 
         console.log('📧 Resultado do envio de email:', emailResult)
 
         if (!emailResult.success) {
           console.error('❌ ERRO AO ENVIAR EMAIL:', emailResult.message)
-          console.warn('⚠️ Aviso: Backup criado mas email não enviado:', emailResult.message)
+          console.warn(`⚠️ Aviso: Backup criado mas email não enviado: ${emailResult.message}`)
           // Continua mesmo se o email falhar
         } else {
           console.log('✅✅✅ EMAIL DE BACKUP ENVIADO COM SUCESSO!')
@@ -317,7 +344,7 @@ export async function POST(request: NextRequest) {
           }
 
           const successMessage = emailResult.success 
-            ? `✅ Dados apagados com sucesso! ${totalDeleted} registros removidos.\n\n📧 Email de backup enviado para ${body.coordinatorEmail || 'coordenador@naf.com'}\n💾 Backup automático criado.`
+            ? `✅ Dados apagados com sucesso! ${totalDeleted} registros removidos.\n\n📧 Email de backup enviado para ${coordinatorEmail || 'souzaestevam925@gmail.com'}\n💾 Backup automático criado.`
             : `✅ Dados apagados com sucesso! ${totalDeleted} registros removidos.\n\n⚠️ Email não enviado: ${emailResult.message}\n💾 Backup automático criado.`
 
           await logAuditAction('DANGER_DELETE_SUCCESS', coordinatorId, true, `Dados removidos (${totalDeleted} registros). Email: ${emailResult.success ? 'Enviado' : 'Falhou'}`)
