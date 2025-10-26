@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import emailjs from '@emailjs/nodejs'
+import nodemailer from 'nodemailer'
 import fs from 'fs'
 import path from 'path'
 
@@ -9,10 +9,17 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Configuração EmailJS
-const EMAILJS_SERVICE_ID = 'service_xehr3ta'
-const EMAILJS_TEMPLATE_ID = 'template_d2rfx39'
-const EMAILJS_PUBLIC_KEY = 'nGm0I7osOMW7psoqF'
+// Configuração de Email com Nodemailer
+const EMAIL_DESTINO = 'souzaestevam925@gmail.com'
+
+// Criar transporter para envio de emails
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // Pode ser alterado para outro serviço
+  auth: {
+    user: process.env.EMAIL_USER || 'souzaestevam925@gmail.com', // Configurar no .env
+    pass: process.env.EMAIL_PASSWORD || 'kczj vzqk nlse iddy', // Senha de app do Gmail
+  },
+})
 
 // Log de auditoria
 async function logAuditAction(action: string, coordinatorId: string, success: boolean, details?: string) {
@@ -65,121 +72,100 @@ async function createAutomaticBackup() {
   }
 }
 
-// Função para enviar backup por email usando EmailJS
-async function sendBackupEmail(
-  backupData: Record<string, unknown[]>,
-  backupRecord: { backup_date: string; tables_count: number; records_count: number },
-  coordinatorEmail: string,
-  coordinatorName: string
-) {
+// Função para enviar email de backup usando Nodemailer
+async function sendBackupEmail(backupData: any, backupRecord: any, coordinatorName: string, coordinatorEmail: string) {
   try {
     console.log('📧 Iniciando envio de email de backup...')
-    console.log('📧 Email de destino:', coordinatorEmail)
-    
-    // Email fixo de destino
-    const EMAIL_DESTINO = 'souzaestevam925@gmail.com'
-    console.log('📧 Email de destino final:', EMAIL_DESTINO)
     
     // Ler o template HTML
     const templatePath = path.join(process.cwd(), 'email-backup-template.html')
-    console.log('📄 Carregando template de:', templatePath)
+    console.log('📄 Lendo template de:', templatePath)
     
     let htmlTemplate = fs.readFileSync(templatePath, 'utf-8')
-    console.log('✅ Template carregado com sucesso')
-
-    // Extrair nomes de estudantes únicos
-    const studentNames = new Set<string>()
-    if (backupData.attendances) {
-      backupData.attendances.forEach((attendance: any) => {
-        if (attendance.student_name) {
-          studentNames.add(attendance.student_name)
-        }
-      })
-    }
-    console.log(`👥 Estudantes encontrados: ${studentNames.size}`)
+    console.log('✅ Template carregado, tamanho:', htmlTemplate.length, 'caracteres')
 
     // Formatar data e hora
-    const backupDate = new Date(backupRecord.backup_date)
+    const backupDate = new Date(backupRecord.backup_date || new Date())
     const formattedDate = backupDate.toLocaleDateString('pt-BR')
     const formattedTime = backupDate.toLocaleTimeString('pt-BR')
 
-    // Criar lista de tabelas
-    const tablesList = Object.keys(backupData)
-      .map(table => `<li>${table} (${backupData[table].length} registros)</li>`)
-      .join('')
+    // Contar registros e estudantes
+    let totalRecords = 0
+    let tablesCount = 0
+    const studentNames = new Set()
 
-    // Criar badges de estudantes
-    const studentsBadges = Array.from(studentNames)
-      .map(name => `<span class="student-badge">${name}</span>`)
-      .join('')
+    for (const [tableName, records] of Object.entries(backupData)) {
+      if (Array.isArray(records) && records.length > 0) {
+        tablesCount++
+        totalRecords += records.length
+        
+        // Extrair nomes de estudantes
+        records.forEach((record: any) => {
+          if (record.student_name) studentNames.add(record.student_name)
+          if (record.name) studentNames.add(record.name)
+        })
+      }
+    }
 
-    // Criar link de download (mock - em produção seria um link real)
-    const downloadLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4000'}/api/backup/download/${Date.now()}`
+    // Criar lista de estudantes para o email
+    const studentBadges = Array.from(studentNames)
+      .slice(0, 10)
+      .map(name => `<span class="badge">${name}</span>`)
+      .join('')
 
     // Substituir variáveis no template
     htmlTemplate = htmlTemplate
-      .replace('{{backup_date}}', formattedDate)
-      .replace('{{backup_time}}', formattedTime)
-      .replace('{{total_records}}', backupRecord.records_count.toString())
-      .replace('{{backup_status}}', '✅ Sucesso')
-      .replace('{{status_class}}', 'status-success')
-      .replace('{{tables_list}}', tablesList)
-      .replace('{{students_badges}}', studentsBadges || '<span class="student-badge">Nenhum estudante encontrado</span>')
-      .replace('{{download_link}}', downloadLink)
-      .replace('{{backup_id}}', `BKP-${Date.now()}`)
-      .replace('{{coordinator_name}}', coordinatorName)
-      .replace('{{coordinator_email}}', coordinatorEmail)
+      .replace(/{{backup_date}}/g, formattedDate)
+      .replace(/{{backup_time}}/g, formattedTime)
+      .replace(/{{total_records}}/g, totalRecords.toString())
+      .replace(/{{tables_count}}/g, tablesCount.toString())
+      .replace(/{{students_count}}/g, studentNames.size.toString())
+      .replace(/{{coordinator_name}}/g, coordinatorName)
+      .replace(/{{coordinator_email}}/g, coordinatorEmail)
+      .replace(/{{students_badges}}/g, studentBadges)
+      .replace(/{{backup_json}}/g, JSON.stringify(backupData, null, 2))
 
     console.log('✅ Template preenchido com dados')
 
-    // Preparar dados para EmailJS - formato correto
-    const templateParams = {
-      to_email: EMAIL_DESTINO,
-      to_name: 'Coordenador NAF',
-      from_name: 'Sistema NAF',
+    // Configurar email
+    const mailOptions = {
+      from: `"Sistema NAF" <${process.env.EMAIL_USER || 'naf@sistema.com'}>`,
+      to: EMAIL_DESTINO,
       subject: `🛡️ Backup Automático de Dados - ${formattedDate}`,
-      message: htmlTemplate,
-      backup_date: formattedDate,
-      backup_time: formattedTime,
-      total_records: backupRecord.records_count.toString(),
-      tables_count: backupRecord.tables_count.toString(),
-      students_count: studentNames.size.toString(),
-      coordinator_name: coordinatorName,
-      coordinator_email: coordinatorEmail
+      html: htmlTemplate,
     }
 
-    console.log('📤 Enviando email via EmailJS...')
-    console.log('📧 Service ID:', EMAILJS_SERVICE_ID)
-    console.log('📧 Template ID:', EMAILJS_TEMPLATE_ID)
+    console.log('📤 Enviando email para:', EMAIL_DESTINO)
 
-    // Enviar email via EmailJS
-    const response = await emailjs.send(
-      EMAILJS_SERVICE_ID,
-      EMAILJS_TEMPLATE_ID,
-      templateParams,
-      {
-        publicKey: EMAILJS_PUBLIC_KEY,
-      }
-    )
+    // Enviar email
+    const info = await transporter.sendMail(mailOptions)
 
     console.log('✅ Email de backup enviado com sucesso!')
-    console.log('📧 Response:', response)
+    console.log('📧 Message ID:', info.messageId)
+    console.log('📧 Response:', info.response)
     
     return { 
       success: true, 
-      message: `Email enviado com sucesso para ${EMAIL_DESTINO}` 
+      message: `Email enviado com sucesso para ${EMAIL_DESTINO}`,
+      messageId: info.messageId
     }
 
   } catch (error) {
-    console.error('❌ Erro ao enviar email de backup:', error)
-    console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2))
-    return { 
-      success: false, 
-      message: `Erro ao enviar email: ${(error as Error).message}` 
+    console.error('❌ ERRO CRÍTICO ao enviar email de backup')
+    console.error('❌ Tipo do erro:', typeof error)
+    console.error('❌ Nome do erro:', (error as any)?.name)
+    console.error('❌ Mensagem:', (error as Error).message)
+    console.error('❌ Stack:', (error as Error).stack)
+    
+    if (error && typeof error === 'object') {
+      console.error('❌ Erro completo (JSON):', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
     }
+
+        throw new Error(`Erro ao enviar email: ${(error as Error).message || 'Erro desconhecido'}`)
   }
 }
 
+// Função principal do endpoint POST
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -216,6 +202,14 @@ export async function POST(request: NextRequest) {
         }
 
         // Enviar backup por email
+        console.log('🔄 Iniciando processo de envio de email...')
+        console.log('📦 Dados do backup prontos:', {
+          tables: Object.keys(backupResult.backupData || {}),
+          records: backupResult.backupRecord?.records_count,
+          coordinatorEmail: body.coordinatorEmail || 'coordenador@naf.com',
+          coordinatorName: body.coordinatorName || 'Coordenador NAF'
+        })
+        
         const emailResult = await sendBackupEmail(
           backupResult.backupData!,
           backupResult.backupRecord!,
@@ -223,11 +217,15 @@ export async function POST(request: NextRequest) {
           body.coordinatorName || 'Coordenador NAF'
         )
 
+        console.log('📧 Resultado do envio de email:', emailResult)
+
         if (!emailResult.success) {
+          console.error('❌ ERRO AO ENVIAR EMAIL:', emailResult.message)
           console.warn('⚠️ Aviso: Backup criado mas email não enviado:', emailResult.message)
           // Continua mesmo se o email falhar
         } else {
-          console.log('✅ Email de backup enviado com sucesso!')
+          console.log('✅✅✅ EMAIL DE BACKUP ENVIADO COM SUCESSO!')
+          console.log('📧 Email enviado para: souzaestevam925@gmail.com')
         }
 
         // Deletar dados de atendimentos
