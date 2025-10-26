@@ -2,7 +2,7 @@ Tarefas finais:
 
 --- Falta
 - Campos de preenchimento (No atendimento): (passo a passo do atendimento, etapas, resumo)
-- Filtro de relatório dos atendimentos por datas (relatório semanal, mensal)
+[ X ] Filtro de relatório dos atendimentos por datas (relatório semanal, mensal)
 
 --- Site do LTD
 - Colocar no site do LTD
@@ -28,3 +28,4 @@ Tarefas finais concluidas:
 [ X ] Designe do Calendário melhorada
 [ X ] Verificacao de pessoas que fazem atendimento no mesmo dia e horario fica bloqueado
 [ X ] Envio de backup de atendimento por e-mail
+- Filtro de relatório dos atendimentos por datas (relatório semanal, mensal)

@@ -277,6 +277,8 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           coordinatorId,
+          coordinatorName,
+          coordinatorEmail,
           format: 'json', // Sempre JSON para o anexo do email
           filters: {
             status: statusFilter.length > 0 ? statusFilter : undefined
