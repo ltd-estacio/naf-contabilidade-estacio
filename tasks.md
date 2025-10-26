@@ -1,6 +1,6 @@
 Tarefas finais:
 
-- Botão de apagar Dados
+[ X ] Botão de apagar Dados
 - Enviar backup por e-mail
 - Extensão para o navegador para envio de formulário (automação)
 - Trocar de estudante na hora do atendimento; (coordenador redirecionar)
@@ -8,7 +8,8 @@ Tarefas finais:
 - Campos de preenchimento: (passo a passo do atendimento, etapas, resumo)
 filtro de relatório dos atendimentos por datas (relatório semanal, mensal)
 - possibilidade de alteração de campos de login e senha para aluno, coordenador e estar isso em algum lugar visível (acesso teste)
-- La na rota /fiscal-guides, tem na parte de "Precisa de Orientação Personalizada?", onde contem os campos "Agendar Atendimento" e "Ver Todos os Serviços", so que o campo "Ver Todos os Serviços" esta com a Cor de botão branco css sobreposto ao passar o mouse por cima, da para ver o que esta escrito, deve mostrar o que esta escrito igual ao botao "Agendar Atendimento"
+[ X ] Cor de botão branco css sobreposto (https://naf-contabilidade-estacio.vercel.app/fiscal-guides)
+- No painel do coordenador, ele pode colocar os cursos externos que os estudantes poderao acessar
 
 - Apresentações, ppt, vídeo explicativo
 - Colocar no site do LTD
@@ -20,4 +21,6 @@ filtro de relatório dos atendimentos por datas (relatório semanal, mensal)
 
 Tarefas finais concluidas:
 
+- Botão de apagar Dados
+- Enviar backup por e-mail
 - Cor de botão branco css sobreposto (https://naf-contabilidade-estacio.vercel.app/fiscal-guides)

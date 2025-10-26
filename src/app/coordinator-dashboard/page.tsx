@@ -794,6 +794,7 @@ export default function CoordinatorDashboard() {
     
     // Executar ação após verificação
     try {
+      const userObj = user as Record<string, unknown>
       const response = await fetch('/api/coordinator/danger-zone', {
         method: 'POST',
         headers: {
@@ -802,7 +803,9 @@ export default function CoordinatorDashboard() {
         body: JSON.stringify({
           action: pendingDangerAction,
           twoFactorCode: twoFactorCode,
-          coordinatorId: (user as Record<string, unknown>)?.id
+          coordinatorId: userObj?.id || 'coord-1',
+          coordinatorEmail: userObj?.email || 'coordenador@naf.edu.br',
+          coordinatorName: userObj?.name || 'Coordenador NAF'
         })
       })
 
@@ -819,7 +822,7 @@ export default function CoordinatorDashboard() {
           if (pendingDangerAction === 'delete') {
             window.location.reload()
           }
-        }, 2000)
+        }, 3000) // Aumentado para 3 segundos para dar tempo de ler a mensagem
       } else {
         setDangerActionResult(`❌ Erro: ${result.error || 'Operação falhou'}`)
       }

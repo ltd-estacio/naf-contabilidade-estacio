@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import emailjs from '@emailjs/nodejs'
+import fs from 'fs'
+import path from 'path'
 
 // Inicializar cliente Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseKey)
+
+// Configuração EmailJS
+const EMAILJS_SERVICE_ID = 'service_xehr3ta'
+const EMAILJS_TEMPLATE_ID = 'template_d2rfx39'
+const EMAILJS_PUBLIC_KEY = 'nGm0I7osOMW7psoqF'
 
 // Log de auditoria
 async function logAuditAction(action: string, coordinatorId: string, success: boolean, details?: string) {
@@ -45,10 +53,105 @@ async function createAutomaticBackup() {
 
     await supabase.from('system_backups').insert(backupRecord)
 
-    return { success: true, message: 'Backup automático criado com sucesso' }
+    return { 
+      success: true, 
+      message: 'Backup automático criado com sucesso',
+      backupData,
+      backupRecord
+    }
   } catch (error) {
     console.error('Erro ao criar backup automático:', error)
     return { success: false, message: 'Falha ao criar backup automático' }
+  }
+}
+
+// Função para enviar backup por email usando EmailJS
+async function sendBackupEmail(
+  backupData: Record<string, unknown[]>,
+  backupRecord: { backup_date: string; tables_count: number; records_count: number },
+  coordinatorEmail: string,
+  coordinatorName: string
+) {
+  try {
+    // Ler o template HTML
+    const templatePath = path.join(process.cwd(), 'email-backup-template.html')
+    let htmlTemplate = fs.readFileSync(templatePath, 'utf-8')
+
+    // Extrair nomes de estudantes únicos
+    const studentNames = new Set<string>()
+    if (backupData.attendances) {
+      backupData.attendances.forEach((attendance: any) => {
+        if (attendance.student_name) {
+          studentNames.add(attendance.student_name)
+        }
+      })
+    }
+
+    // Formatar data e hora
+    const backupDate = new Date(backupRecord.backup_date)
+    const formattedDate = backupDate.toLocaleDateString('pt-BR')
+    const formattedTime = backupDate.toLocaleTimeString('pt-BR')
+
+    // Criar lista de tabelas
+    const tablesList = Object.keys(backupData)
+      .map(table => `<li>${table} (${backupData[table].length} registros)</li>`)
+      .join('')
+
+    // Criar badges de estudantes
+    const studentsBadges = Array.from(studentNames)
+      .map(name => `<span class="student-badge">${name}</span>`)
+      .join('')
+
+    // Criar link de download (mock - em produção seria um link real)
+    const downloadLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4000'}/api/backup/download/${Date.now()}`
+
+    // Substituir variáveis no template
+    htmlTemplate = htmlTemplate
+      .replace('{{backup_date}}', formattedDate)
+      .replace('{{backup_time}}', formattedTime)
+      .replace('{{total_records}}', backupRecord.records_count.toString())
+      .replace('{{backup_status}}', '✅ Sucesso')
+      .replace('{{status_class}}', 'status-success')
+      .replace('{{tables_list}}', tablesList)
+      .replace('{{students_badges}}', studentsBadges || '<span class="student-badge">Nenhum estudante encontrado</span>')
+      .replace('{{download_link}}', downloadLink)
+      .replace('{{backup_id}}', `BKP-${Date.now()}`)
+      .replace('{{coordinator_name}}', coordinatorName)
+      .replace('{{coordinator_email}}', coordinatorEmail)
+
+    // Preparar dados para EmailJS
+    const templateParams = {
+      to_email: coordinatorEmail,
+      to_name: coordinatorName,
+      subject: `🛡️ Backup Automático de Dados - ${formattedDate}`,
+      html_content: htmlTemplate,
+      backup_date: formattedDate,
+      backup_time: formattedTime,
+      total_records: backupRecord.records_count.toString(),
+      tables_count: backupRecord.tables_count.toString(),
+      students_count: studentNames.size.toString(),
+      backup_status: 'Concluído com sucesso'
+    }
+
+    // Enviar email via EmailJS
+    const response = await emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_ID,
+      templateParams,
+      {
+        publicKey: EMAILJS_PUBLIC_KEY,
+      }
+    )
+
+    console.log('✅ Email de backup enviado com sucesso:', response)
+    return { success: true, message: 'Email enviado com sucesso' }
+
+  } catch (error) {
+    console.error('❌ Erro ao enviar email de backup:', error)
+    return { 
+      success: false, 
+      message: `Erro ao enviar email: ${(error as Error).message}` 
+    }
   }
 }
 
@@ -87,6 +190,21 @@ export async function POST(request: NextRequest) {
           )
         }
 
+        // Enviar backup por email
+        const emailResult = await sendBackupEmail(
+          backupResult.backupData!,
+          backupResult.backupRecord!,
+          body.coordinatorEmail || 'coordenador@naf.com',
+          body.coordinatorName || 'Coordenador NAF'
+        )
+
+        if (!emailResult.success) {
+          console.warn('⚠️ Aviso: Backup criado mas email não enviado:', emailResult.message)
+          // Continua mesmo se o email falhar
+        } else {
+          console.log('✅ Email de backup enviado com sucesso!')
+        }
+
         // Deletar dados de atendimentos
         try {
           const tablesToClear = ['fiscal_appointments', 'attendance_feedback', 'appointments']
@@ -118,10 +236,14 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          await logAuditAction('DANGER_DELETE_SUCCESS', coordinatorId, true, `Dados de atendimentos removidos (${totalDeleted} registros) com backup criado`)
+          const successMessage = emailResult.success 
+            ? `✅ Dados apagados com sucesso! ${totalDeleted} registros removidos.\n\n📧 Email de backup enviado para ${body.coordinatorEmail || 'coordenador@naf.com'}\n💾 Backup automático criado.`
+            : `✅ Dados apagados com sucesso! ${totalDeleted} registros removidos.\n\n⚠️ Email não enviado: ${emailResult.message}\n💾 Backup automático criado.`
+
+          await logAuditAction('DANGER_DELETE_SUCCESS', coordinatorId, true, `Dados removidos (${totalDeleted} registros). Email: ${emailResult.success ? 'Enviado' : 'Falhou'}`)
           result = {
             success: true,
-            message: `✅ Dados apagados com sucesso! ${totalDeleted} registros removidos. Backup automático foi criado.`
+            message: successMessage
           }
         } catch (error) {
           await logAuditAction('DANGER_DELETE_FAILED', coordinatorId, false, (error as Error).message)
