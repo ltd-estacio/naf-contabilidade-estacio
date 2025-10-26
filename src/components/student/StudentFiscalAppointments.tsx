@@ -36,6 +36,7 @@ import {
   Loader2
 } from 'lucide-react'
 import FeedbackModal from './FeedbackModal'
+import AttendanceRegistrationModal from './AttendanceRegistrationModal'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 interface FiscalAppointment {
@@ -75,7 +76,11 @@ interface AppointmentProgressNote {
   appointment_id: string
   student_id?: string | null
   student_name?: string | null
-  note: string
+  note?: string | null
+  note_type?: string | null
+  step_by_step?: string | null
+  stages?: string | null
+  summary?: string | null
   created_at: string
   updated_at?: string
 }
@@ -237,6 +242,14 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
   const [noteErrors, setNoteErrors] = useState<Record<string, string>>({})
   const [notesLoading, setNotesLoading] = useState<Record<string, boolean>>({})
   const [notesFetchErrors, setNotesFetchErrors] = useState<Record<string, string>>({})
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
+  const [registrationData, setRegistrationData] = useState({
+    stepByStep: '',
+    stages: '',
+    summary: ''
+  })
+  const [registrationSaving, setRegistrationSaving] = useState(false)
+  const [registrationError, setRegistrationError] = useState('')
   const supabaseRealtime = useMemo(() => getSupabaseBrowserClient(), [])
   const realtimeRefreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -344,6 +357,48 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
       client.removeChannel(channel)
     }
   }, [supabaseRealtime, token, scheduleRealtimeRefresh])
+
+  const handleRegistrationSubmit = async (data: { stepByStep: string; stages: string; summary: string }) => {
+    if (!selectedAppointment) return
+
+    setRegistrationSaving(true)
+    setRegistrationError('')
+
+    try {
+      const response = await fetch('/api/students/attendance-notes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          appointmentId: selectedAppointment.id,
+          stepByStep: data.stepByStep,
+          stages: data.stages,
+          summary: data.summary
+        })
+      })
+
+      if (response.ok) {
+        setShowRegistrationModal(false)
+        setRegistrationData({ stepByStep: '', stages: '', summary: '' })
+        setSuccess('Registro salvo e atendimento iniciado com sucesso!')
+        await loadAppointments({ skipLoadingState: true })
+        // Manter o modal de detalhes aberto para ver o registro
+      } else {
+        const errorData = await response.json()
+        setRegistrationError(errorData.error || 'Erro ao salvar registro')
+        throw new Error(errorData.error || 'Erro ao salvar registro')
+      }
+    } catch (error) {
+      console.error('Erro ao salvar registro:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar registro. Tente novamente.'
+      setRegistrationError(errorMessage)
+      throw error // Permite que o modal trate o erro
+    } finally {
+      setRegistrationSaving(false)
+    }
+  }
 
   const updateAppointmentStatus = async (appointmentId: string, newStatus: string, notes?: string) => {
     try {
@@ -840,7 +895,7 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
             <option value="NAO_COMPARECEU">Não Compareceu</option>
           </select>
 
-          <Button onClick={loadAppointments} variant="outline" size="sm">
+          <Button onClick={() => void loadAppointments()} variant="outline" size="sm">
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
           </Button>
@@ -1353,11 +1408,18 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
 
                     {selectedAppointment.progress_notes && selectedAppointment.progress_notes.length > 0 && (
                       selectedAppointment.progress_notes.map(note => (
-                        <div key={note.id} className="border border-gray-200 dark:border-gray-800 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-semibold text-gray-500">
-                              {note.student_name || 'Você'}
-                            </span>
+                        <div key={note.id} className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-gray-500">
+                                {note.student_name || 'Você'}
+                              </span>
+                              {note.note_type === 'REGISTRO_INICIAL' && (
+                                <Badge className="bg-blue-100 text-blue-800 border-0 text-xs">
+                                  Registro Inicial
+                                </Badge>
+                              )}
+                            </div>
                             <span className="text-xs text-gray-400">
                               {new Date(note.created_at).toLocaleString('pt-BR', {
                                 day: '2-digit',
@@ -1368,7 +1430,52 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                               })}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{note.note}</p>
+
+                          {/* Campos Estruturados */}
+                          {(note.step_by_step || note.stages || note.summary) && (
+                            <div className="space-y-4">
+                              {note.step_by_step && (
+                                <div className="bg-white dark:bg-gray-800 rounded-md p-3">
+                                  <h5 className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Passo a Passo
+                                  </h5>
+                                  <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap font-mono">
+                                    {note.step_by_step}
+                                  </p>
+                                </div>
+                              )}
+
+                              {note.stages && (
+                                <div className="bg-white dark:bg-gray-800 rounded-md p-3">
+                                  <h5 className="text-sm font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4" />
+                                    Etapas
+                                  </h5>
+                                  <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap font-mono">
+                                    {note.stages}
+                                  </p>
+                                </div>
+                              )}
+
+                              {note.summary && (
+                                <div className="bg-white dark:bg-gray-800 rounded-md p-3">
+                                  <h5 className="text-sm font-semibold text-purple-700 dark:text-purple-400 mb-2 flex items-center gap-2">
+                                    <MessageSquare className="h-4 w-4" />
+                                    Resumo
+                                  </h5>
+                                  <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
+                                    {note.summary}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Anotação simples (campo legado) */}
+                          {note.note && !note.step_by_step && !note.stages && !note.summary && (
+                            <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{note.note}</p>
+                          )}
                         </div>
                       ))
                     )}
@@ -1508,7 +1615,9 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
                     {selectedAppointment.status === 'CONFIRMADO' && (
                       <>
                         <Button
-                          onClick={() => updateAppointmentStatus(selectedAppointment.id, 'EM_ANDAMENTO', internalNotes)}
+                          onClick={() => {
+                            setShowRegistrationModal(true)
+                          }}
                           disabled={updating}
                           className="bg-purple-600 hover:bg-purple-700"
                         >
@@ -1853,6 +1962,22 @@ export default function StudentFiscalAppointments({ token }: StudentFiscalAppoin
             setShowFeedbackModal(false)
             setSelectedAppointment(null)
           }}
+        />
+      )}
+
+      {/* Modal de Registro do Atendimento */}
+      {showRegistrationModal && selectedAppointment && (
+        <AttendanceRegistrationModal
+          isOpen={showRegistrationModal}
+          onClose={() => {
+            setShowRegistrationModal(false)
+            setRegistrationData({ stepByStep: '', stages: '', summary: '' })
+            setRegistrationError('')
+          }}
+          onSubmit={handleRegistrationSubmit}
+          appointmentId={selectedAppointment.id}
+          clientName={selectedAppointment.client_name}
+          serviceTitle={selectedAppointment.service_title}
         />
       )}
     </div>

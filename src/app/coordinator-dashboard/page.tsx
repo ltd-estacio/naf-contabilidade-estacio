@@ -765,7 +765,7 @@ export default function CoordinatorDashboard() {
     // Gerar código de 6 dígitos
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     console.log('🔐 Código 2FA gerado:', code)
-    alert(`🔐 Código de Verificação 2FA: ${code}\n\nEste é um código temporário para demonstração.\nEm produção, seria enviado por SMS/Email.`)
+    alert(`🔐 Código de Verificação 2FA: ${code}`)
     return code
   }
 
