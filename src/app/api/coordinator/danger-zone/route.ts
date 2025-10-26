@@ -73,9 +73,19 @@ async function sendBackupEmail(
   coordinatorName: string
 ) {
   try {
+    console.log('📧 Iniciando envio de email de backup...')
+    console.log('📧 Email de destino:', coordinatorEmail)
+    
+    // Email fixo de destino
+    const EMAIL_DESTINO = 'souzaestevam925@gmail.com'
+    console.log('📧 Email de destino final:', EMAIL_DESTINO)
+    
     // Ler o template HTML
     const templatePath = path.join(process.cwd(), 'email-backup-template.html')
+    console.log('📄 Carregando template de:', templatePath)
+    
     let htmlTemplate = fs.readFileSync(templatePath, 'utf-8')
+    console.log('✅ Template carregado com sucesso')
 
     // Extrair nomes de estudantes únicos
     const studentNames = new Set<string>()
@@ -86,6 +96,7 @@ async function sendBackupEmail(
         }
       })
     }
+    console.log(`👥 Estudantes encontrados: ${studentNames.size}`)
 
     // Formatar data e hora
     const backupDate = new Date(backupRecord.backup_date)
@@ -119,19 +130,27 @@ async function sendBackupEmail(
       .replace('{{coordinator_name}}', coordinatorName)
       .replace('{{coordinator_email}}', coordinatorEmail)
 
-    // Preparar dados para EmailJS
+    console.log('✅ Template preenchido com dados')
+
+    // Preparar dados para EmailJS - formato correto
     const templateParams = {
-      to_email: coordinatorEmail,
-      to_name: coordinatorName,
+      to_email: EMAIL_DESTINO,
+      to_name: 'Coordenador NAF',
+      from_name: 'Sistema NAF',
       subject: `🛡️ Backup Automático de Dados - ${formattedDate}`,
-      html_content: htmlTemplate,
+      message: htmlTemplate,
       backup_date: formattedDate,
       backup_time: formattedTime,
       total_records: backupRecord.records_count.toString(),
       tables_count: backupRecord.tables_count.toString(),
       students_count: studentNames.size.toString(),
-      backup_status: 'Concluído com sucesso'
+      coordinator_name: coordinatorName,
+      coordinator_email: coordinatorEmail
     }
+
+    console.log('📤 Enviando email via EmailJS...')
+    console.log('📧 Service ID:', EMAILJS_SERVICE_ID)
+    console.log('📧 Template ID:', EMAILJS_TEMPLATE_ID)
 
     // Enviar email via EmailJS
     const response = await emailjs.send(
@@ -143,11 +162,17 @@ async function sendBackupEmail(
       }
     )
 
-    console.log('✅ Email de backup enviado com sucesso:', response)
-    return { success: true, message: 'Email enviado com sucesso' }
+    console.log('✅ Email de backup enviado com sucesso!')
+    console.log('📧 Response:', response)
+    
+    return { 
+      success: true, 
+      message: `Email enviado com sucesso para ${EMAIL_DESTINO}` 
+    }
 
   } catch (error) {
     console.error('❌ Erro ao enviar email de backup:', error)
+    console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2))
     return { 
       success: false, 
       message: `Erro ao enviar email: ${(error as Error).message}` 

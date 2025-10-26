@@ -1,7 +1,7 @@
 Tarefas finais:
 
 [ X ] Botão de apagar Dados
-- Enviar backup por e-mail
+[ X ] Enviar backup por e-mail
 - Extensão para o navegador para envio de formulário (automação)
 - Trocar de estudante na hora do atendimento; (coordenador redirecionar)
 - Calendário (formato e bloqueio/datas horários pelo coordenador)
