@@ -1,0 +1,1 @@
+1. Melhorar a LLM para conter todas as informacoes para o chat da IA saber responder, deve ser chamada "NAFAI"

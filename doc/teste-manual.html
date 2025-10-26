@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Manual do Sistema NAF</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { padding: 8px 16px; margin: 5px; }
+        .result { margin-top: 10px; padding: 10px; background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste Manual do Sistema NAF Contábil</h1>
+    
+    <div class="section">
+        <h2>1. Teste de Páginas Principais</h2>
+        <button onclick="testarPagina('/')">Dashboard Principal</button>
+        <button onclick="testarPagina('/dashboard/calendar')">Calendário</button>
+        <button onclick="testarPagina('/dashboard/powerbi')">Power BI</button>
+        <button onclick="testarPagina('/schedule')">Agendamento</button>
+        <div id="resultado-paginas" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Teste de APIs</h2>
+        <button onclick="testarAPI('/api/services')">API Serviços</button>
+        <button onclick="testarAPI('/api/demands')">API Demandas</button>
+        <button onclick="testarAPI('/api/schedule')">API Agendamentos</button>
+        <button onclick="testarAPI('/api/dashboard/stats')">API Stats</button>
+        <div id="resultado-apis" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Teste Power BI</h2>
+        <button onclick="testarAPI('/api/reports/powerbi?type=general&format=json')">Power BI JSON</button>
+        <button onclick="testarAPI('/api/reports/powerbi?type=powerbi-dataset&format=csv')">Power BI CSV</button>
+        <div id="resultado-powerbi" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>4. Resumo dos Testes</h2>
+        <button onclick="mostrarResumo()">Ver Resumo</button>
+        <div id="resumo" class="result"></div>
+    </div>
+
+    <script>
+        let resultados = {
+            paginas: [],
+            apis: [],
+            powerbi: []
+        }
+
+        async function testarPagina(url) {
+            const fullUrl = `http://localhost:5000${url}`
+            try {
+                const response = await fetch(fullUrl)
+                const resultado = {
+                    url,
+                    status: response.status,
+                    ok: response.ok,
+                    timestamp: new Date().toLocaleTimeString()
+                }
+                resultados.paginas.push(resultado)
+                
+                const div = document.getElementById('resultado-paginas')
+                const status = resultado.ok ? 
+                    `<span class="success">✅ ${url} - OK (${resultado.status})</span>` :
+                    `<span class="error">❌ ${url} - Erro ${resultado.status}</span>`
+                div.innerHTML += `<div>${status} - ${resultado.timestamp}</div>`
+            } catch (error) {
+                const resultado = {
+                    url,
+                    erro: error.message,
+                    timestamp: new Date().toLocaleTimeString()
+                }
+                resultados.paginas.push(resultado)
+                
+                const div = document.getElementById('resultado-paginas')
+                div.innerHTML += `<div><span class="error">❌ ${url} - ${error.message}</span> - ${resultado.timestamp}</div>`
+            }
+        }
+
+        async function testarAPI(endpoint) {
+            const fullUrl = `http://localhost:5000${endpoint}`
+            try {
+                const response = await fetch(fullUrl)
+                const resultado = {
+                    endpoint,
+                    status: response.status,
+                    ok: response.ok,
+                    timestamp: new Date().toLocaleTimeString()
+                }
+                
+                if (response.ok) {
+                    try {
+                        const data = await response.json()
+                        resultado.dados = Array.isArray(data) ? `${data.length} itens` : 'Dados recebidos'
+                    } catch {
+                        resultado.dados = 'Resposta não-JSON'
+                    }
+                }
+                
+                resultados.apis.push(resultado)
+                
+                const div = endpoint.includes('powerbi') ? 
+                    document.getElementById('resultado-powerbi') :
+                    document.getElementById('resultado-apis')
+                    
+                const status = resultado.ok ? 
+                    `<span class="success">✅ ${endpoint} - OK (${resultado.dados || 'OK'})</span>` :
+                    `<span class="error">❌ ${endpoint} - Erro ${resultado.status}</span>`
+                div.innerHTML += `<div>${status} - ${resultado.timestamp}</div>`
+            } catch (error) {
+                const resultado = {
+                    endpoint,
+                    erro: error.message,
+                    timestamp: new Date().toLocaleTimeString()
+                }
+                resultados.apis.push(resultado)
+                
+                const div = endpoint.includes('powerbi') ? 
+                    document.getElementById('resultado-powerbi') :
+                    document.getElementById('resultado-apis')
+                div.innerHTML += `<div><span class="error">❌ ${endpoint} - ${error.message}</span> - ${resultado.timestamp}</div>`
+            }
+        }
+
+        function mostrarResumo() {
+            const totalTestes = resultados.paginas.length + resultados.apis.length
+            const sucessos = [
+                ...resultados.paginas.filter(r => r.ok),
+                ...resultados.apis.filter(r => r.ok)
+            ].length
+            const falhas = totalTestes - sucessos
+            const taxaSucesso = totalTestes > 0 ? Math.round((sucessos / totalTestes) * 100) : 0
+
+            const div = document.getElementById('resumo')
+            div.innerHTML = `
+                <h3>📊 Resumo dos Testes</h3>
+                <div class="info">
+                    <strong>Total de testes:</strong> ${totalTestes}<br>
+                    <strong class="success">Sucessos:</strong> ${sucessos}<br>
+                    <strong class="error">Falhas:</strong> ${falhas}<br>
+                    <strong>Taxa de sucesso:</strong> ${taxaSucesso}%
+                </div>
+                <div style="margin-top: 15px;">
+                    ${taxaSucesso >= 80 ? 
+                        '<div class="success"><strong>🎉 SISTEMA FUNCIONANDO!</strong></div>' :
+                        '<div class="error"><strong>⚠️ Sistema com problemas</strong></div>'
+                    }
+                </div>
+            `
+        }
+
+        // Teste automático inicial
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                document.getElementById('resultado-paginas').innerHTML = '<div class="info">Clique nos botões acima para testar as páginas</div>'
+                document.getElementById('resultado-apis').innerHTML = '<div class="info">Clique nos botões acima para testar as APIs</div>'
+                document.getElementById('resultado-powerbi').innerHTML = '<div class="info">Clique nos botões acima para testar o Power BI</div>'
+            }, 1000)
+        })
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+- Autenticacao do aluno
+- Chat usuario com o coordenador funcional
+- Rota "https://naf.ltdestacio.com.br/naf-scheduling" melhorada de servico selecionada
+- Data da etapa 3 da rota "https://naf.ltdestacio.com.br/naf-scheduling", alterada de ingles para portugues e tambem verificacao no banco de dados (tabela "fiscal_appointments"). Tambem envio de e-mail funcionando apos o agendamento for conluido
+- Rota do coordenador, "https://naf.ltdestacio.com.br/coordinator-dashboard", os agendamentos feitos na rota "https://naf.ltdestacio.com.br/naf-scheduling" estao la no painel do coordenador, na parte de "Atendimentos"
+- Melhoria na matricula de cada curso no painel do estudante
+- Atendimento em "Visao geral" no painel do coordenador de forma real
+- Melhoria no backup em "Segurança Digital" no painel do coordenador
+- Gerar graficos e muitas informacoes na parte de "Business Intelligence" no painel do coordenador
+- Cadastro de novos usuarios no chat para falar com o coordenador
+- Removendo o som no painel do coordenador
+- Melhora de rota no painel do estudante, coordenador e gestao naf
+- Semestres dos alunos funcionando

@@ -1,0 +1,43 @@
+═══════════════════════════════════════════════════════════════
+  📧 CONFIGURAÇÃO DO EMAIL AUTOMÁTICO - EMAILJS
+═══════════════════════════════════════════════════════════════
+
+🎯 O QUE FAZER:
+
+1. Abra o arquivo: email-template-agendamento.html
+2. Copie TODO o conteúdo do arquivo
+3. Acesse: https://dashboard.emailjs.com/
+4. Vá em "Email Templates"
+5. Encontre o template: template_ofyjueh
+6. Cole o HTML copiado
+7. Salve
+
+✅ PRONTO! Os emails serão enviados automaticamente após cada agendamento.
+
+═══════════════════════════════════════════════════════════════
+
+📋 VARIÁVEIS QUE O SISTEMA ENVIA AUTOMATICAMENTE:
+
+• protocol ........... Protocolo do agendamento
+• clientName ......... Nome do cliente
+• clientEmail ........ Email do cliente
+• clientPhone ........ Telefone do cliente
+• serviceType ........ Tipo de serviço solicitado
+• clientCategory ..... Categoria do atendimento
+• preferredDate ...... Data do agendamento
+• preferredTime ...... Horário do agendamento
+• modality ........... Online ou Presencial
+
+═══════════════════════════════════════════════════════════════
+
+⚠️ IMPORTANTE:
+
+• NÃO altere os nomes das variáveis ({{protocol}}, {{clientName}}, etc)
+• Use EXATAMENTE o template fornecido
+• Teste o envio no EmailJS antes de usar em produção
+
+═══════════════════════════════════════════════════════════════
+
+📖 Para instruções detalhadas, veja: INSTRUCOES-EMAILJS.md
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,6 @@
+awss3:
+  bucket: your-bucket-name
+  prefix: playwright-bin
+github:
+  repository: your-org/naf-contabilidade-estacio
+  release: playwright-assets

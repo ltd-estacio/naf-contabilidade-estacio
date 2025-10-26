@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import navigation-specific styles */
+@import '../styles/navigation.css';
+
+@layer base {
+  :root {
+    /* Light Theme - Default (Branco) */
+    --background: 0 0% 100%;              /* Branco puro */
+    --foreground: 222.2 84% 4.9%;         /* Texto escuro */
+    --card: 0 0% 100%;                    /* Cards brancos */
+    --card-foreground: 222.2 84% 4.9%;   /* Texto escuro nos cards */
+    --popover: 0 0% 100%;                 /* Popover branco */
+    --popover-foreground: 222.2 84% 4.9%; /* Texto escuro popover */
+    --primary: 221.2 83.2% 53.3%;        /* Azul primário */
+    --primary-foreground: 0 0% 100%;      /* Texto branco no primário */
+    --secondary: 210 40% 96%;             /* Cinza claro secundário */
+    --secondary-foreground: 222.2 47.4% 11.2%; /* Texto escuro secundário */
+    --muted: 210 40% 96%;                 /* Cinza claro muted */
+    --muted-foreground: 215.4 16.3% 46.9%; /* Texto cinza muted */
+    --accent: 210 40% 96%;                /* Cinza claro accent */
+    --accent-foreground: 222.2 47.4% 11.2%; /* Texto escuro accent */
+    --destructive: 0 84.2% 60.2%;         /* Vermelho destrutivo */
+    --destructive-foreground: 0 0% 100%;  /* Texto branco destrutivo */
+    --border: 214.3 31.8% 91.4%;          /* Bordas cinza claro */
+    --input: 214.3 31.8% 91.4%;           /* Inputs cinza claro */
+    --ring: 221.2 83.2% 53.3%;            /* Ring azul */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Dark Theme - Tema escuro */
+    --background: 222.2 84% 4.9%;         /* Fundo escuro */
+    --foreground: 210 40% 98%;            /* Texto claro */
+    --card: 222.2 84% 4.9%;               /* Cards escuros */
+    --card-foreground: 210 40% 98%;       /* Texto claro nos cards */
+    --popover: 222.2 84% 4.9%;            /* Popover escuro */
+    --popover-foreground: 210 40% 98%;    /* Texto claro popover */
+    --primary: 217.2 91.2% 59.8%;         /* Azul primário mais claro */
+    --primary-foreground: 222.2 84% 4.9%; /* Texto escuro no primário */
+    --secondary: 217.2 32.6% 17.5%;       /* Cinza escuro secundário */
+    --secondary-foreground: 210 40% 98%;  /* Texto claro secundário */
+    --muted: 217.2 32.6% 17.5%;           /* Cinza escuro muted */
+    --muted-foreground: 215 20.2% 65.1%;  /* Texto cinza claro muted */
+    --accent: 217.2 32.6% 17.5%;          /* Cinza escuro accent */
+    --accent-foreground: 210 40% 98%;     /* Texto claro accent */
+    --destructive: 0 62.8% 30.6%;         /* Vermelho escuro destrutivo */
+    --destructive-foreground: 210 40% 98%; /* Texto claro destrutivo */
+    --border: 217.2 32.6% 17.5%;          /* Bordas escuras */
+    --input: 217.2 32.6% 17.5%;           /* Inputs escuros */
+    --ring: 224.3 76.3% 48%;              /* Ring azul escuro */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-solid;
+  }
+
+  html, body {
+    background-color: white;
+    color: hsl(var(--foreground));
+  }
+
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+}

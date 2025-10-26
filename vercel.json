@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/automation/run/route.js": {
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    },
+    "app/api/automation/run/route.mjs": {
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    }
+  }
+}
