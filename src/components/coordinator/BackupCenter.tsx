@@ -271,15 +271,13 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
     setSuccessMessage('')
 
     try {
-      const response = await fetch('/api/coordinator/backup/send-email', {
+      // 1. Primeiro, gerar o backup com os dados
+      const backupResponse = await fetch('/api/coordinator/backup/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           coordinatorId,
-          coordinatorName,
-          coordinatorEmail,
-          recipientEmail,
-          format,
+          format: 'json', // Sempre JSON para o anexo do email
           filters: {
             status: statusFilter.length > 0 ? statusFilter : undefined
           },
@@ -287,22 +285,45 @@ export default function BackupCenter({ coordinatorId, coordinatorName, coordinat
             start: dateStart || undefined,
             end: dateEnd || undefined
           },
-          includeFeeback: includeFeedback,
-          message: emailMessage
+          includeFeedback
         })
       })
 
-      const result = await response.json()
+      const backupData = await backupResponse.json()
 
-      if (result.success) {
-        setSuccessMessage(`📧 E-mail enviado com sucesso para ${recipientEmail}! ${result.data.totalRecords} registros exportados.`)
+      if (!backupResponse.ok || !backupData.success) {
+        throw new Error(backupData.error || 'Erro ao gerar backup')
+      }
+
+      // 2. Enviar o backup por e-mail usando a nova API
+      const emailResponse = await fetch('/api/backup/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          coordinatorEmail: recipientEmail || coordinatorEmail,
+          coordinatorName: coordinatorName || 'Coordenador',
+          backupData: backupData.data,
+          students: backupData.students || []
+        })
+      })
+
+      const emailResult = await emailResponse.json()
+
+      if (emailResult.success) {
+        setSuccessMessage(
+          `📧 Backup enviado com sucesso para ${recipientEmail || coordinatorEmail}!\n` +
+          `📊 ${emailResult.data.total_records} registros exportados\n` +
+          `📋 ${emailResult.data.tables_count} tabelas incluídas\n` +
+          `👥 ${emailResult.data.students_count} estudantes\n` +
+          `📥 Arquivo: ${emailResult.data.filename}`
+        )
         setEmailMessage('')
         await loadLogs()
       } else {
-        setErrorMessage(result.error || 'Erro ao enviar e-mail')
+        setErrorMessage(emailResult.error || 'Erro ao enviar e-mail')
       }
-    } catch (error) {
-      setErrorMessage('Erro ao enviar e-mail')
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Erro ao enviar e-mail')
       console.error(error)
     } finally {
       setLoading(false)

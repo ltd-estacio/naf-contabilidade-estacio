@@ -13,12 +13,24 @@ export async function GET(
   try {
     const backupId = params.id
 
-    // Buscar o backup pelo ID
-    const { data: backup, error } = await supabase
-      .from('system_backups')
+    // Tentar buscar primeiro na tabela backups
+    let { data: backup, error } = await supabase
+      .from('backups')
       .select('*')
       .eq('id', backupId)
       .single()
+
+    // Se não encontrar, tentar na tabela system_backups (fallback)
+    if (error || !backup) {
+      const result = await supabase
+        .from('system_backups')
+        .select('*')
+        .eq('id', backupId)
+        .single()
+      
+      backup = result.data
+      error = result.error
+    }
 
     if (error || !backup) {
       return NextResponse.json(
@@ -36,7 +48,9 @@ export async function GET(
     const jsonContent = JSON.stringify(backupData, null, 2)
 
     // Criar nome do arquivo com data
-    const backupDate = new Date(backup.backup_date)
+    const backupDate = backup.created_at ? new Date(backup.created_at) : 
+                       backup.backup_date ? new Date(backup.backup_date) : 
+                       new Date()
     const fileName = `backup_naf_${backupDate.toISOString().split('T')[0]}_${backup.id}.json`
 
     // Retornar o arquivo para download
