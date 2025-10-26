@@ -3,398 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backup de Dados NAF - Sistema de Atendimentos</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7fa;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 650px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
-        }
-        
-        .header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-        
-        .header p {
-            font-size: 16px;
-            opacity: 0.95;
-        }
-        
-        .alert-banner {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px 30px;
-            color: #856404;
-        }
-        
-        .alert-banner strong {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 16px;
-        }
-        
-        .content {
-            padding: 30px;
-        }
-        
-        .info-section {
-            margin-bottom: 30px;
-        }
-        
-        .info-section h2 {
-            color: #2d3748;
-            font-size: 20px;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .info-card {
-            background-color: #f7fafc;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 3px solid #667eea;
-        }
-        
-        .info-card label {
-            display: block;
-            font-size: 12px;
-            color: #718096;
-            text-transform: uppercase;
-            font-weight: 600;
-            margin-bottom: 5px;
-            letter-spacing: 0.5px;
-        }
-        
-        .info-card .value {
-            font-size: 18px;
-            color: #2d3748;
-            font-weight: 700;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .status-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .status-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .tables-list {
-            background-color: #edf2f7;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-        
-        .tables-list ul {
-            list-style: none;
-            padding: 0;
-        }
-        
-        .tables-list li {
-            padding: 8px 0;
-            color: #4a5568;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-        }
-        
-        .tables-list li:before {
-            content: "📋";
-            margin-right: 10px;
-            font-size: 16px;
-        }
-        
-        .students-section {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-        
-        .students-section h3 {
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-        
-        .students-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
-        .student-badge {
-            background-color: rgba(255, 255, 255, 0.2);
-            padding: 6px 12px;
-            border-radius: 15px;
-            font-size: 13px;
-            font-weight: 500;
-        }
-        
-        .download-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px;
-            border-radius: 8px;
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        .download-section h3 {
-            color: white;
-            font-size: 20px;
-            margin-bottom: 15px;
-        }
-        
-        .download-button {
-            display: inline-block;
-            background-color: white;
-            color: #667eea;
-            padding: 15px 40px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-        
-        .download-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .backup-details {
-            background-color: #f7fafc;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .backup-details h3 {
-            color: #2d3748;
-            font-size: 16px;
-            margin-bottom: 10px;
-        }
-        
-        .backup-details p {
-            color: #4a5568;
-            font-size: 14px;
-            margin-bottom: 8px;
-        }
-        
-        .footer {
-            background-color: #2d3748;
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .footer p {
-            margin-bottom: 10px;
-            opacity: 0.9;
-        }
-        
-        .footer .brand {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .security-notice {
-            background-color: #e6f3ff;
-            border: 1px solid #b3d9ff;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-        
-        .security-notice strong {
-            color: #0066cc;
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .security-notice p {
-            color: #004d99;
-            font-size: 13px;
-            margin: 0;
-        }
-        
-        @media only screen and (max-width: 600px) {
-            .info-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .students-list {
-                justify-content: center;
-            }
-            
-            .header h1 {
-                font-size: 22px;
-            }
-            
-            .content {
-                padding: 20px;
-            }
-        }
-    </style>
+    <title>Backup Automático - Sistema NAF</title>
 </head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>🛡️ Backup de Dados Realizado</h1>
-            <p>Sistema NAF - Núcleo de Apoio Contábil e Fiscal</p>
-        </div>
-        
-        <!-- Alert Banner -->
-        <div class="alert-banner">
-            <strong>⚠️ Operação Crítica Executada</strong>
-            Este é um backup automático gerado antes da exclusão de dados de atendimentos.
-        </div>
-        
-        <!-- Content -->
-        <div class="content">
-            <!-- Backup Info Section -->
-            <div class="info-section">
-                <h2>📊 Informações do Backup</h2>
-                <div class="info-grid">
-                    <div class="info-card">
-                        <label>Data do Backup</label>
-                        <div class="value">{{backup_date}}</div>
-                    </div>
-                    <div class="info-card">
-                        <label>Hora</label>
-                        <div class="value">{{backup_time}}</div>
-                    </div>
-                    <div class="info-card">
-                        <label>Total de Registros</label>
-                        <div class="value">{{total_records}}</div>
-                    </div>
-                    <div class="info-card">
-                        <label>Status</label>
-                        <div class="value">
-                            <span class="status-badge {{status_class}}">{{backup_status}}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Tables Section -->
-            <div class="info-section">
-                <h2>📋 Tabelas Incluídas no Backup</h2>
-                <div class="tables-list">
-                    <ul>
-                        {{tables_list}}
-                    </ul>
-                </div>
-            </div>
-            
-            <!-- Students Section -->
-            <div class="info-section">
-                <div class="students-section">
-                    <h3>👥 Estudantes Afetados</h3>
-                    <p style="opacity: 0.9; margin-bottom: 10px;">Os seguintes estudantes tiveram dados incluídos neste backup:</p>
-                    <div class="students-list">
-                        {{students_badges}}
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Download Section -->
-            <div class="download-section">
-                <h3>💾 Download do Backup</h3>
-                <p style="color: white; opacity: 0.95; margin-bottom: 20px;">
-                    Clique no botão abaixo para fazer o download do arquivo de backup completo.
-                </p>
-                <a href="{{download_link}}" class="download-button">
-                    ⬇️ Baixar Backup Completo
-                </a>
-            </div>
-            
-            <!-- Backup Details -->
-            <div class="backup-details">
-                <h3>📝 Detalhes Técnicos</h3>
-                <p><strong>ID do Backup:</strong> {{backup_id}}</p>
-                <p><strong>Tipo:</strong> Backup Automático (Danger Zone)</p>
-                <p><strong>Formato:</strong> JSON</p>
-                <p><strong>Compressão:</strong> Habilitada</p>
-                <p><strong>Coordenador:</strong> {{coordinator_name}}</p>
-                <p><strong>Email do Coordenador:</strong> {{coordinator_email}}</p>
-            </div>
-            
-            <!-- Security Notice -->
-            <div class="security-notice">
-                <strong>🔒 Aviso de Segurança</strong>
-                <p>Este backup contém dados sensíveis e deve ser armazenado em local seguro. Não compartilhe este arquivo com pessoas não autorizadas. O link de download expira em 7 dias.</p>
-            </div>
-        </div>
-        
-        <!-- Footer -->
-        <div class="footer">
-            <div class="brand">NAF Contabilidade</div>
-            <p>Núcleo de Apoio Contábil e Fiscal</p>
-            <p style="font-size: 12px; opacity: 0.7; margin-top: 15px;">
-                Este é um email automático. Por favor, não responda.
-            </p>
-            <p style="font-size: 12px; opacity: 0.7;">
-                © 2025 NAF - Todos os direitos reservados
-            </p>
-        </div>
-    </div>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+        <tr>
+            <td align="center">
+                <!-- Container Principal -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 650px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+                    
+                    <!-- Header com gradiente -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                🛡️ Backup Automático de Segurança
+                            </h1>
+                            <p style="margin: 10px 0 0 0; color: #e0e7ff; font-size: 14px; font-weight: 500;">
+                                Sistema NAF - Núcleo de Apoio Contábil e Fiscal
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Status Badge -->
+                    <tr>
+                        <td style="padding: 20px 30px 0 30px;">
+                            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 16px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+                                <p style="margin: 0; color: #ffffff; font-size: 16px; font-weight: 600;">
+                                    {{backup_status}}
+                                </p>
+                                <p style="margin: 8px 0 0 0; color: #d1fae5; font-size: 13px;">
+                                    Backup ID: {{backup_id}}
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Informações do Backup -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: 600; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">
+                                📊 Informações do Backup
+                            </h2>
+                            
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="padding: 12px 16px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 8px; margin-bottom: 8px;" width="50%">
+                                        <p style="margin: 0; color: #6b7280; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Data</p>
+                                        <p style="margin: 6px 0 0 0; color: #1f2937; font-size: 16px; font-weight: 600;">{{backup_date}}</p>
+                                    </td>
+                                    <td style="width: 10px;"></td>
+                                    <td style="padding: 12px 16px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 8px;" width="50%">
+                                        <p style="margin: 0; color: #6b7280; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Horário</p>
+                                        <p style="margin: 6px 0 0 0; color: #1f2937; font-size: 16px; font-weight: 600;">{{backup_time}}</p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Cards de Estatísticas -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
+                                <tr>
+                                    <td width="32%" style="padding: 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                        <div style="font-size: 32px; margin-bottom: 8px;">📦</div>
+                                        <p style="margin: 0; color: #0ea5e9; font-size: 28px; font-weight: 700;">{{total_records}}</p>
+                                        <p style="margin: 6px 0 0 0; color: #64748b; font-size: 12px; font-weight: 500; text-transform: uppercase;">Registros</p>
+                                    </td>
+                                    <td style="width: 2%;"></td>
+                                    <td width="32%" style="padding: 20px; background: linear-gradient(135deg, #fef3c7 0%, #fef08a 100%); border-radius: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                        <div style="font-size: 32px; margin-bottom: 8px;">📋</div>
+                                        <p style="margin: 0; color: #eab308; font-size: 28px; font-weight: 700;">{{tables_count}}</p>
+                                        <p style="margin: 6px 0 0 0; color: #64748b; font-size: 12px; font-weight: 500; text-transform: uppercase;">Tabelas</p>
+                                    </td>
+                                    <td style="width: 2%;"></td>
+                                    <td width="32%" style="padding: 20px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                        <div style="font-size: 32px; margin-bottom: 8px;">👥</div>
+                                        <p style="margin: 0; color: #10b981; font-size: 28px; font-weight: 700;">{{students_count}}</p>
+                                        <p style="margin: 6px 0 0 0; color: #64748b; font-size: 12px; font-weight: 500; text-transform: uppercase;">Estudantes</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Tabelas Incluídas -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <h2 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                                📁 Tabelas Incluídas no Backup
+                            </h2>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background: #f9fafb; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                <thead>
+                                    <tr style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                                        <th style="padding: 14px; text-align: left; color: #ffffff; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Tabela</th>
+                                        <th style="padding: 14px; text-align: center; color: #ffffff; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Registros</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{tables_list}}
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Estudantes -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <h2 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+                                👥 Estudantes no Backup (amostra)
+                            </h2>
+                            <div style="background: #f9fafb; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                {{students_badges}}
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Botão de Download -->
+                    <tr>
+                        <td style="padding: 0 30px 40px 30px; text-align: center;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); padding: 4px;">
+                                        <a href="{{download_link}}" style="display: block; padding: 18px 40px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; text-align: center;">
+                                            📥 Baixar Backup Completo (.JSON)
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin: 16px 0 0 0; color: #6b7280; font-size: 13px;">
+                                Clique no botão acima para baixar o arquivo completo de backup
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Informações do Coordenador -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #f59e0b;">
+                                <p style="margin: 0; color: #92400e; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">ℹ️ Informações do Responsável</p>
+                                <p style="margin: 10px 0 0 0; color: #1f2937; font-size: 15px;">
+                                    <strong>Nome:</strong> {{coordinator_name}}<br>
+                                    <strong>Email:</strong> {{coordinator_email}}
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Avisos de Segurança -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #ef4444;">
+                                <p style="margin: 0; color: #991b1b; font-size: 14px; font-weight: 600;">
+                                    ⚠️ Importante - Segurança do Backup
+                                </p>
+                                <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #7f1d1d; font-size: 13px; line-height: 1.6;">
+                                    <li>Este backup contém dados sensíveis e confidenciais</li>
+                                    <li>Armazene o arquivo em local seguro</li>
+                                    <li>Não compartilhe com pessoas não autorizadas</li>
+                                    <li>O link de download é válido e seguro</li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1f2937 0%, #111827 100%); padding: 30px; text-align: center;">
+                            <p style="margin: 0; color: #9ca3af; font-size: 14px; line-height: 1.6;">
+                                <strong style="color: #ffffff;">Sistema NAF</strong><br>
+                                Núcleo de Apoio Contábil e Fiscal - Estácio<br>
+                                <span style="font-size: 12px;">Backup automático gerado em {{backup_date}} às {{backup_time}}</span>
+                            </p>
+                            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #374151;">
+                                <p style="margin: 0; color: #6b7280; font-size: 11px;">
+                                    Este é um email automático. Por favor, não responda.<br>
+                                    Em caso de dúvidas, entre em contato com a coordenação.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

@@ -58,13 +58,22 @@ async function createAutomaticBackup() {
       records_count: Object.values(backupData).reduce((sum, records) => sum + records.length, 0)
     }
 
-    await supabase.from('system_backups').insert(backupRecord)
+    const { data: insertedBackup, error: insertError } = await supabase
+      .from('system_backups')
+      .insert(backupRecord)
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error('Erro ao inserir backup:', insertError)
+      return { success: false, message: 'Falha ao salvar backup' }
+    }
 
     return { 
       success: true, 
       message: 'Backup automático criado com sucesso',
       backupData,
-      backupRecord
+      backupRecord: insertedBackup
     }
   } catch (error) {
     console.error('Erro ao criar backup automático:', error)
@@ -110,10 +119,40 @@ async function sendBackupEmail(backupData: any, backupRecord: any, coordinatorNa
     // Criar lista de estudantes para o email
     const studentBadges = Array.from(studentNames)
       .slice(0, 10)
-      .map(name => `<span class="badge">${name}</span>`)
+      .map(name => `<span class="badge" style="display: inline-block; padding: 6px 12px; margin: 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; font-size: 12px; font-weight: 500;">${name}</span>`)
       .join('')
 
+    // Criar lista de tabelas detalhada
+    const tablesList = Object.entries(backupData)
+      .map(([tableName, records]) => {
+        if (!Array.isArray(records)) return ''
+        return `
+          <tr style="border-bottom: 1px solid #e5e7eb;">
+            <td style="padding: 12px; color: #374151; font-weight: 500;">${tableName}</td>
+            <td style="padding: 12px; text-align: center; color: #6366f1; font-weight: 600;">${records.length}</td>
+          </tr>
+        `
+      })
+      .join('')
+
+    console.log('📋 Tables List HTML gerado:', tablesList.substring(0, 200))
+
+    // Criar link de download (usando o ID do backup)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const backupIdFromRecord = backupRecord.id || backupRecord.backup_id || 'unknown'
+    const downloadLink = `${baseUrl}/api/backup/download/${backupIdFromRecord}`
+
+    console.log('🔑 Backup Record ID:', backupIdFromRecord)
+    console.log('📦 Backup Record completo:', JSON.stringify(backupRecord, null, 2))
+
+    // Criar ID legível do backup
+    const backupId = `BKP-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${backupIdFromRecord.toString().substring(0, 8)}`
+
+    console.log('🎫 Backup ID legível:', backupId)
+
     // Substituir variáveis no template
+    console.log('🔄 Iniciando substituição de variáveis no template...')
+    
     htmlTemplate = htmlTemplate
       .replace(/{{backup_date}}/g, formattedDate)
       .replace(/{{backup_time}}/g, formattedTime)
@@ -122,10 +161,28 @@ async function sendBackupEmail(backupData: any, backupRecord: any, coordinatorNa
       .replace(/{{students_count}}/g, studentNames.size.toString())
       .replace(/{{coordinator_name}}/g, coordinatorName)
       .replace(/{{coordinator_email}}/g, coordinatorEmail)
-      .replace(/{{students_badges}}/g, studentBadges)
-      .replace(/{{backup_json}}/g, JSON.stringify(backupData, null, 2))
+      .replace(/{{students_badges}}/g, studentBadges || '<span style="color: #9ca3af;">Nenhum estudante encontrado</span>')
+      .replace(/{{tables_list}}/g, tablesList)
+      .replace(/{{download_link}}/g, downloadLink)
+      .replace(/{{backup_id}}/g, backupId)
+      .replace(/{{backup_status}}/g, '✅ Concluído com Sucesso')
+      .replace(/{{status_class}}/g, 'status-success')
 
     console.log('✅ Template preenchido com dados')
+    console.log('📥 Link de download:', downloadLink)
+    console.log('🎫 Backup ID no email:', backupId)
+    console.log('📊 Total de registros:', totalRecords)
+    console.log('📋 Número de tabelas:', tablesCount)
+    
+    // Verificar se as variáveis foram substituídas
+    const hasPlaceholders = htmlTemplate.includes('{{')
+    if (hasPlaceholders) {
+      console.warn('⚠️ AVISO: Ainda existem placeholders não substituídos no template!')
+      const remainingPlaceholders = htmlTemplate.match(/{{[^}]+}}/g)
+      console.warn('⚠️ Placeholders restantes:', remainingPlaceholders)
+    } else {
+      console.log('✅ Todas as variáveis foram substituídas com sucesso!')
+    }
 
     // Configurar email
     const mailOptions = {
