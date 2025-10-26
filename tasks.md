@@ -25,3 +25,4 @@ Tarefas finais concluidas:
 [ X ] No painel do coordenador, ele pode colocar os cursos externos que os estudantes poderao acessar
 [ X ] Trocar de estudante na hora do atendimento (coordenador redirecionar)
 [ X ] Calendário (formato e bloqueio/datas horários pelo coordenador)
+[ X ] Designe do Calendário melhorada
