@@ -122,20 +122,13 @@ export async function POST(request: NextRequest) {
         : `[${new Date().toLocaleString('pt-BR')}] Atendimento transferido para: ${newStudent.name} (${newStudent.email}). Motivo: ${reason || 'Transferência manual'}`
     }
 
+    console.log('🔄 Atualizando atendimento com:', updateData)
+
     const { data: updatedAppointment, error: updateError } = await supabase
       .from('fiscal_appointments')
       .update(updateData)
       .eq('id', appointment_id)
-      .select(`
-        *,
-        students:assigned_student_id (
-          id,
-          name,
-          email,
-          phone,
-          course
-        )
-      `)
+      .select()
       .single()
 
     if (updateError) {
