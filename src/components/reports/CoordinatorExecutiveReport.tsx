@@ -273,34 +273,67 @@ const CoordinatorExecutiveReport: React.FC = () => {
       : 0
   }, [data])
 
-  const statusChartData = useMemo(() => (
-    data?.statusDistribution.map(item => ({ label: item.label, value: item.count })) || []
-  ), [data])
+  const statusChartData = useMemo(() => {
+    const chartData = data?.statusDistribution.map(item => ({ 
+      label: item.label, 
+      value: item.count,
+      color: statusCategoryStyles[item.category] ? undefined : undefined // Usar cores padrão
+    })) || []
+    
+    // Se não houver dados, retornar dados de exemplo para mostrar o gráfico vazio
+    if (chartData.length === 0) {
+      return [{ label: 'Sem dados', value: 0 }]
+    }
+    return chartData
+  }, [data])
 
-  const timelineChartData = useMemo(() => (
-    data?.timeline.map(item => ({ label: item.period.split('-').reverse().join('/'), value: item.total })) || []
-  ), [data])
+  const timelineChartData = useMemo(() => {
+    const chartData = data?.timeline.map(item => ({ 
+      label: item.period.split('-').reverse().join('/'), 
+      value: item.total 
+    })) || []
+    
+    if (chartData.length === 0) {
+      return [{ label: 'Sem dados', value: 0 }]
+    }
+    return chartData
+  }, [data])
 
-  const completionChartData = useMemo(() => (
-    data?.timeline.map(item => ({
+  const completionChartData = useMemo(() => {
+    const chartData = data?.timeline.map(item => ({
       label: item.period.split('-').reverse().join('/'),
       value: item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0
     })) || []
-  ), [data])
+    
+    if (chartData.length === 0) {
+      return [{ label: 'Sem dados', value: 0 }]
+    }
+    return chartData
+  }, [data])
 
-  const courseChartData = useMemo(() => (
-    data?.courseDistribution.slice(0, 8).map(item => ({
+  const courseChartData = useMemo(() => {
+    const chartData = data?.courseDistribution.slice(0, 8).map(item => ({
       label: item.course || 'Sem curso',
       value: item.total
     })) || []
-  ), [data])
+    
+    if (chartData.length === 0) {
+      return [{ label: 'Sem dados', value: 0 }]
+    }
+    return chartData
+  }, [data])
 
-  const audienceChartData = useMemo(() => (
-    data?.clientCategories.slice(0, 8).map(item => ({
+  const audienceChartData = useMemo(() => {
+    const chartData = data?.clientCategories.slice(0, 8).map(item => ({
       label: item.category,
       value: Math.round(item.percent * 10) / 10
     })) || []
-  ), [data])
+    
+    if (chartData.length === 0) {
+      return [{ label: 'Sem dados', value: 0 }]
+    }
+    return chartData
+  }, [data])
 
   const topStudents = useMemo(() => (
     data?.studentInsights.slice(0, 6) || []
@@ -432,46 +465,49 @@ const CoordinatorExecutiveReport: React.FC = () => {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-100">
-          <CardContent className="p-5 space-y-2">
-            <div className="flex items-center gap-2 text-blue-500 text-xs font-semibold uppercase tracking-wide">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200">
+          <CardContent className="p-6 space-y-2">
+            <div className="flex items-center gap-2 text-blue-600 text-xs font-semibold uppercase tracking-wide">
               <TrendingUp className="h-4 w-4" /> Volume Consolidado
             </div>
-            <div className="text-3xl font-bold text-blue-950">{data.summary.totals.overall}</div>
-            <p className="text-xs text-blue-800">
+            <div className="text-4xl font-bold text-blue-900">{data.summary.totals.overall}</div>
+            <p className="text-xs text-blue-700">
               {data.summary.totals.regular} atendimentos regulares • {data.summary.totals.fiscal} fiscais
             </p>
           </CardContent>
         </Card>
-        <Card className="border border-emerald-100 bg-emerald-50/80">
-          <CardContent className="p-5 space-y-2">
-            <div className="flex items-center gap-2 text-emerald-600 text-xs font-semibold uppercase tracking-wide">
-              <CheckStatusIcon className="h-4 w-4" /> Taxa de Conclusão
+
+        <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border border-green-200">
+          <CardContent className="p-6 space-y-2">
+            <div className="flex items-center gap-2 text-green-600 text-xs font-semibold uppercase tracking-wide">
+              <Activity className="h-4 w-4" /> Taxa de Conclusão
             </div>
-            <div className="text-3xl font-bold text-emerald-800">{conclusionRate}%</div>
-            <p className="text-xs text-emerald-700">
-              Tempo médio: {Math.round(data.summary.averageDuration || 0)} min • Reagendados: {data.summary.rescheduledCount}
+            <div className="text-4xl font-bold text-green-900">{conclusionRate}%</div>
+            <p className="text-xs text-green-700">
+              Tempo médio: {data.summary.averageDuration ? Math.round(data.summary.averageDuration) : 0} min • Reagendados: {data.summary.rescheduledCount}
             </p>
           </CardContent>
         </Card>
-        <Card className="border border-purple-100 bg-purple-50/80">
-          <CardContent className="p-5 space-y-2">
+
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200">
+          <CardContent className="p-6 space-y-2">
             <div className="flex items-center gap-2 text-purple-600 text-xs font-semibold uppercase tracking-wide">
               <Users className="h-4 w-4" /> Engajamento dos Estudantes
             </div>
-            <div className="text-3xl font-bold text-purple-900">{data.summary.totalStudents}</div>
+            <div className="text-4xl font-bold text-purple-900">{data.summary.totalStudents}</div>
             <p className="text-xs text-purple-700">
-              {Math.round((data.summary.totalNotes || 0) / Math.max(1, data.summary.totalStudents))} registros por estudante em média
+              {data.studentInsights.length} registros por estudante em média
             </p>
           </CardContent>
         </Card>
-        <Card className="border border-amber-100 bg-amber-50/80">
-          <CardContent className="p-5 space-y-2">
-            <div className="flex items-center gap-2 text-amber-600 text-xs font-semibold uppercase tracking-wide">
+
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border border-orange-200">
+          <CardContent className="p-6 space-y-2">
+            <div className="flex items-center gap-2 text-orange-600 text-xs font-semibold uppercase tracking-wide">
               <NotebookPen className="h-4 w-4" /> Registro do Atendimento
             </div>
-            <div className="text-3xl font-bold text-amber-900">{data.summary.totalNotes}</div>
-            <p className="text-xs text-amber-700">
+            <div className="text-4xl font-bold text-orange-900">{data.summary.totalNotes}</div>
+            <p className="text-xs text-orange-700">
               Documentações lançadas pelos estudantes durante o atendimento
             </p>
           </CardContent>
