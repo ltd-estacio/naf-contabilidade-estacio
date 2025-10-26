@@ -19,10 +19,12 @@ import {
   UserCheck,
   Users,
   TrendingUp,
-  X
+  X,
+  ArrowRightLeft
 } from 'lucide-react'
 
 interface FiscalAppointment {
+  id?: string
   protocol: string
   client_name: string
   client_email: string
@@ -30,6 +32,8 @@ interface FiscalAppointment {
   status: string
   urgency_level: string
   created_at: string
+  assigned_student_id?: string
+  assigned_student_name?: string
 }
 
 interface FiscalAppointmentsData {
@@ -69,6 +73,18 @@ interface StudentHistoryData {
     cancelados: number
   }
   serviceCategories: Record<string, number>
+  feedbacks?: {
+    total: number
+    average_rating: number
+  }
+}
+
+interface AvailableStudent {
+  id: string
+  name: string
+  email: string
+  course: string
+  semester: string
 }
 
 export default function FiscalAppointmentsSection() {
@@ -80,6 +96,15 @@ export default function FiscalAppointmentsSection() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [studentHistory, setStudentHistory] = useState<StudentHistoryData | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  
+  // Estados para transferência de estudante
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [selectedAppointment, setSelectedAppointment] = useState<FiscalAppointment | null>(null)
+  const [availableStudents, setAvailableStudents] = useState<AvailableStudent[]>([])
+  const [selectedNewStudent, setSelectedNewStudent] = useState<string>('')
+  const [transferReason, setTransferReason] = useState<string>('')
+  const [transferring, setTransferring] = useState(false)
+  const [loadingStudents, setLoadingStudents] = useState(false)
 
   const loadData = async () => {
     try {
@@ -226,6 +251,78 @@ export default function FiscalAppointmentsSection() {
       console.error('Erro ao carregar histórico:', error)
     } finally {
       setLoadingHistory(false)
+    }
+  }
+
+  // Função para abrir modal de transferência
+  const openTransferModal = async (appointment: FiscalAppointment) => {
+    setSelectedAppointment(appointment)
+    setShowTransferModal(true)
+    setLoadingStudents(true)
+    
+    try {
+      // Buscar estudantes disponíveis
+      const response = await fetch(`/api/fiscal-appointments/transfer?current_student_id=${appointment.assigned_student_id || ''}`)
+      
+      if (response.ok) {
+        const result = await response.json()
+        setAvailableStudents(result.students || [])
+      } else {
+        console.error('Erro ao carregar estudantes disponíveis')
+        setAvailableStudents([])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar estudantes:', error)
+      setAvailableStudents([])
+    } finally {
+      setLoadingStudents(false)
+    }
+  }
+
+  // Função para executar a transferência
+  const executeTransfer = async () => {
+    if (!selectedAppointment || !selectedNewStudent) {
+      alert('Selecione um estudante para a transferência')
+      return
+    }
+
+    setTransferring(true)
+
+    try {
+      const response = await fetch('/api/fiscal-appointments/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          appointment_id: selectedAppointment.id,
+          from_student_id: selectedAppointment.assigned_student_id,
+          to_student_id: selectedNewStudent,
+          reason: transferReason || 'Transferência manual pelo coordenador'
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        alert('✅ Atendimento transferido com sucesso!')
+        
+        // Fechar modal e resetar estado
+        setShowTransferModal(false)
+        setSelectedAppointment(null)
+        setSelectedNewStudent('')
+        setTransferReason('')
+        
+        // Recarregar dados
+        await refreshData()
+      } else {
+        const error = await response.json()
+        alert(`❌ Erro ao transferir atendimento: ${error.error || 'Erro desconhecido'}`)
+      }
+    } catch (error) {
+      console.error('Erro ao transferir:', error)
+      alert('❌ Erro ao transferir atendimento. Tente novamente.')
+    } finally {
+      setTransferring(false)
     }
   }
 
@@ -491,6 +588,19 @@ export default function FiscalAppointmentsSection() {
                           Confirmar
                         </Button>
                       )}
+
+                      {/* Botão de Transferência - Só aparece para atendimentos em andamento ou confirmados */}
+                      {(appointment.status === 'EM_ANDAMENTO' || appointment.status === 'CONFIRMADO') && appointment.id && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                          onClick={() => openTransferModal(appointment)}
+                        >
+                          <ArrowRightLeft className="h-4 w-4 mr-2" />
+                          Transferir
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -668,14 +778,14 @@ export default function FiscalAppointmentsSection() {
                           <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
                             <div className="flex items-center justify-center gap-1 mb-1">
                               {[...Array(5)].map((_, i) => (
-                                <span key={i} className={i < Math.round(studentHistory.feedbacks.average_rating) ? 'text-yellow-500 text-2xl' : 'text-gray-300 text-2xl'}>★</span>
+                                <span key={i} className={i < Math.round(studentHistory.feedbacks?.average_rating || 0) ? 'text-yellow-500 text-2xl' : 'text-gray-300 text-2xl'}>★</span>
                               ))}
                             </div>
-                            <p className="text-2xl font-bold text-yellow-700">{studentHistory.feedbacks.average_rating.toFixed(1)}/5</p>
+                            <p className="text-2xl font-bold text-yellow-700">{studentHistory.feedbacks?.average_rating.toFixed(1)}/5</p>
                             <p className="text-xs text-gray-600">Média de Avaliação</p>
                           </div>
                           <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                            <p className="text-2xl font-bold text-blue-700">{studentHistory.feedbacks.total}</p>
+                            <p className="text-2xl font-bold text-blue-700">{studentHistory.feedbacks?.total}</p>
                             <p className="text-xs text-gray-600">Total de Feedbacks</p>
                           </div>
                         </div>
@@ -786,6 +896,162 @@ export default function FiscalAppointmentsSection() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Transferência de Estudante */}
+      {showTransferModal && selectedAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header do Modal */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+                  Transferir Atendimento para Outro Estudante
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Protocolo: <span className="font-mono font-medium">{selectedAppointment.protocol}</span>
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowTransferModal(false)
+                  setSelectedAppointment(null)
+                  setSelectedNewStudent('')
+                  setTransferReason('')
+                }}
+                disabled={transferring}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Conteúdo do Modal */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Informações do Atendimento Atual */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Atendimento Atual</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Serviço:</span>
+                    <span className="font-medium">{selectedAppointment.service_title}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Cliente:</span>
+                    <span className="font-medium">{selectedAppointment.client_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status:</span>
+                    {getStatusBadge(selectedAppointment.status)}
+                  </div>
+                  {selectedAppointment.assigned_student_name && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Estudante Atual:</span>
+                      <span className="font-medium">{selectedAppointment.assigned_student_name}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Seleção do Novo Estudante */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Selecionar Novo Estudante *
+                </label>
+                
+                {loadingStudents ? (
+                  <div className="flex items-center justify-center py-8 border border-gray-200 dark:border-gray-800 rounded-md">
+                    <RefreshCw className="h-5 w-5 animate-spin text-blue-600 mr-2" />
+                    <span className="text-sm text-gray-600">Carregando estudantes disponíveis...</span>
+                  </div>
+                ) : availableStudents.length > 0 ? (
+                  <select
+                    value={selectedNewStudent}
+                    onChange={(e) => setSelectedNewStudent(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={transferring}
+                  >
+                    <option value="">-- Selecione um estudante --</option>
+                    {availableStudents.map((student) => (
+                      <option key={student.id} value={student.id}>
+                        {student.name} - {student.course} ({student.semester})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      ⚠️ Nenhum estudante disponível para transferência no momento.
+                    </p>
+                  </div>
+                )}
+                
+                {selectedNewStudent && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      ℹ️ O atendimento será transferido para o estudante selecionado e ele receberá uma notificação.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Motivo da Transferência */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Motivo da Transferência (opcional)
+                </label>
+                <textarea
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  placeholder="Ex: Redistribuição de carga, especialização do estudante, disponibilidade..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={transferring}
+                />
+                <p className="text-xs text-gray-500">
+                  Este motivo será registrado no histórico do atendimento para auditoria.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer com Ações */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowTransferModal(false)
+                  setSelectedAppointment(null)
+                  setSelectedNewStudent('')
+                  setTransferReason('')
+                }}
+                disabled={transferring}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={executeTransfer}
+                disabled={!selectedNewStudent || transferring || loadingStudents}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {transferring ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Transferindo...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft className="h-4 w-4 mr-2" />
+                    Confirmar Transferência
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
