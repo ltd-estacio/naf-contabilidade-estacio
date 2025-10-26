@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
+import ImprovedCalendarPicker from '@/components/calendar/ImprovedCalendarPicker'
 import MainNavigation from '@/components/MainNavigation'
 import {
   Calendar as CalendarIcon,
@@ -294,6 +295,22 @@ function NAFSchedulingSystem() {
       preferredDateISO: selectedDate.toISOString().split('T')[0],
       preferredTime: slot.time,
       preferredPeriod: derivePeriodFromTime(slot.time)
+    }))
+  }
+
+  // Nova função para integração com ImprovedCalendarPicker
+  const handleDateTimeSelect = (dateString: string, time: string, format: 'presencial' | 'online') => {
+    const date = new Date(dateString + 'T00:00:00')
+    date.setHours(0, 0, 0, 0)
+    
+    setSelectedDate(date)
+    setAppointment(prev => ({
+      ...prev,
+      preferredDate: date,
+      preferredDateISO: dateString,
+      preferredTime: time,
+      preferredPeriod: derivePeriodFromTime(time),
+      isOnline: format === 'online'
     }))
   }
 
@@ -811,158 +828,13 @@ function NAFSchedulingSystem() {
               })}
             </div>
 
-            <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr]">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                    Calendário
-                  </h3>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Domingos indisponíveis
-                  </span>
-                </div>
-                <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900/40 p-4">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelection}
-                    disabled={(date: Date) => isPastDate(date) || date.getDay() === 0}
-                    locale={ptBR}
-                    className="w-full mx-auto"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {selectedDate
-                        ? selectedDate.toLocaleDateString('pt-BR', {
-                            weekday: 'long',
-                            day: '2-digit',
-                            month: 'long'
-                          })
-                        : 'Horários'}
-                    </p>
-                    {selectedDate && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        BRT
-                      </span>
-                    )}
-                  </div>
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-4">
-                    {!selectedDate ? (
-                      <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-gray-500 dark:text-gray-400">
-                        <Clock className="h-10 w-10 opacity-40" />
-                        Escolha uma data
-                      </div>
-                    ) : loading ? (
-                      <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-gray-500 dark:text-gray-400">
-                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-r-transparent"></div>
-                        Carregando...
-                      </div>
-                    ) : availableSlots.length > 0 ? (
-                      <div className="grid grid-cols-3 gap-3">
-                        {availableSlots.map((slot, index) => {
-                          const isSelected =
-                            appointment.preferredTime === slot.time &&
-                            appointment.preferredDate?.toDateString() === selectedDate?.toDateString()
-
-                          return (
-                            <Button
-                              key={index}
-                              type="button"
-                              variant="outline"
-                              disabled={!slot.available || loading}
-                              onClick={() => handleTimeSelection(slot)}
-                              className={`justify-center h-12 text-sm font-semibold transition-all ${
-                                isSelected
-                                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
-                                  : slot.available
-                                    ? 'border-gray-200 hover:border-blue-400 dark:border-gray-700 dark:hover:border-blue-600'
-                                    : 'border-gray-200 dark:border-gray-700 opacity-40 cursor-not-allowed'
-                              }`}
-                            >
-                              {slot.time}
-                            </Button>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center gap-2 py-6 text-sm text-gray-500 dark:text-gray-400">
-                        <Clock className="h-6 w-6 opacity-40" />
-                        Sem horários
-                      </div>
-                    )}
-                  </div>
-                  {selectedDate && !loading && availableSlots.length > 0 && (
-                    <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-                        Disponível
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-gray-400"></span>
-                        Ocupado
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-base font-semibold text-gray-900 dark:text-white">
-                    Formato do Atendimento *
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setAppointment(prev => ({ ...prev, isOnline: false }))}
-                      className={`h-20 justify-start gap-3 border-2 text-left transition-all ${
-                        presencialSelected
-                          ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-900/30 dark:border-blue-500'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${
-                        presencialSelected
-                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300'
-                          : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200'
-                      }`}>
-                        <Building2 className="h-5 w-5" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-base font-semibold text-gray-900 dark:text-white">Presencial</span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">No NAF</span>
-                      </div>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setAppointment(prev => ({ ...prev, isOnline: true }))}
-                      className={`h-20 justify-start gap-3 border-2 text-left transition-all ${
-                        onlineSelected
-                          ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-900/30 dark:border-blue-500'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${
-                        onlineSelected
-                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300'
-                          : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200'
-                      }`}>
-                        <Monitor className="h-5 w-5" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-base font-semibold text-gray-900 dark:text-white">Online</span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">Link por email</span>
-                      </div>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Novo Calendário Moderno */}
+            <ImprovedCalendarPicker
+              onDateTimeSelect={handleDateTimeSelect}
+              selectedDate={appointment.preferredDateISO || ''}
+              selectedTime={appointment.preferredTime}
+              selectedFormat={appointment.isOnline === null ? undefined : (appointment.isOnline ? 'online' : 'presencial')}
+            />
           </CardContent>
         </Card>
       </div>

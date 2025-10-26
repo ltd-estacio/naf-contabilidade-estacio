@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Disponibilidade criada com sucesso',
-      data
+      availability: data
     })
   } catch (error: any) {
     console.error('Erro ao processar requisição:', error)
