@@ -2,7 +2,6 @@ Tarefas finais:
 
 --- Falta
 - Campos de preenchimento (No atendimento): (passo a passo do atendimento, etapas, resumo)
-[ X ] Filtro de relatório dos atendimentos por datas (relatório semanal, mensal)
 
 --- Site do LTD
 - Colocar no site do LTD

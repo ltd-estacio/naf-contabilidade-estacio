@@ -7,39 +7,112 @@ export async function GET(request: NextRequest) {
   try {
     console.log('📊 Business Intelligence API - Iniciando coleta de dados')
 
+    // Extrair parâmetros de filtro da URL
+    const { searchParams } = new URL(request.url)
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+    const studentId = searchParams.get('studentId')
+    const statusFilters = searchParams.getAll('status')
+    const minRating = searchParams.get('minRating')
+    const serviceType = searchParams.get('serviceType')
+    const course = searchParams.get('course')
+    const semester = searchParams.get('semester')
+    const hasFeedback = searchParams.get('hasFeedback')
+
+    console.log('🔍 Filtros aplicados:', {
+      startDate,
+      endDate,
+      studentId,
+      statusFilters,
+      minRating,
+      serviceType,
+      course,
+      semester,
+      hasFeedback
+    })
+
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
 
     // ==================== ESTUDANTES ====================
-    const { data: students, error: studentsError } = await supabase
+    let studentsQuery = supabase
       .from('students')
       .select('*')
       .order('created_at', { ascending: false })
+
+    // Aplicar filtros de estudantes
+    if (studentId) {
+      studentsQuery = studentsQuery.eq('id', studentId)
+    }
+    if (course) {
+      studentsQuery = studentsQuery.ilike('course', `%${course}%`)
+    }
+    if (semester) {
+      studentsQuery = studentsQuery.eq('semester', semester)
+    }
+
+    const { data: students, error: studentsError } = await studentsQuery
 
     if (studentsError) console.error('Erro ao buscar estudantes:', studentsError)
 
     // Estatísticas detalhadas de cada estudante
     const studentsWithStats = await Promise.all(
       (students || []).map(async (student) => {
-        // Buscar atendimentos normais
-        const { data: studentAttendances } = await supabase
+        // Buscar atendimentos normais com filtros
+        let attendancesQuery = (supabase as any)
           .from('attendances')
           .select('*')
           .eq('student_id', student.id)
 
-        // Buscar atendimentos fiscais
-        const { data: fiscalAttendances } = await supabase
+        if (startDate) {
+          attendancesQuery = attendancesQuery.gte('created_at', startDate)
+        }
+        if (endDate) {
+          attendancesQuery = attendancesQuery.lte('created_at', endDate)
+        }
+        if (statusFilters.length > 0) {
+          attendancesQuery = attendancesQuery.in('status', statusFilters)
+        }
+        if (serviceType) {
+          attendancesQuery = attendancesQuery.ilike('service_type', `%${serviceType}%`)
+        }
+
+        const { data: studentAttendances } = await attendancesQuery
+
+        // Buscar atendimentos fiscais com filtros
+        let fiscalQuery = (supabase as any)
           .from('fiscal_appointments')
           .select('*')
           .eq('assigned_student_id', student.id)
 
+        if (startDate) {
+          fiscalQuery = fiscalQuery.gte('created_at', startDate)
+        }
+        if (endDate) {
+          fiscalQuery = fiscalQuery.lte('created_at', endDate)
+        }
+        if (statusFilters.length > 0) {
+          fiscalQuery = fiscalQuery.in('status', statusFilters)
+        }
+        if (serviceType) {
+          fiscalQuery = fiscalQuery.ilike('service_type', `%${serviceType}%`)
+        }
+
+        const { data: fiscalAttendances } = await fiscalQuery
+
         // Buscar feedbacks de atendimentos fiscais
-        const { data: fiscalFeedbacks } = await supabase
+        let feedbackQuery = (supabase as any)
           .from('fiscal_appointment_feedbacks')
           .select('rating, fiscal_appointments!inner(assigned_student_id)')
           .eq('fiscal_appointments.assigned_student_id', student.id)
+
+        if (minRating) {
+          feedbackQuery = feedbackQuery.gte('rating', parseInt(minRating))
+        }
+
+        const { data: fiscalFeedbacks } = await feedbackQuery
 
         const { data: chatConversations } = await supabase
           .from('chat_conversations')

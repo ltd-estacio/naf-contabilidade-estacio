@@ -7,6 +7,15 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Activity,
   TrendingUp,
@@ -25,7 +34,13 @@ import {
   XCircle,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  Filter,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  X,
+  Search
 } from 'lucide-react'
 
 interface BIData {
@@ -39,12 +54,35 @@ interface BIData {
   metadata?: any
 }
 
+interface ReportFilters {
+  dateRange: 'week' | 'month' | 'quarter' | 'year' | 'custom' | 'all'
+  startDate?: string
+  endDate?: string
+  studentId?: string
+  status?: string[]
+  minRating?: number
+  serviceType?: string
+  course?: string
+  semester?: string
+  hasFeedback?: boolean
+}
+
 export default function BusinessIntelligence() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<BIData>({})
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('general')
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  
+  // Estados para filtros avançados
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState<ReportFilters>({
+    dateRange: 'all',
+    status: [],
+    hasFeedback: undefined
+  })
+  const [applyingFilters, setApplyingFilters] = useState(false)
+  const [exportingReport, setExportingReport] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -87,6 +125,142 @@ export default function BusinessIntelligence() {
     if (value > 0) return <ArrowUpRight className="h-4 w-4 text-green-500" />
     if (value < 0) return <ArrowDownRight className="h-4 w-4 text-red-500" />
     return <Minus className="h-4 w-4 text-gray-500" />
+  }
+
+  // Calcular datas baseadas no filtro selecionado
+  const getDateRange = (range: string) => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    switch (range) {
+      case 'week':
+        const weekStart = new Date(today)
+        weekStart.setDate(today.getDate() - 7)
+        return { start: weekStart.toISOString(), end: now.toISOString() }
+      
+      case 'month':
+        const monthStart = new Date(today)
+        monthStart.setMonth(today.getMonth() - 1)
+        return { start: monthStart.toISOString(), end: now.toISOString() }
+      
+      case 'quarter':
+        const quarterStart = new Date(today)
+        quarterStart.setMonth(today.getMonth() - 3)
+        return { start: quarterStart.toISOString(), end: now.toISOString() }
+      
+      case 'year':
+        const yearStart = new Date(today)
+        yearStart.setFullYear(today.getFullYear() - 1)
+        return { start: yearStart.toISOString(), end: now.toISOString() }
+      
+      case 'custom':
+        return {
+          start: filters.startDate || undefined,
+          end: filters.endDate || undefined
+        }
+      
+      default:
+        return {}
+    }
+  }
+
+  // Aplicar filtros e recarregar dados
+  const applyFilters = async () => {
+    setApplyingFilters(true)
+    try {
+      const dateRange = getDateRange(filters.dateRange)
+      
+      // Construir query params
+      const params = new URLSearchParams()
+      if (dateRange.start) params.append('startDate', dateRange.start)
+      if (dateRange.end) params.append('endDate', dateRange.end)
+      if (filters.studentId) params.append('studentId', filters.studentId)
+      if (filters.status && filters.status.length > 0) {
+        filters.status.forEach(s => params.append('status', s))
+      }
+      if (filters.minRating) params.append('minRating', filters.minRating.toString())
+      if (filters.serviceType) params.append('serviceType', filters.serviceType)
+      if (filters.course) params.append('course', filters.course)
+      if (filters.semester) params.append('semester', filters.semester)
+      if (filters.hasFeedback !== undefined) {
+        params.append('hasFeedback', filters.hasFeedback.toString())
+      }
+
+      const response = await fetch(`/api/coordinator/business-intelligence?${params.toString()}`)
+      const result = await response.json()
+
+      if (response.ok) {
+        setData(result)
+        setLastUpdated(new Date().toLocaleString('pt-BR'))
+      } else {
+        setError(result.error || 'Erro ao aplicar filtros')
+      }
+    } catch (err) {
+      setError('Erro ao aplicar filtros')
+      console.error(err)
+    } finally {
+      setApplyingFilters(false)
+    }
+  }
+
+  // Limpar todos os filtros
+  const clearFilters = () => {
+    setFilters({
+      dateRange: 'all',
+      status: [],
+      hasFeedback: undefined
+    })
+    loadData()
+  }
+
+  // Exportar relatório em diferentes formatos
+  const exportReport = async (format: 'csv' | 'json' | 'pdf') => {
+    setExportingReport(true)
+    try {
+      const dateRange = getDateRange(filters.dateRange)
+      
+      const response = await fetch('/api/coordinator/business-intelligence/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          format,
+          filters: {
+            ...filters,
+            ...dateRange
+          },
+          data
+        })
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `relatorio-bi-${new Date().toISOString().split('T')[0]}.${format}`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      } else {
+        setError('Erro ao exportar relatório')
+      }
+    } catch (err) {
+      setError('Erro ao exportar relatório')
+      console.error(err)
+    } finally {
+      setExportingReport(false)
+    }
+  }
+
+  // Toggle status no filtro
+  const toggleStatusFilter = (status: string) => {
+    setFilters(prev => ({
+      ...prev,
+      status: prev.status?.includes(status)
+        ? prev.status.filter(s => s !== status)
+        : [...(prev.status || []), status]
+    }))
   }
 
   const renderGeneralSection = () => {
@@ -1116,6 +1290,313 @@ export default function BusinessIntelligence() {
             </div>
           )}
         </CardContent>
+      </Card>
+
+      {/* Painel de Filtros Avançados */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-blue-600" />
+              <CardTitle>Filtros de Relatório</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowFilters(!showFilters)}
+                variant="outline"
+                size="sm"
+              >
+                {showFilters ? (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    Ocultar Filtros
+                  </>
+                ) : (
+                  <>
+                    <Filter className="h-4 w-4 mr-2" />
+                    Mostrar Filtros
+                  </>
+                )}
+              </Button>
+              {(filters.dateRange !== 'all' || (filters.status && filters.status.length > 0) || filters.studentId || filters.minRating) && (
+                <Button
+                  onClick={clearFilters}
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Limpar Filtros
+                </Button>
+              )}
+            </div>
+          </div>
+          <CardDescription>
+            Personalize os relatórios filtrando por período, estudante, status, avaliação e mais
+          </CardDescription>
+        </CardHeader>
+
+        {showFilters && (
+          <CardContent className="space-y-6">
+            {/* Linha 1: Período */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dateRange" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-blue-600" />
+                  Período do Relatório
+                </Label>
+                <Select
+                  value={filters.dateRange}
+                  onValueChange={(value: any) => setFilters(prev => ({ ...prev, dateRange: value }))}
+                >
+                  <SelectTrigger id="dateRange">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">📊 Todos os Dados</SelectItem>
+                    <SelectItem value="week">📅 Última Semana</SelectItem>
+                    <SelectItem value="month">📆 Último Mês</SelectItem>
+                    <SelectItem value="quarter">📈 Último Trimestre</SelectItem>
+                    <SelectItem value="year">📊 Último Ano</SelectItem>
+                    <SelectItem value="custom">🎯 Período Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {filters.dateRange === 'custom' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="startDate">Data Inicial</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={filters.startDate || ''}
+                      onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endDate">Data Final</Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={filters.endDate || ''}
+                      onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Linha 2: Status dos Atendimentos */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                Status dos Atendimentos
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'CONCLUIDO', label: 'Concluído', color: 'bg-green-100 text-green-700 hover:bg-green-200' },
+                  { value: 'EM_ANDAMENTO', label: 'Em Andamento', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+                  { value: 'AGENDADO', label: 'Agendado', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
+                  { value: 'CANCELADO', label: 'Cancelado', color: 'bg-red-100 text-red-700 hover:bg-red-200' },
+                  { value: 'NAO_COMPARECEU', label: 'Não Compareceu', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' }
+                ].map((status) => (
+                  <Button
+                    key={status.value}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleStatusFilter(status.value)}
+                    className={`${
+                      filters.status?.includes(status.value)
+                        ? status.color + ' border-2'
+                        : 'bg-white'
+                    }`}
+                  >
+                    {filters.status?.includes(status.value) && (
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                    )}
+                    {status.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Linha 3: Filtros Avançados */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="minRating" className="flex items-center gap-2">
+                  <Star className="h-4 w-4 text-yellow-500" />
+                  Avaliação Mínima
+                </Label>
+                <Select
+                  value={filters.minRating?.toString() || '0'}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, minRating: parseInt(value) }))}
+                >
+                  <SelectTrigger id="minRating">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Todas as Avaliações</SelectItem>
+                    <SelectItem value="1">⭐ 1+ Estrela</SelectItem>
+                    <SelectItem value="2">⭐⭐ 2+ Estrelas</SelectItem>
+                    <SelectItem value="3">⭐⭐⭐ 3+ Estrelas</SelectItem>
+                    <SelectItem value="4">⭐⭐⭐⭐ 4+ Estrelas</SelectItem>
+                    <SelectItem value="5">⭐⭐⭐⭐⭐ 5 Estrelas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="course" className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-purple-600" />
+                  Curso
+                </Label>
+                <Input
+                  id="course"
+                  placeholder="Ex: Ciências Contábeis"
+                  value={filters.course || ''}
+                  onChange={(e) => setFilters(prev => ({ ...prev, course: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="semester" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-indigo-600" />
+                  Semestre
+                </Label>
+                <Input
+                  id="semester"
+                  placeholder="Ex: 5"
+                  value={filters.semester || ''}
+                  onChange={(e) => setFilters(prev => ({ ...prev, semester: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Linha 4: Filtro de Feedback */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <MessageCircle className="h-4 w-4 text-pink-600" />
+                Feedback do Cliente
+              </Label>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters(prev => ({ ...prev, hasFeedback: true }))}
+                  className={filters.hasFeedback === true ? 'bg-pink-100 border-pink-500' : ''}
+                >
+                  {filters.hasFeedback === true && <CheckCircle className="h-3 w-3 mr-1" />}
+                  Com Feedback
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters(prev => ({ ...prev, hasFeedback: false }))}
+                  className={filters.hasFeedback === false ? 'bg-gray-100 border-gray-500' : ''}
+                >
+                  {filters.hasFeedback === false && <CheckCircle className="h-3 w-3 mr-1" />}
+                  Sem Feedback
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters(prev => ({ ...prev, hasFeedback: undefined }))}
+                  className={filters.hasFeedback === undefined ? 'bg-blue-100 border-blue-500' : ''}
+                >
+                  {filters.hasFeedback === undefined && <CheckCircle className="h-3 w-3 mr-1" />}
+                  Todos
+                </Button>
+              </div>
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="flex gap-2">
+                <Button
+                  onClick={applyFilters}
+                  disabled={applyingFilters}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {applyingFilters ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Aplicando...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Aplicar Filtros
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => exportReport('csv')}
+                  disabled={exportingReport}
+                  variant="outline"
+                  size="sm"
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </Button>
+                <Button
+                  onClick={() => exportReport('json')}
+                  disabled={exportingReport}
+                  variant="outline"
+                  size="sm"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Exportar JSON
+                </Button>
+              </div>
+            </div>
+
+            {/* Indicador de filtros ativos */}
+            {(filters.dateRange !== 'all' || (filters.status && filters.status.length > 0) || filters.minRating || filters.course || filters.semester) && (
+              <Alert className="bg-blue-50 border-blue-200">
+                <AlertDescription>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium">Filtros Ativos:</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {filters.dateRange !== 'all' && (
+                      <Badge variant="secondary">
+                        📅 {filters.dateRange === 'week' ? 'Última Semana' : 
+                           filters.dateRange === 'month' ? 'Último Mês' :
+                           filters.dateRange === 'quarter' ? 'Último Trimestre' :
+                           filters.dateRange === 'year' ? 'Último Ano' : 'Personalizado'}
+                      </Badge>
+                    )}
+                    {filters.status && filters.status.length > 0 && (
+                      <Badge variant="secondary">
+                        ✓ {filters.status.length} Status
+                      </Badge>
+                    )}
+                    {filters.minRating && (
+                      <Badge variant="secondary">
+                        ⭐ {filters.minRating}+ Estrelas
+                      </Badge>
+                    )}
+                    {filters.course && (
+                      <Badge variant="secondary">
+                        🎓 {filters.course}
+                      </Badge>
+                    )}
+                    {filters.semester && (
+                      <Badge variant="secondary">
+                        📚 Semestre {filters.semester}
+                      </Badge>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Tabs */}
