@@ -74,9 +74,9 @@ CREATE POLICY "Coordenadores podem ver todas as transferências"
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM students
+      SELECT 1 FROM coordinator_users
       WHERE id = auth.uid()
-      AND role = 'COORDENADOR'
+      AND is_active = true
     )
   );
 

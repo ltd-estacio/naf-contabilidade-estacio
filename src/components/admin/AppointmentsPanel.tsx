@@ -24,7 +24,8 @@ import {
   Trash2,
   Filter,
   Search,
-  RefreshCw
+  RefreshCw,
+  ArrowRightLeft
 } from 'lucide-react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
@@ -94,6 +95,15 @@ export default function AppointmentsPanel() {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({})
+
+  // Estados para transferência de estudante
+  const [showTransferDialog, setShowTransferDialog] = useState(false)
+  const [transferringAppointment, setTransferringAppointment] = useState<Appointment | null>(null)
+  const [availableStudents, setAvailableStudents] = useState<Array<{id: string, name: string, email: string, course: string, semester: string}>>([])
+  const [selectedStudent, setSelectedStudent] = useState('')
+  const [transferReason, setTransferReason] = useState('')
+  const [loadingStudents, setLoadingStudents] = useState(false)
+  const [transferring, setTransferring] = useState(false)
 
   const supabaseRealtime = useMemo(() => getSupabaseBrowserClient(), [])
   const realtimeRefreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -329,6 +339,76 @@ export default function AppointmentsPanel() {
     }
   }
 
+  // Função para abrir modal de transferência
+  const openTransferDialog = async (appointment: Appointment) => {
+    setTransferringAppointment(appointment)
+    setShowTransferDialog(true)
+    setLoadingStudents(true)
+    setSelectedStudent('')
+    setTransferReason('')
+    
+    try {
+      // Buscar estudantes disponíveis
+      const response = await fetch('/api/fiscal-appointments/transfer')
+      
+      if (response.ok) {
+        const result = await response.json()
+        setAvailableStudents(result.students || [])
+      } else {
+        console.error('Erro ao carregar estudantes disponíveis')
+        setAvailableStudents([])
+        setError('Erro ao carregar lista de estudantes')
+      }
+    } catch (error) {
+      console.error('Erro ao carregar estudantes:', error)
+      setAvailableStudents([])
+      setError('Erro de conexão ao carregar estudantes')
+    } finally {
+      setLoadingStudents(false)
+    }
+  }
+
+  // Função para executar transferência
+  const executeTransfer = async () => {
+    if (!transferringAppointment || !selectedStudent) {
+      setError('Selecione um estudante para a transferência')
+      return
+    }
+
+    setTransferring(true)
+
+    try {
+      const response = await fetch('/api/fiscal-appointments/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          appointment_id: transferringAppointment.id,
+          to_student_id: selectedStudent,
+          reason: transferReason || 'Transferência manual pelo coordenador'
+        })
+      })
+
+      if (response.ok) {
+        setSuccess('✅ Atendimento transferido com sucesso!')
+        setShowTransferDialog(false)
+        setTransferringAppointment(null)
+        setSelectedStudent('')
+        setTransferReason('')
+        loadAppointments()
+      } else {
+        const error = await response.json()
+        setError(`Erro ao transferir: ${error.error || 'Erro desconhecido'}`)
+      }
+    } catch (error) {
+      console.error('Erro ao transferir:', error)
+      setError('Erro ao transferir atendimento. Tente novamente.')
+    } finally {
+      setTransferring(false)
+    }
+  }
+
   const startChat = async (appointment: Appointment) => {
     // Iniciar chat com o usuário
     if (appointment.conversation_id) {
@@ -450,7 +530,7 @@ export default function AppointmentsPanel() {
             <Button
               variant="outline"
               size="sm"
-              onClick={loadAppointments}
+              onClick={() => loadAppointments()}
               disabled={loading}
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -751,25 +831,53 @@ export default function AppointmentsPanel() {
                     )}
 
                     {appointment.status === 'confirmed' && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateAppointmentStatus(appointment.id, 'in_progress', undefined, appointment.source)}
-                        className="w-full"
-                      >
-                        <Clock className="h-4 w-4 mr-2" />
-                        Iniciar Atendimento
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => updateAppointmentStatus(appointment.id, 'in_progress', undefined, appointment.source)}
+                          className="w-full"
+                        >
+                          <Clock className="h-4 w-4 mr-2" />
+                          Iniciar Atendimento
+                        </Button>
+                        {/* Botão de Transferência - apenas para atendimentos fiscais confirmados */}
+                        {appointment.source === 'fiscal' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openTransferDialog(appointment)}
+                            className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
+                          >
+                            <ArrowRightLeft className="h-4 w-4 mr-2" />
+                            Transferir
+                          </Button>
+                        )}
+                      </>
                     )}
 
                     {appointment.status === 'in_progress' && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateAppointmentStatus(appointment.id, 'completed', undefined, appointment.source)}
-                        className="w-full bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Concluir
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => updateAppointmentStatus(appointment.id, 'completed', undefined, appointment.source)}
+                          className="w-full bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Concluir
+                        </Button>
+                        {/* Botão de Transferência - apenas para atendimentos fiscais em andamento */}
+                        {appointment.source === 'fiscal' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openTransferDialog(appointment)}
+                            className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
+                          >
+                            <ArrowRightLeft className="h-4 w-4 mr-2" />
+                            Transferir
+                          </Button>
+                        )}
+                      </>
                     )}
 
                     {appointment.conversation_id && (
@@ -828,7 +936,7 @@ export default function AppointmentsPanel() {
                   value={editingAppointment.status}
                   onValueChange={(value) => setEditingAppointment({
                     ...editingAppointment,
-                    status: value as unknown
+                    status: value as 'scheduled' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
                   })}
                 >
                   <SelectTrigger>
@@ -878,6 +986,118 @@ export default function AppointmentsPanel() {
                   onClick={() => setShowEditDialog(false)}
                 >
                   Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Transferência de Estudante */}
+      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+              Transferir Atendimento para Outro Estudante
+            </DialogTitle>
+          </DialogHeader>
+
+          {transferringAppointment && (
+            <div className="space-y-4">
+              {/* Informações do Atendimento */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+                <h4 className="font-semibold text-sm mb-2">Atendimento Atual</h4>
+                <div className="space-y-1 text-sm">
+                  {transferringAppointment.protocol && (
+                    <p><span className="text-gray-600">Protocolo:</span> <span className="font-mono font-medium">{transferringAppointment.protocol}</span></p>
+                  )}
+                  <p><span className="text-gray-600">Serviço:</span> {transferringAppointment.service_type}</p>
+                  <p><span className="text-gray-600">Cliente:</span> {transferringAppointment.client_name || transferringAppointment.chat_users?.name}</p>
+                  <p><span className="text-gray-600">Status:</span> {getStatusLabel(transferringAppointment.status)}</p>
+                </div>
+              </div>
+
+              {/* Seleção do Novo Estudante */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Selecionar Novo Estudante *
+                </label>
+                
+                {loadingStudents ? (
+                  <div className="flex items-center justify-center py-8 border border-gray-200 dark:border-gray-800 rounded-md">
+                    <RefreshCw className="h-5 w-5 animate-spin text-blue-600 mr-2" />
+                    <span className="text-sm text-gray-600">Carregando estudantes...</span>
+                  </div>
+                ) : availableStudents.length > 0 ? (
+                  <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="-- Selecione um estudante --" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableStudents.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name} - {student.course} ({student.semester})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      ⚠️ Nenhum estudante disponível para transferência no momento.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Motivo da Transferência */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Motivo da Transferência (opcional)
+                </label>
+                <Textarea
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  placeholder="Ex: Redistribuição de carga, especialização do estudante, disponibilidade..."
+                  rows={3}
+                  disabled={transferring}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Este motivo será registrado no histórico do atendimento para auditoria.
+                </p>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowTransferDialog(false)
+                    setTransferringAppointment(null)
+                    setSelectedStudent('')
+                    setTransferReason('')
+                  }}
+                  disabled={transferring}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={executeTransfer}
+                  disabled={!selectedStudent || transferring || loadingStudents}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {transferring ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Transferindo...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRightLeft className="h-4 w-4 mr-2" />
+                      Confirmar Transferência
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
