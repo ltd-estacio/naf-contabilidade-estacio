@@ -36,6 +36,15 @@ CREATE TABLE public.attendances (
   CONSTRAINT attendances_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
   CONSTRAINT attendances_supervisor_id_fkey FOREIGN KEY (supervisor_id) REFERENCES public.coordinator_users(id)
 );
+CREATE TABLE public.audit_logs (
+  id integer NOT NULL DEFAULT nextval('audit_logs_id_seq'::regclass),
+  action_type character varying NOT NULL,
+  user_id character varying NOT NULL,
+  success boolean NOT NULL DEFAULT false,
+  details text,
+  timestamp timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT audit_logs_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.backup_configurations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   coordinator_id uuid NOT NULL UNIQUE,
@@ -444,6 +453,18 @@ CREATE TABLE public.fiscal_appointment_feedbacks (
   CONSTRAINT fiscal_appointment_feedbacks_pkey PRIMARY KEY (id),
   CONSTRAINT fiscal_appointment_feedbacks_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.fiscal_appointments(id),
   CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES public.students(id)
+);
+CREATE TABLE public.fiscal_appointment_notes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  appointment_id uuid NOT NULL,
+  student_id uuid,
+  student_name text,
+  note text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT fiscal_appointment_notes_pkey PRIMARY KEY (id),
+  CONSTRAINT fiscal_appointment_notes_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.fiscal_appointments(id),
+  CONSTRAINT fk_fiscal_appointment_notes_student FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
 CREATE TABLE public.fiscal_appointments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -888,6 +909,16 @@ CREATE TABLE public.students (
   registration_year integer,
   registration_semester integer,
   CONSTRAINT students_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.system_backups (
+  id integer NOT NULL DEFAULT nextval('system_backups_id_seq'::regclass),
+  backup_date timestamp with time zone NOT NULL DEFAULT now(),
+  backup_type character varying NOT NULL,
+  data jsonb NOT NULL,
+  tables_count integer NOT NULL DEFAULT 0,
+  records_count integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_backups_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.theme_modules (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
