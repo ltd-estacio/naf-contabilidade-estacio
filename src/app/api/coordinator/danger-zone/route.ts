@@ -90,18 +90,38 @@ export async function POST(request: NextRequest) {
         // Deletar dados de atendimentos
         try {
           const tablesToClear = ['fiscal_appointments', 'attendance_feedback', 'appointments']
+          let totalDeleted = 0
           
           for (const table of tablesToClear) {
-            const { error } = await supabase.from(table).delete().neq('id', 0)
-            if (error) {
-              throw new Error(`Erro ao limpar tabela ${table}: ${error.message}`)
+            // Obter todos os IDs primeiro
+            const { data: records, error: selectError } = await supabase
+              .from(table)
+              .select('id')
+            
+            if (selectError) {
+              console.warn(`Aviso ao selecionar da tabela ${table}:`, selectError.message)
+              continue
+            }
+
+            if (records && records.length > 0) {
+              // Deletar todos os registros
+              const { error: deleteError, count } = await supabase
+                .from(table)
+                .delete()
+                .in('id', records.map(r => r.id))
+              
+              if (deleteError) {
+                throw new Error(`Erro ao limpar tabela ${table}: ${deleteError.message}`)
+              }
+              
+              totalDeleted += count || 0
             }
           }
 
-          await logAuditAction('DANGER_DELETE_SUCCESS', coordinatorId, true, 'Dados de atendimentos removidos com backup criado')
+          await logAuditAction('DANGER_DELETE_SUCCESS', coordinatorId, true, `Dados de atendimentos removidos (${totalDeleted} registros) com backup criado`)
           result = {
             success: true,
-            message: '✅ Dados apagados com sucesso! Backup automático foi criado.'
+            message: `✅ Dados apagados com sucesso! ${totalDeleted} registros removidos. Backup automático foi criado.`
           }
         } catch (error) {
           await logAuditAction('DANGER_DELETE_FAILED', coordinatorId, false, (error as Error).message)
