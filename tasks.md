@@ -1,12 +1,12 @@
 Tarefas finais:
 
-[ X ] possibilidade de alteração de campos de login e senha para aluno, coordenador e estar isso em algum lugar visível
-[ X ] No painel do coordenador, ele pode colocar os cursos externos que os estudantes poderão acessar
-
-- Trocar de estudante na hora do atendimento; (coordenador redirecionar)
+--- Falta
+- Trocar de estudante na hora do atendimento (coordenador redirecionar)
 - Calendário (formato e bloqueio/datas horários pelo coordenador)
 - Campos de preenchimento: (passo a passo do atendimento, etapas, resumo)
 filtro de relatório dos atendimentos por datas (relatório semanal, mensal)
+
+--- Site do LTD
 - Colocar no site do LTD
 - documentação do projeto no LTD
 - melhorar site do ltd para colocar todos os projetos

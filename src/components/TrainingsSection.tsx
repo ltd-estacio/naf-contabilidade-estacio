@@ -192,49 +192,45 @@ export default function TrainingsSection() {
       setLoading(true)
       setError(null)
 
-      let token = localStorage.getItem('student_token')
+      console.log('🔄 Carregando cursos externos do banco de dados...')
 
-      // Mock token para desenvolvimento se não existir
-      if (!token) {
-        const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdHVkZW50SWQiOiJzdHVkZW50LTEiLCJyb2xlIjoic3R1ZGVudCIsIm5hbWUiOiJBbHVubyBUZXN0ZSJ9.mock'
-        localStorage.setItem('student_token', mockToken)
-        token = mockToken
-      }
-
-      console.log('🔄 Carregando cursos da API...')
-
-      const response = await fetch('/api/courses', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      // Buscar cursos externos da API
+      const response = await fetch('/api/external-courses?active=true')
 
       if (response.ok) {
         const data = await response.json()
-        console.log('✅ Dados dos cursos carregados:', data)
+        console.log('✅ Cursos externos carregados:', data)
 
-        // Transformar os dados da API para o formato esperado
-        const transformedData = transformApiDataToTrainingsData(data)
+        // Transformar cursos da API para o formato do TrainingsSection
+        const externalCourses: Course[] = (data.courses || []).map((course: any) => ({
+          id: course.id.toString(),
+          title: course.title,
+          description: course.description || 'Sem descrição',
+          difficulty: course.difficulty_level || 'Intermediário',
+          duration: course.duration || 'Não especificado',
+          progress: 0,
+          modules: 0,
+          completed: 0,
+          instructor: course.platform || 'Plataforma Externa',
+          category: 'external',
+          externalUrl: course.course_url,
+          isEnrolled: false,
+          isMandatory: false
+        }))
 
-        // Se não houver dados da API, usar fallback
-        const hasInternalCourses = transformedData.internalCourses.length > 0
-        const hasExternalCourses = transformedData.externalCourses.length > 0
-        const hasManuals = transformedData.manuals.length > 0
-
-        if (!hasInternalCourses && !hasExternalCourses && !hasManuals) {
-          console.warn('⚠️ API retornou vazia, usando dados de fallback')
-          setTrainingsData(fallbackCoursesData)
-        } else {
-          // Mesclar com fallback se alguma categoria estiver vazia
-          setTrainingsData({
-            internalCourses: hasInternalCourses ? transformedData.internalCourses : fallbackCoursesData.internalCourses,
-            externalCourses: hasExternalCourses ? transformedData.externalCourses : fallbackCoursesData.externalCourses,
-            manuals: hasManuals ? transformedData.manuals : fallbackCoursesData.manuals,
-            legislation: transformedData.legislation,
-            stats: transformedData.stats
-          })
-        }
+        // Usar dados transformados ou fallback
+        setTrainingsData({
+          internalCourses: fallbackCoursesData.internalCourses,
+          externalCourses: externalCourses.length > 0 ? externalCourses : fallbackCoursesData.externalCourses,
+          manuals: fallbackCoursesData.manuals,
+          legislation: fallbackCoursesData.legislation,
+          stats: {
+            totalCourses: externalCourses.length + fallbackCoursesData.manuals.length,
+            enrolledCourses: 0,
+            completedCourses: 0,
+            totalProgress: 0
+          }
+        })
       } else {
         console.warn('⚠️ API não disponível, usando dados locais')
         setTrainingsData(fallbackCoursesData)
@@ -249,62 +245,10 @@ export default function TrainingsSection() {
   }
 
   // Transformar dados da API para o formato do componente
-  const transformApiDataToTrainingsData = (apiData: unknown): TrainingsData => {
-    const { courses, internalCourses, externalCourses, manuals, stats } = apiData
-
-    return {
-      internalCourses: (internalCourses || []).map((course: unknown) => ({
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        difficulty: course.difficulty_level || 'Iniciante',
-        duration: course.estimated_duration || '0h',
-        progress: course.overall_progress || 0,
-        modules: course.modules_count || 0,
-        completed: course.completed_modules || 0,
-        instructor: course.instructor_name || 'NAF',
-        category: 'internal',
-        isEnrolled: course.is_enrolled || false,
-        isMandatory: course.is_mandatory || false
-      })),
-      externalCourses: (externalCourses || []).map((course: unknown) => ({
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        difficulty: course.difficulty_level || 'Iniciante',
-        duration: course.estimated_duration || '0h',
-        progress: course.overall_progress || 0,
-        modules: 0,
-        completed: 0,
-        instructor: course.instructor_name || 'Externo',
-        category: 'external',
-        externalUrl: course.external_url,
-        isEnrolled: course.is_enrolled || false,
-        isMandatory: course.is_mandatory || false
-      })),
-      manuals: (manuals || []).map((manual: unknown) => ({
-        id: manual.id,
-        title: manual.title,
-        description: manual.description,
-        difficulty: manual.difficulty_level || 'Iniciante',
-        duration: manual.estimated_duration || '1h',
-        progress: manual.overall_progress || 0,
-        modules: 0,
-        completed: 0,
-        instructor: manual.instructor_name || 'Receita Federal',
-        category: 'manual',
-        pdfUrl: manual.external_url,
-        isMandatory: manual.is_mandatory || false
-      })),
-      legislation: ALL_GUIDES,
-      stats: {
-        totalCourses: stats?.totalCourses || 0,
-        enrolledCourses: stats?.enrolledCourses || 0,
-        completedCourses: stats?.completedCourses || 0,
-        totalProgress: stats?.progressPercentage || 0
-      }
-    }
-  }
+  // Função não utilizada - mantida para referência futura
+  // const transformApiDataToTrainingsData = (apiData: unknown): TrainingsData => {
+  //   ... código comentado ...
+  // }
 
   useEffect(() => {
     loadCoursesData()
@@ -460,12 +404,25 @@ export default function TrainingsSection() {
     loadCoursesData()
   }
 
-  const handleOpenExternal = (url: string) => {
-    window.open(url, '_blank')
+  const handleOpenExternal = async (url: string, courseId?: string) => {
+    // Registrar visualização se courseId foi fornecido
+    if (courseId) {
+      try {
+        await fetch(`/api/external-courses/${courseId}/view`, {
+          method: 'POST'
+        })
+        console.log(`✅ Visualização registrada para curso ${courseId}`)
+      } catch (error) {
+        console.error('❌ Erro ao registrar visualização:', error)
+      }
+    }
+    
+    // Abrir curso em nova aba
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleOpenManual = (url: string) => {
-    window.open(url, '_blank')
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   // Se um curso foi selecionado, mostrar o conteúdo do curso
@@ -732,7 +689,7 @@ export default function TrainingsSection() {
                     <div className="flex gap-2 pt-2">
                       <Button
                         className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
-                        onClick={() => handleOpenExternal(course.externalUrl!)}
+                        onClick={() => handleOpenExternal(course.externalUrl!, course.id)}
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Acessar Curso

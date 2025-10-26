@@ -1160,6 +1160,13 @@ export default function CoordinatorDashboard() {
       category: 'security'
     },
     {
+      value: 'courses',
+      label: 'Cursos Estudantes',
+      description: 'Gerenciar cursos e materiais externos',
+      icon: BookOpen,
+      category: 'management'
+    },
+    {
       value: 'automation',
       label: 'Automação Fiscal',
       description: 'Upload inteligente e preenchimento automático',
