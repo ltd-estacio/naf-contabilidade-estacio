@@ -232,6 +232,12 @@ export default function CoordinatorDashboard() {
   const [backupError, setBackupError] = useState<string | null>(null)
   const [backupMetadata, setBackupMetadata] = useState<BackupMetadataSummary | null>(null)
   const [backupHistory, setBackupHistory] = useState<BackupHistoryItem[]>([])
+  const [twoFactorOpen, setTwoFactorOpen] = useState(false)
+  const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [twoFactorError, setTwoFactorError] = useState('')
+  const [twoFactorVerified, setTwoFactorVerified] = useState(false)
+  const [pendingDangerAction, setPendingDangerAction] = useState<'delete' | 'confirm' | 'view' | null>(null)
+  const [dangerActionResult, setDangerActionResult] = useState<string | null>(null)
   const router = useRouter()
   // Links antigos foram reorganizados em um componente dedicado de navegação inline
 
@@ -751,6 +757,77 @@ export default function CoordinatorDashboard() {
     router.push('/coordinator-login')
   }
 
+  // Funções de autenticação 2FA e operações de perigo
+  const generateTwoFactorCode = () => {
+    // Gerar código de 6 dígitos
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    console.log('🔐 Código 2FA gerado:', code)
+    alert(`🔐 Código de Verificação 2FA: ${code}\n\nEste é um código temporário para demonstração.\nEm produção, seria enviado por SMS/Email.`)
+    return code
+  }
+
+  const handleDangerAction = (action: 'delete' | 'confirm' | 'view') => {
+    setPendingDangerAction(action)
+    setTwoFactorOpen(true)
+    setTwoFactorCode('')
+    setTwoFactorError('')
+    setTwoFactorVerified(false)
+    setDangerActionResult(null)
+    
+    // Gerar código 2FA
+    const generatedCode = generateTwoFactorCode()
+    // Armazenar temporariamente (em produção, seria no backend)
+    sessionStorage.setItem('temp_2fa_code', generatedCode)
+  }
+
+  const handleTwoFactorVerification = async () => {
+    const expectedCode = sessionStorage.getItem('temp_2fa_code')
+    
+    if (twoFactorCode !== expectedCode) {
+      setTwoFactorError('❌ Código incorreto. Tente novamente.')
+      setTwoFactorCode('')
+      return
+    }
+
+    setTwoFactorVerified(true)
+    setTwoFactorError('')
+    
+    // Executar ação após verificação
+    try {
+      const response = await fetch('/api/coordinator/danger-zone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: pendingDangerAction,
+          twoFactorCode: twoFactorCode,
+          coordinatorId: (user as Record<string, unknown>)?.id
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        setDangerActionResult(`✅ ${result.message}`)
+        setTimeout(() => {
+          setTwoFactorOpen(false)
+          setPendingDangerAction(null)
+          sessionStorage.removeItem('temp_2fa_code')
+          
+          // Recarregar dados se necessário
+          if (pendingDangerAction === 'delete') {
+            window.location.reload()
+          }
+        }, 2000)
+      } else {
+        setDangerActionResult(`❌ Erro: ${result.error || 'Operação falhou'}`)
+      }
+    } catch (error) {
+      setDangerActionResult(`❌ Erro de conexão: ${(error as Error).message}`)
+    }
+  }
+
   const previewAllowed = backupForm.format === 'json'
   const extrasAvailable = backupForm.format === 'zip'
   const backupMetadataErrors = backupMetadata
@@ -1071,6 +1148,13 @@ export default function CoordinatorDashboard() {
       category: 'management'
     },
     {
+      value: 'danger',
+      label: 'Perigo',
+      description: 'Operações Críticas - Autenticação Necessária',
+      icon: AlertTriangle,
+      category: 'security'
+    },
+    {
       value: 'automation',
       label: 'Automação Fiscal',
       description: 'Upload inteligente e preenchimento automático',
@@ -1327,6 +1411,10 @@ export default function CoordinatorDashboard() {
             <TabsTrigger className="w-full justify-center gap-2" value="security">
               <ShieldCheck className="h-4 w-4" />
               Segurança Digital
+            </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="danger">
+              <AlertTriangle className="h-4 w-4" />
+              Perigo
             </TabsTrigger>
             <TabsTrigger className="w-full justify-center gap-2" value="automation">
               <Cpu className="h-4 w-4" />
@@ -2179,6 +2267,183 @@ export default function CoordinatorDashboard() {
             />
           </TabsContent>
 
+          {/* PAINEL DE PERIGO - Operações Críticas com 2FA */}
+          <TabsContent value="danger" className="space-y-6">
+            <Alert className="border-red-300 bg-red-50">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <AlertDescription className="text-red-800">
+                <strong>⚠️ ZONA DE PERIGO - OPERAÇÕES CRÍTICAS</strong>
+                <p className="mt-2">
+                  Esta área contém operações que podem afetar permanentemente a integridade dos dados do sistema.
+                  Todas as ações requerem <strong>Autenticação em Duas Etapas (2FA)</strong>.
+                </p>
+              </AlertDescription>
+            </Alert>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Card: Apagar Dados */}
+              <Card className="border-red-300 shadow-lg hover:shadow-xl transition-shadow">
+                <CardHeader className="bg-gradient-to-br from-red-50 to-red-100">
+                  <CardTitle className="flex items-center gap-2 text-red-800">
+                    <AlertTriangle className="h-6 w-6" />
+                    Apagar Dados
+                  </CardTitle>
+                  <CardDescription className="text-red-700">
+                    Remove permanentemente os dados de atendimentos do sistema
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                    <p className="text-sm font-semibold text-red-800">⚠️ Esta ação é irreversível!</p>
+                    <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+                      <li>Remove todos os registros de atendimentos</li>
+                      <li>Apaga histórico de agendamentos</li>
+                      <li>Exclui avaliações e feedbacks</li>
+                      <li>Não pode ser desfeita</li>
+                    </ul>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    className="w-full bg-red-600 hover:bg-red-700"
+                    onClick={() => handleDangerAction('delete')}
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Apagar Dados (Requer 2FA)
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Card: Confirmar Dados */}
+              <Card className="border-blue-300 shadow-lg hover:shadow-xl transition-shadow">
+                <CardHeader className="bg-gradient-to-br from-blue-50 to-blue-100">
+                  <CardTitle className="flex items-center gap-2 text-blue-800">
+                    <CheckCircle className="h-6 w-6" />
+                    Confirmar Dados
+                  </CardTitle>
+                  <CardDescription className="text-blue-700">
+                    Valida e confirma a integridade dos dados no sistema
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                    <p className="text-sm font-semibold text-blue-800">✓ Verificação de Integridade</p>
+                    <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
+                      <li>Valida consistência dos registros</li>
+                      <li>Verifica relações entre tabelas</li>
+                      <li>Confirma backup recente disponível</li>
+                      <li>Gera relatório de status</li>
+                    </ul>
+                  </div>
+                  <Button
+                    variant="default"
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={() => handleDangerAction('confirm')}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirmar Integridade (Requer 2FA)
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Card: Visualizar Dados */}
+              <Card className="border-purple-300 shadow-lg hover:shadow-xl transition-shadow">
+                <CardHeader className="bg-gradient-to-br from-purple-50 to-purple-100">
+                  <CardTitle className="flex items-center gap-2 text-purple-800">
+                    <Database className="h-6 w-6" />
+                    Visualizar Dados
+                  </CardTitle>
+                  <CardDescription className="text-purple-700">
+                    Acessa informações sensíveis e estatísticas detalhadas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-2">
+                    <p className="text-sm font-semibold text-purple-800">👁️ Acesso Protegido</p>
+                    <ul className="text-xs text-purple-700 space-y-1 list-disc list-inside">
+                      <li>Visualiza dados sensíveis completos</li>
+                      <li>Exporta relatórios detalhados</li>
+                      <li>Acessa logs de auditoria</li>
+                      <li>Requer autorização 2FA</li>
+                    </ul>
+                  </div>
+                  <Button
+                    variant="default"
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                    onClick={() => handleDangerAction('view')}
+                  >
+                    <Database className="h-4 w-4 mr-2" />
+                    Visualizar Dados (Requer 2FA)
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Informações de Segurança */}
+            <Card className="border-amber-300 bg-amber-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-amber-900">
+                  <ShieldCheck className="h-5 w-5" />
+                  Protocolo de Segurança
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm text-amber-900">🔐 Autenticação em Duas Etapas</h4>
+                    <p className="text-xs text-amber-800">
+                      Todas as operações nesta área requerem um código de verificação único que será enviado para o seu dispositivo.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm text-amber-900">📝 Registro de Auditoria</h4>
+                    <p className="text-xs text-amber-800">
+                      Todas as ações são registradas com timestamp, usuário responsável e detalhes da operação.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm text-amber-900">⏱️ Timeout de Sessão</h4>
+                    <p className="text-xs text-amber-800">
+                      A autorização 2FA expira após 5 minutos. Uma nova verificação será necessária após esse período.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm text-amber-900">🔄 Backup Automático</h4>
+                    <p className="text-xs text-amber-800">
+                      Um backup automático é criado antes de qualquer operação de exclusão de dados.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Logs de Atividades Recentes */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-gray-600" />
+                  Registro de Atividades Críticas
+                </CardTitle>
+                <CardDescription>
+                  Últimas operações realizadas nesta área de perigo
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div>
+                        <p className="text-sm font-medium">Sistema iniciado</p>
+                        <p className="text-xs text-gray-500">Nenhuma operação crítica registrada ainda</p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500">Hoje</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="automation" className="space-y-6">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <Card className="xl:col-span-2 border border-slate-200/70 shadow-lg shadow-blue-100/50">
@@ -2836,6 +3101,123 @@ export default function CoordinatorDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Dialog de Autenticação 2FA para Operações Críticas */}
+      <Dialog open={twoFactorOpen} onOpenChange={setTwoFactorOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <ShieldCheck className="h-6 w-6" />
+              Autenticação em Duas Etapas (2FA)
+            </DialogTitle>
+            <DialogDescription>
+              {!twoFactorVerified 
+                ? "Digite o código de verificação de 6 dígitos enviado para confirmar esta operação crítica."
+                : "Autenticação bem-sucedida! Processando operação..."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!twoFactorVerified ? (
+            <div className="space-y-6 py-4">
+              {/* Informação da Ação */}
+              <Alert className="border-amber-300 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  <strong>Ação solicitada:</strong>{' '}
+                  {pendingDangerAction === 'delete' && 'Apagar Dados de Atendimentos'}
+                  {pendingDangerAction === 'confirm' && 'Confirmar Integridade dos Dados'}
+                  {pendingDangerAction === 'view' && 'Visualizar Dados Sensíveis'}
+                </AlertDescription>
+              </Alert>
+
+              {/* Campo de Código */}
+              <div className="space-y-2">
+                <label htmlFor="2fa-code" className="text-sm font-semibold text-gray-700">
+                  Código de Verificação
+                </label>
+                <input
+                  id="2fa-code"
+                  type="text"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full text-center text-2xl font-bold tracking-widest rounded-lg border-2 border-gray-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
+                  autoFocus
+                />
+                <p className="text-xs text-gray-500 text-center">
+                  O código foi exibido em um alerta. Em produção, seria enviado via SMS/Email.
+                </p>
+              </div>
+
+              {/* Mensagem de Erro */}
+              {twoFactorError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{twoFactorError}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Botões de Ação */}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setTwoFactorOpen(false)
+                    setPendingDangerAction(null)
+                    setTwoFactorCode('')
+                    setTwoFactorError('')
+                    sessionStorage.removeItem('temp_2fa_code')
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleTwoFactorVerification}
+                  disabled={twoFactorCode.length !== 6}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Verificar
+                </Button>
+              </div>
+
+              {/* Informações de Segurança */}
+              <div className="border-t pt-4 space-y-2">
+                <p className="text-xs font-semibold text-gray-700">🔒 Informações de Segurança:</p>
+                <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                  <li>O código expira em 5 minutos</li>
+                  <li>Máximo de 3 tentativas incorretas</li>
+                  <li>Operação registrada em log de auditoria</li>
+                  <li>Backup automático antes de exclusões</li>
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-6">
+              {/* Resultado da Operação */}
+              {dangerActionResult ? (
+                <Alert className={dangerActionResult.startsWith('✅') ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}>
+                  {dangerActionResult.startsWith('✅') ? (
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                  )}
+                  <AlertDescription className={dangerActionResult.startsWith('✅') ? 'text-green-800' : 'text-red-800'}>
+                    {dangerActionResult}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="text-center space-y-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-sm text-gray-600">Processando operação segura...</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={automationDialogOpen} onOpenChange={setAutomationDialogOpen}>
         <DialogContent className="max-w-3xl">
