@@ -370,10 +370,9 @@ export default async function Home() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-4 pt-2">
-                <Link
-                  href="https://play.google.com/store/apps/details?id=br.com.estacio.naf"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <a
+                  href="/apk/naf.apk"
+                  download="NAF-Estacio.apk"
                   className="group inline-flex items-center gap-3 rounded-xl bg-white text-slate-900 px-6 py-3 font-semibold shadow-lg shadow-slate-900/30 transition-transform duration-200 hover:-translate-y-1"
                 >
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white group-hover:scale-105 transition">
@@ -385,10 +384,10 @@ export default async function Home() {
                     </svg>
                   </span>
                   <div className="flex flex-col leading-tight">
-                    <span className="text-xs text-slate-500">Disponível na</span>
+                    <span className="text-xs text-slate-500">Baixar App</span>
                     <span>Google Play</span>
                   </div>
-                </Link>
+                </a>
                 <p className="text-sm text-slate-300/70">
                   Compatível com Android 8 ou superior • Oferece login seguro para estudantes e coordenadores.
                 </p>
