@@ -1112,24 +1112,17 @@ export default function CoordinatorDashboard() {
       category: 'management'
     },
     {
+      value: 'courses',
+      label: 'Cursos Estudantes',
+      description: 'Gerenciar cursos e materiais externos',
+      icon: BookOpen,
+      category: 'management'
+    },
+    {
       value: 'appointments',
       label: 'Atendimentos',
       description: 'Gestão Inteligente',
       icon: Calendar,
-      category: 'operations'
-    },
-    {
-      value: 'fiscal',
-      label: 'Fiscal & Compliance',
-      description: 'Procedimentos e Orientações',
-      icon: BookOpen,
-      category: 'compliance'
-    },
-    {
-      value: 'chat',
-      label: 'Comunicação',
-      description: 'Central de Mensagens',
-      icon: MessageCircle,
       category: 'operations'
     },
     {
@@ -1138,6 +1131,13 @@ export default function CoordinatorDashboard() {
       description: 'Relatórios Estratégicos',
       icon: Download,
       category: 'analytics'
+    },
+    {
+      value: 'fiscal',
+      label: 'Fiscal & Compliance',
+      description: 'Procedimentos e Orientações',
+      icon: BookOpen,
+      category: 'compliance'
     },
     {
       value: 'security',
@@ -1151,20 +1151,6 @@ export default function CoordinatorDashboard() {
       label: 'Segurança Digital',
       description: 'Backup e Recuperação',
       icon: HardDriveDownload,
-      category: 'management'
-    },
-    {
-      value: 'danger',
-      label: 'Perigo',
-      description: 'Operações Críticas - Autenticação Necessária',
-      icon: AlertTriangle,
-      category: 'security'
-    },
-    {
-      value: 'courses',
-      label: 'Cursos Estudantes',
-      description: 'Gerenciar cursos e materiais externos',
-      icon: BookOpen,
       category: 'management'
     },
     {
@@ -1194,7 +1180,21 @@ export default function CoordinatorDashboard() {
       description: 'Gerar Acesso ao Chat',
       icon: LinkIcon,
       category: 'analytics'
-    }
+    },
+    {
+      value: 'chat',
+      label: 'Comunicação',
+      description: 'Central de Mensagens',
+      icon: MessageCircle,
+      category: 'operations'
+    },
+    {
+      value: 'danger',
+      label: 'Perigo',
+      description: 'Operações Críticas - Autenticação Necessária',
+      icon: AlertTriangle,
+      category: 'security'
+    },
   ]
 
   return (

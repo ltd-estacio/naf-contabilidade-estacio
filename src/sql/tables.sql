@@ -1,6 +1,21 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.appointment_audit_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  appointment_id uuid NOT NULL,
+  from_student_id uuid,
+  to_student_id uuid NOT NULL,
+  coordinator_id uuid,
+  action character varying NOT NULL DEFAULT 'TRANSFER_STUDENT'::character varying,
+  reason text,
+  timestamp timestamp with time zone NOT NULL DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT appointment_audit_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_appointment FOREIGN KEY (appointment_id) REFERENCES public.fiscal_appointments(id),
+  CONSTRAINT fk_from_student FOREIGN KEY (from_student_id) REFERENCES public.students(id),
+  CONSTRAINT fk_to_student FOREIGN KEY (to_student_id) REFERENCES public.students(id)
+);
 CREATE TABLE public.attendances (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   protocol character varying NOT NULL UNIQUE,
@@ -432,6 +447,23 @@ CREATE TABLE public.dashboard_metrics (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT dashboard_metrics_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.external_courses (
+  id integer NOT NULL DEFAULT nextval('external_courses_id_seq'::regclass),
+  title character varying NOT NULL,
+  description text,
+  course_url character varying NOT NULL CHECK (course_url::text ~ '^https?://'::text),
+  platform character varying,
+  category character varying,
+  difficulty_level character varying,
+  duration character varying,
+  is_active boolean DEFAULT true,
+  thumbnail_url character varying,
+  created_by character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  views_count integer DEFAULT 0,
+  CONSTRAINT external_courses_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.fiscal_appointment_feedbacks (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   appointment_id uuid NOT NULL,
@@ -459,9 +491,13 @@ CREATE TABLE public.fiscal_appointment_notes (
   appointment_id uuid NOT NULL,
   student_id uuid,
   student_name text,
-  note text NOT NULL,
+  note text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  note_type text DEFAULT 'GERAL'::text,
+  step_by_step text,
+  stages text,
+  summary text,
   CONSTRAINT fiscal_appointment_notes_pkey PRIMARY KEY (id),
   CONSTRAINT fiscal_appointment_notes_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.fiscal_appointments(id),
   CONSTRAINT fk_fiscal_appointment_notes_student FOREIGN KEY (student_id) REFERENCES public.students(id)
@@ -649,6 +685,17 @@ CREATE TABLE public.notifications (
   sent_at timestamp with time zone,
   CONSTRAINT notifications_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.password_changes (
+  id integer NOT NULL DEFAULT nextval('password_changes_id_seq'::regclass),
+  user_id character varying NOT NULL,
+  user_email character varying NOT NULL,
+  user_type character varying NOT NULL,
+  changed_at timestamp with time zone DEFAULT now(),
+  ip_address inet,
+  user_agent text,
+  success boolean DEFAULT true,
+  CONSTRAINT password_changes_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.report_history (
   id text NOT NULL,
   student_id text NOT NULL,
@@ -668,6 +715,37 @@ CREATE TABLE public.report_history (
   generated_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   file_size integer,
   CONSTRAINT report_history_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.scheduling_availability (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  type character varying NOT NULL CHECK (type::text = ANY (ARRAY['available'::character varying, 'blocked'::character varying]::text[])),
+  specific_date date,
+  day_of_week integer CHECK (day_of_week >= 0 AND day_of_week <= 6),
+  start_time time without time zone NOT NULL,
+  end_time time without time zone NOT NULL,
+  reason text,
+  max_appointments integer DEFAULT 1,
+  is_active boolean DEFAULT true,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scheduling_availability_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.scheduling_settings (
+  id uuid NOT NULL DEFAULT gen_random_uuid() CHECK (id = '00000000-0000-0000-0000-000000000001'::uuid),
+  min_advance_hours integer DEFAULT 24,
+  max_advance_days integer DEFAULT 30,
+  default_start_time time without time zone DEFAULT '08:00:00'::time without time zone,
+  default_end_time time without time zone DEFAULT '17:00:00'::time without time zone,
+  slot_duration_minutes integer DEFAULT 30,
+  default_working_days jsonb DEFAULT '[1, 2, 3, 4, 5]'::jsonb,
+  blocked_dates jsonb DEFAULT '[]'::jsonb,
+  send_confirmation_email boolean DEFAULT true,
+  send_reminder_email boolean DEFAULT true,
+  reminder_hours_before integer DEFAULT 24,
+  updated_by uuid,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scheduling_settings_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.service_metrics (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

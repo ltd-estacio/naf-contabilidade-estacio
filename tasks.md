@@ -1,14 +1,9 @@
 Tarefas finais:
 
---- Falta
 - Campos de preenchimento (No atendimento): (passo a passo do atendimento, etapas, resumo)
-
---- Site do LTD
 - Colocar no site do LTD
 - Documentação do projeto no LTD
 - Melhorar site do LTD para colocar todos os projetos
-
---- Difícil
 - Apresentações, ppt, vídeo explicativo
 - Extensão para o navegador para envio de formulário (automação)
 - Publicar em diversas plataformas (publicidade)
@@ -28,4 +23,3 @@ Tarefas finais concluidas:
 [ X ] Verificacao de pessoas que fazem atendimento no mesmo dia e horario fica bloqueado
 [ X ] Envio de backup de atendimento por e-mail
 [ X ] Filtro de relatório dos atendimentos por datas (relatório semanal, mensal)
-[ X ] 
