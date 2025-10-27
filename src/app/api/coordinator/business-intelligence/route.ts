@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       studentsQuery = studentsQuery.eq('id', studentId)
     }
     if (course) {
-      studentsQuery = studentsQuery.ilike('course', `%${course}%`)
+      studentsQuery = studentsQuery.filter('course', 'ilike', `%${course}%`)
     }
     if (semester) {
       studentsQuery = studentsQuery.eq('semester', semester)
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
           attendancesQuery = attendancesQuery.in('status', statusFilters)
         }
         if (serviceType) {
-          attendancesQuery = attendancesQuery.ilike('service_type', `%${serviceType}%`)
+          attendancesQuery = attendancesQuery.filter('service_type', 'ilike', `%${serviceType}%`)
         }
 
         const { data: studentAttendances } = await attendancesQuery
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
           fiscalQuery = fiscalQuery.in('status', statusFilters)
         }
         if (serviceType) {
-          fiscalQuery = fiscalQuery.ilike('service_type', `%${serviceType}%`)
+          fiscalQuery = fiscalQuery.filter('service_type', 'ilike', `%${serviceType}%`)
         }
 
         const { data: fiscalAttendances } = await fiscalQuery
