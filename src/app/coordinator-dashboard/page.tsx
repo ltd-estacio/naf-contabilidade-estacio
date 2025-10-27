@@ -43,7 +43,9 @@ import {
   Upload,
   FileSpreadsheet,
   FileCheck,
-  Sparkles
+  Sparkles,
+  Code,
+  KeyRound
 } from 'lucide-react'
 import Link from 'next/link'
 import DashboardInlineNav from '@/components/DashboardInlineNav'
@@ -60,6 +62,9 @@ import BackupCenter from '@/components/coordinator/BackupCenter'
 import ExternalCoursesManager from '@/components/ExternalCoursesManager'
 import PasswordChangeForm from '@/components/PasswordChangeForm'
 import SchedulingAvailabilityManager from '@/components/admin/SchedulingAvailabilityManager'
+import CoordinatorNotes from '@/components/coordinator/CoordinatorNotes'
+import SourceCodeManager from '@/components/coordinator/SourceCodeManager'
+import AccountsManager from '@/components/coordinator/AccountsManager'
 // import { HistoryDashboard } from '@/components/coordinator/HistoryDashboard'
 
 interface ServiceMetrics {
@@ -1154,6 +1159,27 @@ export default function CoordinatorDashboard() {
       category: 'management'
     },
     {
+      value: 'notes',
+      label: 'Anotações',
+      description: 'Sistema completo de anotações do coordenador',
+      icon: FileText,
+      category: 'operations'
+    },
+    {
+      value: 'source-code',
+      label: 'Código Fonte',
+      description: 'Download do código fonte do site e app NAF',
+      icon: Code,
+      category: 'operations'
+    },
+    {
+      value: 'accounts',
+      label: 'Contas',
+      description: 'Gerenciar contas Gmail, EmailJS, Supabase e Gemini',
+      icon: KeyRound,
+      category: 'operations'
+    },
+    {
       value: 'scheduling',
       label: 'Disponibilidade',
       description: 'Gerenciar horários de agendamento',
@@ -1435,6 +1461,18 @@ export default function CoordinatorDashboard() {
             <TabsTrigger className="w-full justify-center gap-2" value="courses">
               <BookOpen className="h-4 w-4" />
               Cursos Externos
+            </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="notes">
+              <FileText className="h-4 w-4" />
+              Anotações
+            </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="source-code">
+              <Code className="h-4 w-4" />
+              Código Fonte
+            </TabsTrigger>
+            <TabsTrigger className="w-full justify-center gap-2" value="accounts">
+              <KeyRound className="h-4 w-4" />
+              Contas
             </TabsTrigger>
             <TabsTrigger className="w-full justify-center gap-2" value="scheduling">
               <CalendarClock className="h-4 w-4" />
@@ -2311,6 +2349,21 @@ export default function CoordinatorDashboard() {
           {/* NOVA ABA: CURSOS EXTERNOS */}
           <TabsContent value="courses" className="space-y-6">
             <ExternalCoursesManager />
+          </TabsContent>
+
+          {/* ANOTAÇÕES DO COORDENADOR */}
+          <TabsContent value="notes" className="space-y-6">
+            <CoordinatorNotes />
+          </TabsContent>
+
+          {/* CÓDIGO FONTE */}
+          <TabsContent value="source-code" className="space-y-6">
+            <SourceCodeManager />
+          </TabsContent>
+
+          {/* GERENCIAMENTO DE CONTAS */}
+          <TabsContent value="accounts" className="space-y-6">
+            <AccountsManager />
           </TabsContent>
 
           {/* NOVA ABA: DISPONIBILIDADE DE AGENDAMENTOS */}

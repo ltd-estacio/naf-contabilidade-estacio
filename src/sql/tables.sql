@@ -356,6 +356,83 @@ CREATE TABLE public.coordinator_login_logs (
   CONSTRAINT coordinator_login_logs_pkey PRIMARY KEY (id),
   CONSTRAINT coordinator_login_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.coordinator_users(id)
 );
+CREATE TABLE public.coordinator_note_categories (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  coordinator_id character varying NOT NULL,
+  name character varying NOT NULL,
+  description text,
+  color character varying,
+  icon character varying,
+  display_order integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT coordinator_note_categories_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.coordinator_note_reminders (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  note_id uuid,
+  coordinator_id character varying NOT NULL,
+  reminder_date timestamp with time zone NOT NULL,
+  reminder_type character varying NOT NULL,
+  is_sent boolean DEFAULT false,
+  sent_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT coordinator_note_reminders_pkey PRIMARY KEY (id),
+  CONSTRAINT coordinator_note_reminders_note_id_fkey FOREIGN KEY (note_id) REFERENCES public.coordinator_notes(id)
+);
+CREATE TABLE public.coordinator_note_templates (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  coordinator_id character varying NOT NULL,
+  name character varying NOT NULL,
+  description text,
+  template_content text NOT NULL,
+  category character varying,
+  default_tags ARRAY,
+  is_public boolean DEFAULT false,
+  usage_count integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT coordinator_note_templates_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.coordinator_notes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  coordinator_id character varying NOT NULL,
+  coordinator_name character varying NOT NULL,
+  coordinator_email character varying NOT NULL,
+  title character varying NOT NULL,
+  content text NOT NULL,
+  summary text,
+  category character varying NOT NULL,
+  priority character varying DEFAULT 'MEDIUM'::character varying,
+  status character varying DEFAULT 'ACTIVE'::character varying,
+  tags ARRAY,
+  keywords ARRAY,
+  note_date date NOT NULL DEFAULT CURRENT_DATE,
+  reminder_date timestamp with time zone,
+  due_date date,
+  related_student_ids ARRAY,
+  related_teacher_ids ARRAY,
+  related_attendance_ids ARRAY,
+  attachments jsonb DEFAULT '[]'::jsonb,
+  external_references jsonb DEFAULT '[]'::jsonb,
+  is_private boolean DEFAULT false,
+  is_pinned boolean DEFAULT false,
+  is_favorite boolean DEFAULT false,
+  version integer DEFAULT 1,
+  previous_version_id uuid,
+  edit_history jsonb DEFAULT '[]'::jsonb,
+  word_count integer DEFAULT 0,
+  reading_time_minutes integer DEFAULT 0,
+  view_count integer DEFAULT 0,
+  last_viewed_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  archived_at timestamp with time zone,
+  deleted_at timestamp with time zone,
+  CONSTRAINT coordinator_notes_pkey PRIMARY KEY (id),
+  CONSTRAINT coordinator_notes_previous_version_id_fkey FOREIGN KEY (previous_version_id) REFERENCES public.coordinator_notes(id)
+);
 CREATE TABLE public.coordinator_reports (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   report_type character varying NOT NULL,
