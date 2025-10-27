@@ -607,7 +607,7 @@ export default function ServicesPage() {
               </Button>
             </Link>
             <Link href="tel:(48)98461-4449">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white dark:bg-gray-950 hover:text-blue-600 dark:text-blue-400">
+              <Button size="lg" variant="outline" className="border-white bg-white/10 text-white hover:bg-white hover:text-blue-600 backdrop-blur-sm font-semibold">
                 <span className="mr-2">📞</span>
                 (48) 98461-4449
               </Button>
