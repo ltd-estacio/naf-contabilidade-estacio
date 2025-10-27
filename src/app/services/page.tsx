@@ -27,7 +27,8 @@ import {
   Calendar,
   Eye,
   Grid,
-  List
+  List,
+  LucideIcon
 } from 'lucide-react'
 
 interface NAFService {
@@ -78,7 +79,7 @@ interface ServiceStats {
   }
 }
 
-const iconMap: { [key: string]: unknown } = {
+const iconMap: { [key: string]: LucideIcon } = {
   Calculator,
   FileText,
   Users,
@@ -163,7 +164,7 @@ export default function ServicesPage() {
           setServices(servicesData)
           setStatsData(data)
         } else {
-          console.error('Erro ao buscar estatísticas de serviços:', data.error || data)
+          console.error('Erro ao buscar estatísticas de serviços:', data)
         }
       } catch (error) {
         console.error('Erro ao buscar estatísticas de serviços:', error)
@@ -181,7 +182,7 @@ export default function ServicesPage() {
     (service.subcategory?.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
-  const getIconComponent = (iconName?: string) => {
+  const getIconComponent = (iconName?: string): LucideIcon => {
     if (!iconName || !iconMap[iconName]) {
       return FileText
     }
