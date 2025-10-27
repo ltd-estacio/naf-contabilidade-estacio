@@ -9,13 +9,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Configuração do Nodemailer
+// Configuração do Nodemailer com credenciais corretas
+// Nota: A senha de app do Gmail pode ter espaços
+const emailUser = process.env.EMAIL_USER || 'souzaestevam925@gmail.com'
+const emailPassword = (process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASSWORD || 'kcvzqknlseiddy').replace(/\s/g, '') // Remove espaços
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER || 'naf.contabilidade@gmail.com',
-    pass: process.env.EMAIL_PASS || 'your-app-password'
+    user: emailUser,
+    pass: emailPassword
   }
+})
+
+console.log('📧 Nodemailer configurado:', {
+  user: emailUser,
+  passwordLength: emailPassword.length
 })
 
 /**
@@ -25,6 +34,8 @@ export async function POST(request: NextRequest) {
   console.log('🚀 API /api/backup/send-email CHAMADA!')
   console.log('🚀 Environment vars:', {
     hasEmailUser: !!process.env.EMAIL_USER,
+    emailUser: process.env.EMAIL_USER || 'souzaestevam925@gmail.com',
+    hasEmailAppPassword: !!process.env.EMAIL_APP_PASSWORD,
     hasEmailPass: !!process.env.EMAIL_PASS,
     hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
     hasSupabaseKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -239,7 +250,7 @@ export async function POST(request: NextRequest) {
     const mailOptions = {
       from: {
         name: 'NAF Contabilidade - Sistema de Backup',
-        address: process.env.EMAIL_USER || 'naf.contabilidade@gmail.com'
+        address: process.env.EMAIL_USER || 'souzaestevam925@gmail.com'
       },
       to: coordinatorEmail,
       subject: `🛡️ Backup NAF - ${backupDate} às ${backupTime}`,
