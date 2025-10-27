@@ -120,6 +120,9 @@ interface DashboardData {
     taxaConclusao: number
     tempoMedio: number
     satisfacao: number
+    pendentes?: number
+    urgentes?: number
+    estudantesAtivos?: number
   }
   services: ServiceMetrics[]
   students: StudentData[]
@@ -204,11 +207,17 @@ interface AutomationFormOption {
   description: string
 }
 
+interface User {
+  id: string
+  name?: string
+  email?: string
+}
+
 export default function CoordinatorDashboard() {
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [error, setError] = useState('')
-  const [user, setUser] = useState<unknown>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [chatNotifications, setChatNotifications] = useState(0)
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedAutomationForm, setSelectedAutomationForm] = useState('ficha-servico')
@@ -634,7 +643,7 @@ export default function CoordinatorDashboard() {
       }
 
     } catch (error: unknown) {
-      const message = error?.message || 'Erro inesperado durante o preview.'
+      const message = error instanceof Error ? error.message : 'Erro inesperado durante o preview.'
       setBackupError(message)
       updateBackupHistory({
         id: generateId(),
@@ -742,7 +751,7 @@ export default function CoordinatorDashboard() {
       })
 
     } catch (error: unknown) {
-      const message = error?.message || 'Erro inesperado ao baixar o backup.'
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao baixar o backup.'
       setBackupError(message)
       updateBackupHistory({
         id: generateId(),
@@ -1307,16 +1316,15 @@ export default function CoordinatorDashboard() {
                 <p className="mt-1 text-sm font-medium text-slate-700">Renovação em <span className="text-blue-600">03/05/2026</span></p>
                 <p className="mt-1 text-xs text-slate-500">Gerenciado via <span className="font-semibold text-blue-600">registro.br</span></p>
               </div>
-              <Button
-                asChild
-                size="sm"
-                className="bg-blue-600 text-white hover:bg-blue-700"
-              >
-                <Link href="https://registro.br/painel/" target="_blank" rel="noreferrer">
+              <Link href="https://registro.br/painel/" target="_blank" rel="noreferrer">
+                <Button
+                  size="sm"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                >
                   Acessar Registro.br
                   <ArrowRight className="ml-2 h-3 w-3" />
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </div>
           </div>
         </button>
@@ -2666,16 +2674,16 @@ export default function CoordinatorDashboard() {
                           >
                             Limpar seleção
                           </Button>
-                          <Button asChild size="sm" variant="ghost" className="text-slate-600 hover:text-blue-600">
-                            <Link
-                              href="https://github.com/ltd-2025-02/naf-contabilidade-estacio/blob/main/doc/ATUALIZACAO_REGISTRO_ATENDIMENTOS.md"
-                              target="_blank"
-                              rel="noreferrer"
-                            >
+                          <Link
+                            href="https://github.com/ltd-2025-02/naf-contabilidade-estacio/blob/main/doc/ATUALIZACAO_REGISTRO_ATENDIMENTOS.md"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Button size="sm" variant="ghost" className="text-slate-600 hover:text-blue-600">
                               <FileText className="mr-2 h-4 w-4" />
                               Guia rápido
-                            </Link>
-                          </Button>
+                            </Button>
+                          </Link>
                         </div>
                       </div>
                     </div>
@@ -2870,12 +2878,12 @@ export default function CoordinatorDashboard() {
                 <div className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-sm">
                   <h4 className="text-sm font-semibold text-slate-700">Ações rápidas</h4>
                   <div className="mt-3 flex flex-col gap-2">
-                    <Button asChild variant="outline" className="justify-start">
-                      <Link href={domainRegistrarUrl} target="_blank" rel="noreferrer">
+                    <Link href={domainRegistrarUrl} target="_blank" rel="noreferrer">
+                      <Button variant="outline" className="justify-start w-full">
                         <ArrowRight className="mr-2 h-4 w-4" />
                         Abrir painel do registro.br
-                      </Link>
-                    </Button>
+                      </Button>
+                    </Link>
                     <Button variant="ghost" className="justify-start text-slate-600 hover:text-blue-600">
                       <CalendarClock className="mr-2 h-4 w-4 text-blue-500" />
                       Agendar lembrete no calendário institucional
