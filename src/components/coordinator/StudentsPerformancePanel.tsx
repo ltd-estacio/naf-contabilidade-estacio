@@ -284,37 +284,55 @@ NAF Estácio Florianópolis
   }
 
   const confirmRemove = async () => {
-    if (!selectedStudent) return
+    if (!selectedStudent) {
+      console.error('❌ Nenhum estudante selecionado')
+      alert('Erro: Nenhum estudante selecionado')
+      return
+    }
 
     setActionLoading(true)
     setError('') // Limpar erros anteriores
 
     try {
-      console.log('🗑️ Removendo estudante:', selectedStudent.id, 'Motivo:', removeReason)
+      console.log('🗑️ Removendo estudante:', {
+        id: selectedStudent.id,
+        name: selectedStudent.name,
+        reason: removeReason
+      })
 
       const response = await fetch('/api/students/remove', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studentId: selectedStudent.id,
-          reason: removeReason
+          reason: removeReason || 'MANUAL_REMOVAL'
         })
       })
+
+      console.log('📡 Status da resposta:', response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Erro HTTP:', response.status, errorText)
+        throw new Error(`Erro HTTP ${response.status}: ${errorText}`)
+      }
 
       const data = await response.json()
       console.log('📥 Resposta da API:', data)
 
       if (data.success) {
         console.log('✅ Estudante removido com sucesso')
-        // Recarregar lista de estudantes
-        await loadStudents()
         setRemoveModalOpen(false)
         setRemoveReason('')
+        setSelectedStudent(null)
+        
+        // Recarregar lista de estudantes
+        await loadStudents()
+        
         alert(`Estudante ${selectedStudent.name} removido com sucesso!`)
       } else {
-        console.error('❌ Erro na resposta:', data.error)
-        setError(`Erro ao remover estudante: ${data.error || 'Erro desconhecido'}`)
-        alert(`Erro ao remover estudante: ${data.error || 'Erro desconhecido'}`)
+        console.error('❌ API retornou success: false', data.error)
+        throw new Error(data.error || 'Erro desconhecido ao remover estudante')
       }
     } catch (err) {
       console.error('❌ Erro ao remover estudante:', err)
@@ -372,18 +390,47 @@ NAF Estácio Florianópolis
   // Verificar estudantes graduados (executar verificação automática)
   const checkGraduatedStudents = async () => {
     setActionLoading(true)
+    setError('')
+    
     try {
+      console.log('🎓 Verificando estudantes graduados...')
+      
       const response = await fetch('/api/students/graduation/check', {
         method: 'POST'
       })
+
+      console.log('📡 Status da resposta:', response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Erro HTTP:', response.status, errorText)
+        throw new Error(`Erro HTTP ${response.status}`)
+      }
+
       const data = await response.json()
+      console.log('📥 Resposta da API:', data)
 
       if (data.success) {
-        alert(`${data.totalProcessed} estudante(s) processado(s)`)
+        const total = data.totalProcessed || 0
+        const students = data.studentsProcessed || []
+        
+        console.log(`✅ ${total} estudante(s) processado(s)`, students)
+        
+        if (total > 0) {
+          alert(`✅ ${total} estudante(s) graduado(s) identificado(s) e marcado(s)!`)
+        } else {
+          alert('ℹ️ Nenhum estudante em condições de graduação foi encontrado.')
+        }
+        
         await loadStudents()
+      } else {
+        throw new Error(data.error || 'Erro desconhecido')
       }
     } catch (err) {
-      console.error('Erro ao verificar graduados:', err)
+      console.error('❌ Erro ao verificar graduados:', err)
+      const errorMsg = err instanceof Error ? err.message : 'Erro de conexão'
+      setError(`Erro ao verificar graduados: ${errorMsg}`)
+      alert(`❌ Erro ao verificar graduados: ${errorMsg}`)
     } finally {
       setActionLoading(false)
     }

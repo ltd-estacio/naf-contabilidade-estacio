@@ -1988,10 +1988,10 @@ export default function CoordinatorDashboard() {
                       size="sm"
                       variant="outline"
                       className="w-full"
-                      onClick={() => setSelectedStudentPortalView('trainings')}
+                      onClick={() => setActiveTab('courses')}
                     >
                       <BookOpen className="h-3 w-3 mr-1" />
-                      Acompanhar
+                      Ver Cursos
                     </Button>
                   </div>
 
