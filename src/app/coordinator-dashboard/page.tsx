@@ -811,7 +811,6 @@ export default function CoordinatorDashboard() {
     
     // Executar ação após verificação
     try {
-      const userObj = user as Record<string, unknown>
       const response = await fetch('/api/coordinator/danger-zone', {
         method: 'POST',
         headers: {
@@ -820,9 +819,9 @@ export default function CoordinatorDashboard() {
         body: JSON.stringify({
           action: pendingDangerAction,
           twoFactorCode: twoFactorCode,
-          coordinatorId: userObj?.id || 'coord-1',
-          coordinatorEmail: userObj?.email || 'coordenador@naf.edu.br',
-          coordinatorName: userObj?.name || 'Coordenador NAF'
+          coordinatorId: user?.id || 'coord-1',
+          coordinatorEmail: user?.email || 'coordenador@naf.edu.br',
+          coordinatorName: user?.name || 'Coordenador NAF'
         })
       })
 
