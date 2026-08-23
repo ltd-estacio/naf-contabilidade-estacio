@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Eye, EyeOff, User, ArrowLeft, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { getSemestersForCourse, getCourseInfo } from '@/config/courseDurations'
+import { loadTurnstile, ensureHuman, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client'
 
 interface StudentData {
   email: string
@@ -42,6 +43,8 @@ interface StudentData {
 
 export default function StudentRegister() {
   const router = useRouter()
+
+  useEffect(() => { loadTurnstile(); }, [])
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -346,6 +349,7 @@ export default function StudentRegister() {
     setLoading(true)
     setError('')
 
+    const __h = await ensureHuman(); if (!__h.ok) { setError(__h.reason || 'Verificação anti-robô falhou.'); setLoading(false); return; }
     try {
       // Adicionar ano e semestre de cadastro
       const registrationData = {
@@ -782,6 +786,13 @@ export default function StudentRegister() {
                 </div>
               </div>
             )}
+
+            {step === 4 && TURNSTILE_SITE_KEY && (
+
+              <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-theme="auto" data-language="pt-br" data-size="flexible" />
+
+            )}
+
 
             {/* Navigation buttons */}
             <div className="flex justify-between pt-6">

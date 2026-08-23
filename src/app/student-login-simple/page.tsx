@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,9 +27,12 @@ import Link from 'next/link'
 import DashboardInlineNav from '@/components/DashboardInlineNav'
 import Footer from '@/components/Footer'
 import studentSession from '@/lib/studentSession'
+import { loadTurnstile, ensureHuman, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client'
 
 export default function StudentLoginSimple() {
   const router = useRouter()
+
+  useEffect(() => { loadTurnstile(); }, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -40,6 +43,7 @@ export default function StudentLoginSimple() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    const __h = await ensureHuman(); if (!__h.ok) { setError(__h.reason || 'Verificação anti-robô falhou.'); setLoading(false); return; }
 
     try {
       const response = await fetch('/api/students/auth/simple-login', {
@@ -217,6 +221,13 @@ export default function StudentLoginSimple() {
                         <AlertDescription>{error}</AlertDescription>
                       </Alert>
                     )}
+
+                    {TURNSTILE_SITE_KEY && (
+
+                      <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-theme="auto" data-language="pt-br" data-size="flexible" />
+
+                    )}
+
 
                     <Button
                       type="submit"

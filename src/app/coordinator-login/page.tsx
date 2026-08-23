@@ -12,6 +12,7 @@ import { Eye, EyeOff, Lock, Mail, Shield, BarChart3, CheckCircle2, Users, Buildi
 import Link from 'next/link'
 import MainNavigation from '@/components/MainNavigation'
 import Footer from '@/components/Footer'
+import { loadTurnstile, ensureHuman, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client'
 
 export default function CoordinatorLogin() {
   const [email, setEmail] = useState('')
@@ -21,10 +22,13 @@ export default function CoordinatorLogin() {
   const [error, setError] = useState('')
   const router = useRouter()
 
+
+  useEffect(() => { loadTurnstile(); }, [])
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    const __h = await ensureHuman(); if (!__h.ok) { setError(__h.reason || 'Verificação anti-robô falhou.'); setLoading(false); return; }
 
     try {
       const response = await fetch('/api/coordinator/auth/login', {
@@ -150,6 +154,13 @@ export default function CoordinatorLogin() {
                   </button>
                 </div>
                   </div>
+
+                  {TURNSTILE_SITE_KEY && (
+
+                    <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-theme="auto" data-language="pt-br" data-size="flexible" />
+
+                  )}
+
 
                   <Button
                     type="submit"

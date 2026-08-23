@@ -1,36 +1,22 @@
-# Node / Vite
 node_modules/
-package-lock.json
-.vite/
-.dist/
+.next/
+.env
+.env.*
+!.env.example
+.vercel/
 dist/
 build/
-
-# Next / React
-.next/
 out/
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-*_log.txt
-*.log
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Editor / OS
+.turbo/
+*.tsbuildinfo
 .DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.swp
-
-# SQLite
-*.db
-*.sqlite
-*.sqlite3
-playwright-bin/
+.sec-scan/
+supabase.txt
+env.txt
+.env.txt
+secrets.txt
+credentials.txt
+*.pem
+*.key
+creds.txt
+keys.txt

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Lock, Mail, Building2 } from "lucide-react"
+import { loadTurnstile, ensureHuman, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client'
 
 export default function NAFLogin() {
   const [email, setEmail] = useState('')
@@ -17,10 +18,13 @@ export default function NAFLogin() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
+
+  useEffect(() => { loadTurnstile(); }, [])
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
+    const __h = await ensureHuman(); if (!__h.ok) { setError(__h.reason || 'Verificação anti-robô falhou.'); setLoading(false); return; }
 
     try {
       const response = await fetch('/api/naf/auth/login', {
@@ -122,6 +126,13 @@ export default function NAFLogin() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+
+            {TURNSTILE_SITE_KEY && (
+
+              <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-theme="auto" data-language="pt-br" data-size="flexible" />
+
+            )}
+
 
             <Button
               type="submit"

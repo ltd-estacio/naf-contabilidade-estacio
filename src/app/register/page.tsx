@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import { loadTurnstile, ensureHuman, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -24,10 +25,13 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  useEffect(() => { loadTurnstile(); }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
+    const __h = await ensureHuman(); if (!__h.ok) { setError(__h.reason || 'Verificação anti-robô falhou.'); setIsLoading(false); return; }
     setSuccess('')
     
     // Validação básica
@@ -332,6 +336,13 @@ export default function RegisterPage() {
                   </Link>
                 </label>
               </div>
+
+              {TURNSTILE_SITE_KEY && (
+
+                <div className="cf-turnstile" data-sitekey={TURNSTILE_SITE_KEY} data-theme="auto" data-language="pt-br" data-size="flexible" />
+
+              )}
+
 
               <Button
                 type="submit"
